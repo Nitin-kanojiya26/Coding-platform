@@ -284,3 +284,74 @@ exports.getBookmarks = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// @desc    Get user's streak (current and max)
+// @route   GET /api/users/streak
+// @access  Private
+exports.getUserStreak = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get all submission dates (distinct) for this user
+    const submissions = await Submission.find({ user: userId })
+      .select('submittedAt')
+      .sort({ submittedAt: 1 }); // oldest first
+
+    if (!submissions.length) {
+      return res.status(200).json({
+        status: 'success',
+        data: { currentStreak: 0, maxStreak: 0 },
+      });
+    }
+
+    // Extract unique dates (YYYY-MM-DD)
+    const dates = submissions.map(s => s.submittedAt.toISOString().split('T')[0]);
+    const uniqueDates = [...new Set(dates)].sort();
+
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let streak = 0;
+    let prevDate = null;
+
+    // Go through dates from oldest to newest
+    for (const dateStr of uniqueDates) {
+      const current = new Date(dateStr);
+      if (prevDate === null) {
+        streak = 1;
+      } else {
+        const diff = (current - prevDate) / (1000 * 60 * 60 * 24);
+        if (diff === 1) {
+          streak++;
+        } else {
+          streak = 1;
+        }
+      }
+      prevDate = current;
+      maxStreak = Math.max(maxStreak, streak);
+    }
+
+    // Compute current streak: count from today backwards
+    // We'll check if today has submissions, then count back
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let current = 0;
+    let checkDate = new Date(today);
+    // Check up to 365 days back
+    for (let i = 0; i < 365; i++) {
+      const dateStr = checkDate.toISOString().split('T')[0];
+      if (uniqueDates.includes(dateStr)) {
+        current++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    currentStreak = current;
+
+    res.status(200).json({
+      status: 'success',
+      data: { currentStreak, maxStreak },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
