@@ -2,6 +2,7 @@
 const User = require('../models/Users');
 const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
+const Login = require('../models/Login');
 const { sendOTPEmail } = require('../services/emailService');
 
 // Helper to sign JWT tokens
@@ -112,6 +113,7 @@ exports.loginUser = async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
+        await Login.create({ user: user._id });
 
         res.status(200).json({
             status: 'success',

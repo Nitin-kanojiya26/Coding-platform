@@ -1,6 +1,7 @@
 const User = require('../models/Users');
 const Submission = require('../models/Submission');
 const Problem = require('../models/Problem');
+const Login=require('../models/Login')
 
 // @desc    Get user profile with populated solved problems
 // @route   GET /api/users/profile
@@ -280,6 +281,21 @@ exports.getBookmarks = async (req, res) => {
       count: user.bookmarkedProblems.length,
       bookmarks: user.bookmarkedProblems,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// GET /api/users/login-activity – returns list of dates (YYYY-MM-DD)
+exports.getLoginActivity = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const logins = await Login.find({
+      user: userId,
+      loggedAt: { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+    }).select('loggedAt -_id');
+
+    const dates = logins.map(l => l.loggedAt.toISOString().split('T')[0]);
+    res.status(200).json({ status: 'success', data: dates });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

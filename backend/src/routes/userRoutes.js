@@ -11,7 +11,8 @@ const {
   getBookmarks,
   removeBookmark,
   bookmarkProblem,
-  getUserStreak
+  getUserStreak,
+  getLoginActivity
 } = require('../controllers/userController');
 
 router.get('/profile', protect, getUserProfile);
@@ -23,5 +24,6 @@ router.get('/activity', protect, getRecentActivity);
 router.post('/problems/:id/bookmark', protect, bookmarkProblem);
 router.delete('/problems/:id/bookmark', protect, removeBookmark);
 router.get('/bookmarks', protect, getBookmarks);
+router.get('/login-activity', protect, getLoginActivity);
 router.get('/streak', protect, getUserStreak);
 module.exports = router;
