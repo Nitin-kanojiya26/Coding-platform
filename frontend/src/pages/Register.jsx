@@ -44,98 +44,118 @@ export default function Register() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#0f172a] px-4 py-12">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.03),transparent_65%)]" />
+    /* OUTER BOX ENVIRONMENT: Clean, flat pure dark black void layer */
+    <div className="relative flex min-h-screen items-center justify-center bg-[#000000] px-4 py-12 antialiased select-none">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.01),transparent_50%)] pointer-events-none" />
 
-      <div className="z-10 w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl shadow-2xl">
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-xl shadow-cyan-500/10 transition-transform hover:scale-105">
-            <Terminal className="h-6 w-6 text-white" />
+      {/* INNER BOX CONTAINER: Elevated matte charcoal shield maximizing panel contrast */}
+      <div className="z-10 w-full max-w-md space-y-7 rounded-2xl border border-zinc-800/80 bg-[#0a0a0c] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
+        
+        {/* Brand Header */}
+        <div className="flex flex-col items-center text-center space-y-4">
+          {/* Logo container using matching vibrant gradient framework */}
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-transform duration-300 hover:scale-105">
+            <Terminal className="h-5 w-5 text-white" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white mt-2">Initialize Account</h2>
-          <p className="text-sm text-slate-400">Step {step} of 2: {step === 1 ? 'Identity Binding' : 'Node Verification'}</p>
+          
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-wide text-slate-100">
+              Initialize <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 font-black">Workspace</span>
+            </h2>
+            <p className="text-[11px] text-zinc-500 font-medium tracking-normal">
+              Step {step} of 2: {step === 1 ? 'Identity Binding' : 'Node Verification'}
+            </p>
+          </div>
         </div>
 
+        {/* System Error Notification Container */}
         {error && (
-          <div className="flex items-start gap-3 rounded-xl bg-rose-500/10 p-4 border border-rose-500/20 text-rose-400 text-sm animate-in fade-in duration-200">
-            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-            <p>{error}</p>
+          <div className="flex items-start gap-3 rounded-xl bg-rose-950/20 p-3.5 border border-rose-900/40 text-rose-400 text-xs animate-in fade-in duration-200">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" />
+            <p className="font-medium tracking-tight">{error}</p>
           </div>
         )}
 
+        {/* System Information Notification Container */}
         {infoMessage && step === 2 && (
-          <div className="flex items-start gap-3 rounded-xl bg-cyan-500/10 p-4 border border-cyan-500/20 text-cyan-400 text-sm animate-in fade-in duration-200">
-            <ShieldCheck className="h-5 w-5 shrink-0 mt-0.5" />
-            <p>{infoMessage}</p>
+          <div className="flex items-start gap-3 rounded-xl bg-sky-950/20 p-3.5 border border-sky-900/40 text-sky-400 text-xs animate-in fade-in duration-200">
+            <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-sky-500" />
+            <p className="font-medium tracking-tight">{infoMessage}</p>
           </div>
         )}
 
+        {/* Input Validation Suite */}
         {step === 1 ? (
           <form onSubmit={handleRequestOTP} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
                 Display Name
               </label>
-              <div className="relative">
-                <User className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <div className="relative group rounded-xl">
+                <User className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-zinc-600 transition-colors group-focus-within:text-space-blue" />
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  className="w-full rounded-xl border border-zinc-900 bg-[#000000] py-2.5 pr-4 pl-10 text-xs text-slate-200 placeholder-zinc-700 outline-none transition-all duration-150 focus:border-zinc-700 focus:bg-[#020202]"
                   placeholder="John Doe"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
                 Email Address
               </label>
-              <div className="relative">
-                <Mail className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <div className="relative group rounded-xl">
+                <Mail className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-zinc-600 transition-colors group-focus-within:text-space-blue" />
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-                  placeholder="name@domain.com"
+                  className="w-full rounded-xl border border-zinc-900 bg-[#000000] py-2.5 pr-4 pl-10 text-xs text-slate-200 placeholder-zinc-700 outline-none transition-all duration-150 focus:border-zinc-700 focus:bg-[#020202]"
+                  placeholder="identity@domain.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
                 Secure Password
               </label>
-              <div className="relative">
-                <Lock className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <div className="relative group rounded-xl">
+                <Lock className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-zinc-600 transition-colors group-focus-within:text-space-blue" />
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  className="w-full rounded-xl border border-zinc-900 bg-[#000000] py-2.5 pr-4 pl-10 text-xs text-slate-200 placeholder-zinc-700 outline-none transition-all duration-150 focus:border-zinc-700 focus:bg-[#020202]"
                   placeholder="••••••••"
                 />
               </div>
             </div>
 
+            {/* Action Trigger Button */}
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition-all duration-200 hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+              className="flex w-full items-center justify-center rounded-xl bg-space-blue border border-space-blue/50 py-2.5 text-xs font-bold text-white hover:bg-space-blue/90 shadow-[0_4px_20px_rgba(29,78,216,0.15)] transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
             >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Request Security Code'}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-white" />
+              ) : (
+                'Request Security Token'
+              )}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyOTP} className="space-y-4">
+          <form onSubmit={handleVerifyOTP} className="space-y-5">
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
-                One‑Time Validation Token
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                One-Time Validation Token
               </label>
               <input
                 type="text"
@@ -143,7 +163,7 @@ export default function Register() {
                 maxLength="6"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                className="w-full tracking-widest text-center font-mono rounded-xl border border-slate-800 bg-slate-900/50 py-3 text-lg text-white outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                className="w-full tracking-[0.6em] text-center font-mono rounded-xl border border-zinc-900 bg-[#000000] py-3 text-base text-slate-200 placeholder-zinc-800 outline-none transition-all duration-150 focus:border-zinc-700 focus:bg-[#020202]"
                 placeholder="000000"
               />
             </div>
@@ -152,24 +172,32 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-1/3 rounded-xl border border-slate-800 py-2.5 text-xs font-medium text-slate-400 hover:bg-slate-800 transition-colors duration-200"
+                className="w-1/3 rounded-xl border border-zinc-900 py-2.5 text-xs font-semibold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/30 transition-all duration-150 active:scale-[0.98]"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 flex items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+                className="flex-1 flex items-center justify-center rounded-xl bg-space-blue border border-space-blue/50 py-2.5 text-xs font-bold text-white hover:bg-space-blue/90 shadow-[0_4px_20px_rgba(29,78,216,0.15)] transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Verify Token'}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                ) : (
+                  'Verify Token'
+                )}
               </button>
             </div>
           </form>
         )}
 
-        <div className="text-center text-sm text-slate-500">
+        {/* Footer Navigation Cluster */}
+        <div className="text-center text-xs text-zinc-500 font-medium pt-2">
           Already verified?{' '}
-          <Link to="/login" className="font-medium text-cyan-400 hover:underline transition-colors duration-200">
+          <Link 
+            to="/login" 
+            className="font-bold text-space-blue hover:underline transition-colors duration-150"
+          >
             Log In
           </Link>
         </div>

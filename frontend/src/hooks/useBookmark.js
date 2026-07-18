@@ -13,8 +13,9 @@ export function useBookmark(problemId) {
     const checkBookmark = async () => {
       try {
         const res = await API.get('/users/bookmarks');
-        const bookmarks = res.data.bookmarks || [];
-        const found = bookmarks.some((b) => b._id === problemId);
+        // ✅ Handle both response shapes
+        const bookmarks = res.data.bookmarks || res.data.data || [];
+        const found = bookmarks.some((b) => b._id.toString() === problemId.toString());
         setIsBookmarked(found);
       } catch (err) {
         console.error('Failed to check bookmark status', err);
@@ -24,18 +25,18 @@ export function useBookmark(problemId) {
   }, [user, problemId]);
 
   const toggleBookmark = async () => {
-    if (!user) return;
+    if (!user || !problemId) return;
     setLoading(true);
     try {
       if (isBookmarked) {
-        await API.delete(`/problems/${problemId}/bookmark`);
+        await API.delete(`/users/problems/${problemId}/bookmark`);
         setIsBookmarked(false);
       } else {
-        await API.post(`/problems/${problemId}/bookmark`);
+        await API.post(`/users/problems/${problemId}/bookmark`);
         setIsBookmarked(true);
       }
     } catch (err) {
-      console.error('Bookmark toggle failed', err);
+      console.error('Bookmark toggle failed:', err.response?.data || err.message);
     } finally {
       setLoading(false);
     }

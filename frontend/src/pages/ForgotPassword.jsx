@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API from '../api/client';
 import { Mail, Loader2, AlertCircle } from 'lucide-react';
 
 export default function ForgotPassword() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -17,6 +18,10 @@ export default function ForgotPassword() {
     try {
       const res = await API.post('/auth/forgot-password', { email });
       setMessage(res.data.message || 'Reset code sent to your email.');
+      // ✅ Navigate to reset page after 1.5s
+      setTimeout(() => {
+        navigate('/reset-password', { state: { email } });
+      }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Request failed.');
     } finally {

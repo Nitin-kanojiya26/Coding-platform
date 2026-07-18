@@ -1,28 +1,49 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import API from '../api/client';
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  
+  // Pre-fill email from navigation state (optional)
+  const [email, setEmail] = useState(location.state?.email || '');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setMessage('');
+    
     try {
-      const res = await API.post('/auth/reset-password', { email, otp, password });
-      setMessage(res.data.message || 'Password updated. You can now log in.');
+      const res = await API.post('/auth/reset-password', { 
+        email, 
+        otp, 
+        password 
+      });
+      setMessage(res.data.message || 'Password updated successfully.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Reset failed.');
+      setError(err.response?.data?.message || 'Reset failed. Please check your OTP.');
     } finally {
       setLoading(false);
     }
@@ -32,8 +53,13 @@ export default function ResetPassword() {
     <div className="relative flex min-h-screen items-center justify-center bg-[#0f172a] px-4 py-12">
       <div className="z-10 w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl shadow-2xl">
         <div className="text-center">
+          <div className="flex justify-center mb-3">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <ShieldCheck className="h-6 w-6 text-white" />
+            </div>
+          </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Set New Password</h2>
-          <p className="text-sm text-slate-400 mt-1">Enter the reset code and your new password.</p>
+          <p className="text-sm text-slate-400 mt-1">Enter the OTP sent to your email and create a new password.</p>
         </div>
 
         {message && (
@@ -49,6 +75,7 @@ export default function ResetPassword() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Email */}
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
               Email Address
@@ -66,21 +93,23 @@ export default function ResetPassword() {
             </div>
           </div>
 
+          {/* OTP */}
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
-              Reset Code (OTP)
+              OTP Code
             </label>
             <input
               type="text"
               required
               maxLength="6"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 px-4 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 px-4 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-center tracking-widest font-mono"
               placeholder="123456"
             />
           </div>
 
+          {/* New Password */}
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
               New Password
@@ -99,12 +128,31 @@ export default function ResetPassword() {
             </div>
           </div>
 
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <input
+                type="password"
+                required
+                minLength="6"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
             className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition-all duration-200 hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
           >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Update Password'}
+            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Reset Password'}
           </button>
         </form>
 

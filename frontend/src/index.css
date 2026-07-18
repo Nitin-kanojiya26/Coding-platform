@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cyber-black: #060608;
-  --color-matrix-gray: #0b0b0f;
-  --color-terminal-dark: #0f1016;
-  --color-neon-cyan: #00f0ff;
-  --color-neon-purple: #bd00ff;
-  --color-neon-emerald: #00ff66;
-  --color-neon-rose: #ff0055;
-  --color-neon-amber: #ffaa00;
-}
+  /* Color Palette Variables */
+  --color-space-950: #09111e; /* Sidebar */
+  --color-space-900: #0e1726; /* Main BG */
+  --color-space-850: #131c2d; /* Cards */
+  --color-space-800: #162235; /* Pills & Active Inputs */
+  --color-space-700: #1b2536; /* Default Borders */
+  --color-space-blue: #1d4ed8; /* Glow Border Blue */
 
+  /* Glow Utilities */
+  --shadow-blue-glow: 0 0 12px rgba(37, 99, 235, 0.25);
+}
 @layer base {
   body {
     background-color: #0f172a;

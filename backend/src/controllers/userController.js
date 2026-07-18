@@ -323,21 +323,21 @@ exports.getUserStreak = async (req, res) => {
     const dates = submissions.map(s => s.submittedAt.toISOString().split('T')[0]);
     const uniqueDates = [...new Set(dates)].sort();
 
-    let currentStreak = 0;
     let maxStreak = 0;
     let streak = 0;
     let prevDate = null;
 
-    // Go through dates from oldest to newest
+    // 1. Compute Max Streak (Go through dates from oldest to newest)
     for (const dateStr of uniqueDates) {
       const current = new Date(dateStr);
       if (prevDate === null) {
         streak = 1;
       } else {
         const diff = (current - prevDate) / (1000 * 60 * 60 * 24);
-        if (diff === 1) {
+        // Using Math.round to protect against floating-point daylight savings gaps
+        if (Math.round(diff) === 1) {
           streak++;
-        } else {
+        } else if (Math.round(diff) > 1) {
           streak = 1;
         }
       }
@@ -345,29 +345,48 @@ exports.getUserStreak = async (req, res) => {
       maxStreak = Math.max(maxStreak, streak);
     }
 
-    // Compute current streak: count from today backwards
-    // We'll check if today has submissions, then count back
+    // 2. Compute Current Streak dynamically with a rolling look-back
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let current = 0;
-    let checkDate = new Date(today);
-    // Check up to 365 days back
-    for (let i = 0; i < 365; i++) {
-      const dateStr = checkDate.toISOString().split('T')[0];
-      if (uniqueDates.includes(dateStr)) {
-        current++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        break;
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Determine starting checkpoint date for our backward scan
+    let checkDate;
+    if (uniqueDates.includes(todayStr)) {
+      checkDate = new Date(today);
+    } else if (uniqueDates.includes(yesterdayStr)) {
+      checkDate = new Date(yesterday);
+    } else {
+      checkDate = null; // Streak has fully broken (no submissions today or yesterday)
+    }
+
+    let currentStreak = 0;
+    if (checkDate) {
+      for (let i = 0; i < 365; i++) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        if (uniqueDates.includes(dateStr)) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break; // Hit a missing link in the chain
+        }
       }
     }
-    currentStreak = current;
 
-    res.status(200).json({
+    // Safeguard maxStreak parameter to ensure it never falls behind current calculations
+    if (currentStreak > maxStreak) {
+      maxStreak = currentStreak;
+    }
+
+    // Return exact signature expected by front-end framework
+    return res.status(200).json({
       status: 'success',
       data: { currentStreak, maxStreak },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ status: 'fail', message: error.message });
   }
 };

@@ -23,7 +23,6 @@ import MySubmissions from './pages/MySubmissions';
 import Settings from './pages/Settings';
 import CreateProblem from './pages/CreateProblem';
 
-
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -42,7 +41,6 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-
       {/* Protected */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

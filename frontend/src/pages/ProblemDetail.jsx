@@ -16,8 +16,28 @@ import {
   ChevronRight,
   CheckCircle,
   XCircle,
+  Copy,
+  Check,
+  X,
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
+
+// Language configuration
+const LANGUAGES = [
+  { id: 'cpp', label: 'C++ (GCC 14)', monaco: 'cpp' },
+  { id: 'java', label: 'Java (OpenJDK 21)', monaco: 'java' },
+  { id: 'python', label: 'Python 3', monaco: 'python' },
+  { id: 'javascript', label: 'JavaScript (Node.js)', monaco: 'javascript' },
+  { id: 'c', label: 'C (GCC 14)', monaco: 'c' },
+];
+
+const defaultTemplates = {
+  cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    return 0;\n}`,
+  java: `public class Solution {\n    public static void main(String[] args) {\n        // Your code here\n    }\n}`,
+  python: `# Your code here\n`,
+  javascript: `// Your code here\n`,
+  c: `#include <stdio.h>\n\nint main() {\n    // Your code here\n    return 0;\n}`,
+};
 
 export default function ProblemDetail() {
   const { slug } = useParams();
@@ -35,6 +55,8 @@ export default function ProblemDetail() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [showSample, setShowSample] = useState(true);
+  const [showComments, setShowComments] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const { isBookmarked, toggleBookmark, loading: bookmarkLoading } = useBookmark(problem?._id);
 
@@ -45,11 +67,9 @@ export default function ProblemDetail() {
         const p = res.data.problem || res.data;
         setProblem(p);
 
-        setCode(
-          p.language === 'java'
-            ? `public class Solution {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}`
-            : `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}`
-        );
+        const lang = p.language || 'cpp';
+        setLanguage(lang);
+        setCode(defaultTemplates[lang] || defaultTemplates.cpp);
 
         const cRes = await API.get(`/problems/${p._id}/comments`);
         setComments(cRes.data.comments || cRes.data || []);
@@ -107,199 +127,247 @@ export default function ProblemDetail() {
     }
   };
 
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (loading) {
     return (
-      <div className="flex h-[70vh] w-full items-center justify-center">
+      <div className="flex h-[70vh] w-full items-center justify-center bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-7rem)] overflow-hidden">
-      {/* Left Panel – Problem Description */}
-      <div className="lg:col-span-5 flex flex-col h-full overflow-y-auto space-y-4 pr-1">
-        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                <Cpu className="h-3.5 w-3.5" />
-                Problem
-              </div>
-              <h1 className="text-xl font-bold text-white mt-1">{problem?.title}</h1>
+    <div className="h-[calc(100vh-4rem)] overflow-hidden flex flex-col lg:flex-row gap-0 bg-black text-zinc-300">
+      
+      {/* ─── LEFT PANEL – Problem Description ─── */}
+      <div className="lg:w-[38%] flex flex-col overflow-y-auto border-r border-zinc-900/80 bg-black/95">
+        {/* Header */}
+        <div className="p-5 border-b border-zinc-900/80 flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
+              <Cpu className="h-3.5 w-3.5" />
+              Problem
             </div>
+            <h1 className="text-lg font-medium text-white mt-0.5 truncate">{problem?.title}</h1>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={toggleBookmark}
               disabled={bookmarkLoading}
-              className="p-2 rounded-lg hover:bg-slate-800 transition-all duration-200"
+              className="p-1.5 rounded-lg hover:bg-zinc-900/60 transition-colors"
             >
               <Bookmark
-                className={`h-6 w-6 transition-all duration-200 ${
-                  isBookmarked ? 'fill-cyan-400 text-cyan-400' : 'text-slate-500 hover:text-slate-300'
+                className={`h-5 w-5 transition-all ${
+                  isBookmarked ? 'fill-cyan-400 text-cyan-400' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               />
             </button>
+            {/* 🔥 Comment Icon with count */}
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                showComments ? 'text-cyan-400 bg-cyan-500/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
+              }`}
+            >
+              <MessageSquare className="h-5 w-5" />
+              <span className="text-xs font-mono">{comments.length}</span>
+            </button>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <DifficultyBadge difficulty={problem?.difficulty} />
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs text-slate-400">
-              ⏱ {problem?.timeLimit || 1000}ms
-            </span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs text-slate-400">
-              💾 {problem?.memoryLimit || 128}MB
-            </span>
-          </div>
-
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line border-t border-slate-800 pt-4">
+        {/* Body */}
+        <div className="p-5 space-y-5 flex-1">
+          {/* Description */}
+          <div className="text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap font-sans">
             {problem?.description}
-          </p>
+          </div>
 
+          {/* Constraints */}
           {problem?.constraints && (
-            <div className="rounded-xl bg-slate-800/30 border border-slate-800 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <div>
+              <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider mb-1.5">
                 Constraints
-              </p>
-              <p className="text-sm text-slate-300 mt-1">{problem.constraints}</p>
+              </div>
+              <ul className="text-sm space-y-1 text-zinc-400 font-mono">
+                {problem.constraints.split('\n').filter(Boolean).map((c, i) => (
+                  <li key={i} className="before:content-['▹'] before:text-cyan-700 before:mr-2">
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Sample Test Cases */}
+          {problem?.sampleTestCases?.length > 0 && (
+            <div className="border border-zinc-900/80 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowSample(!showSample)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors text-sm font-mono"
+              >
+                <span className="flex items-center gap-2 text-zinc-300">
+                  {showSample ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  Sample Test Cases
+                </span>
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">▸</span>
+              </button>
+              {showSample && (
+                <div className="px-4 py-3 space-y-3 border-t border-zinc-900/80">
+                  {problem.sampleTestCases.map((tc, i) => (
+                    <div key={i} className="bg-zinc-900/20 rounded-lg p-3 text-sm font-mono">
+                      <div>
+                        <span className="text-cyan-400">Input:</span> {tc.input}
+                      </div>
+                      <div>
+                        <span className="text-emerald-400">Output:</span> {tc.output}
+                      </div>
+                      {tc.explanation && (
+                        <div className="mt-1 text-xs text-zinc-500 border-t border-zinc-900/60 pt-1.5">
+                          {tc.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Comments Panel (toggleable) */}
+          {showComments && (
+            <div className="border-t border-zinc-900/80 pt-4 animate-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono text-zinc-400">
+                  💬 {comments.length} comments
+                </span>
+                <button
+                  onClick={() => setShowComments(false)}
+                  className="text-zinc-500 hover:text-zinc-300 p-1 rounded"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                {comments.map((c, i) => (
+                  <div key={i} className="bg-zinc-900/30 border border-zinc-900/60 rounded-lg p-3 text-sm">
+                    <div className="flex justify-between text-[10px] text-zinc-500 font-mono mb-0.5">
+                      <span className="text-cyan-400">{c.user?.name || 'Anonymous'}</span>
+                      <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-zinc-300">{c.text}</p>
+                  </div>
+                ))}
+                <form onSubmit={handlePostComment} className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Write your solution approach..."
+                    className="flex-1 bg-zinc-900/60 border border-zinc-900/80 px-3 py-2 text-sm text-white placeholder-zinc-600 rounded-lg focus:border-cyan-500 outline-none transition-colors"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Post
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </div>
-
-        {/* Sample Test Cases */}
-        {problem?.sampleTestCases?.length > 0 && (
-          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setShowSample(!showSample)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-800/30 transition-colors duration-200"
-            >
-              <span className="font-medium text-slate-300">Sample Test Cases</span>
-              {showSample ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
-            </button>
-            {showSample && (
-              <div className="px-6 py-4 border-t border-slate-800 space-y-3">
-                {problem.sampleTestCases.map((tc, i) => (
-                  <div key={i} className="bg-slate-800/30 rounded-lg p-3 text-sm">
-                    <div>
-                      <span className="text-slate-500">Input:</span>
-                      <code className="ml-2 text-cyan-300 font-mono">{tc.input}</code>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Output:</span>
-                      <code className="ml-2 text-emerald-300 font-mono">{tc.output}</code>
-                    </div>
-                    {tc.explanation && <p className="text-xs text-slate-400 mt-1">{tc.explanation}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Comments */}
-        <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-xs font-medium text-purple-400 uppercase tracking-wider">
-            <MessageSquare className="h-3.5 w-3.5" />
-            Discussion ({comments.length})
-          </div>
-
-          <form onSubmit={handlePostComment} className="flex gap-2">
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Write a comment..."
-              className="flex-1 px-4 py-2 rounded-xl border border-slate-800 bg-slate-900/50 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500 transition-all duration-200"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-xl text-white text-sm font-medium transition-all duration-200 hover:scale-[1.02]"
-            >
-              Post
-            </button>
-          </form>
-
-          <div className="space-y-3 max-h-40 overflow-y-auto">
-            {comments.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No comments yet.</p>
-            ) : (
-              comments.map((c, i) => (
-                <div key={i} className="text-sm p-3 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span className="font-medium text-slate-300">{c.user?.name || 'Unknown'}</span>
-                    <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-slate-300 mt-1">{c.text}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Right Panel – Code Editor */}
-      <div className="lg:col-span-7 flex flex-col h-full bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="flex h-12 w-full items-center justify-between bg-slate-800/50 px-4 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-xs font-mono font-medium uppercase tracking-widest text-slate-400">
-              Editor
-            </span>
+      {/* ─── RIGHT PANEL – Editor & Terminal ─── */}
+      <div className="lg:w-[62%] flex flex-col h-full bg-black">
+        {/* Editor Toolbar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-zinc-950/80 border-b border-zinc-900/80 flex-shrink-0">
+          <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
+            <span className="text-cyan-400">●</span>
+            <span className="uppercase tracking-wider">Workspace</span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-400">Ready</span>
           </div>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-mono text-slate-300 outline-none focus:border-cyan-500 cursor-pointer transition-all duration-200"
-          >
-            <option value="cpp">C++ (GCC 14)</option>
-            <option value="java">Java (OpenJDK 21)</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={language}
+              onChange={(e) => {
+                const newLang = e.target.value;
+                setLanguage(newLang);
+                setCode(defaultTemplates[newLang] || defaultTemplates.cpp);
+              }}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs font-mono text-zinc-300 outline-none focus:border-cyan-500 cursor-pointer transition-colors"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.id} value={lang.id}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleCopyCode}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 transition-colors text-zinc-500 hover:text-white"
+              title="Copy code"
+            >
+              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 w-full bg-[#0d1117]">
+        {/* Monaco Editor */}
+        <div className="flex-1 min-h-[200px] bg-[#0d1117]">
           <Editor
             height="100%"
             theme="vs-dark"
-            language={language === 'cpp' ? 'cpp' : 'java'}
+            language={LANGUAGES.find(l => l.id === language)?.monaco || 'cpp'}
             value={code}
             onChange={(val) => setCode(val || '')}
             options={{
-              fontSize: 13,
+              fontSize: 14,
               fontFamily: 'JetBrains Mono, monospace',
               minimap: { enabled: false },
-              scrollbar: { verticalScrollbarSize: 4, horizontalScrollbarSize: 4 },
+              scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
               padding: { top: 12 },
               lineNumbersMinChars: 3,
+              automaticLayout: true,
             }}
           />
         </div>
 
-        <div className="border-t border-slate-800 bg-slate-900/50 p-4 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-            <span className="font-mono text-[10px] text-slate-500 uppercase tracking-widest">
-              Workspace Status: Operational
-            </span>
-            <div className="flex gap-2.5">
-              <button
-                onClick={triggerSandboxRun}
-                disabled={running || submitting}
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-xl border border-slate-800 bg-slate-800/40 px-4 py-2 text-slate-300 hover:text-white transition-all duration-200 disabled:opacity-40 hover:scale-[1.02]"
-              >
-                {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 text-cyan-400" />}
-                Run
-              </button>
-              <button
-                onClick={triggerProductionTransmit}
-                disabled={running || submitting}
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 px-5 py-2 text-white shadow-lg transition-all duration-200 hover:opacity-90 disabled:opacity-40 hover:scale-[1.02]"
-              >
-                {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Submit
-              </button>
-            </div>
+        {/* Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-zinc-900/80 bg-zinc-950/60 flex-shrink-0">
+          <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
+            ● Online
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={triggerSandboxRun}
+              disabled={running || submitting}
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-zinc-300 hover:text-white transition-all disabled:opacity-40 hover:bg-zinc-800/50"
+            >
+              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 text-cyan-400" />}
+              Run
+            </button>
+            <button
+              onClick={triggerProductionTransmit}
+              disabled={running || submitting}
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 px-5 py-2 text-white shadow-lg shadow-cyan-500/20 transition-all hover:opacity-90 disabled:opacity-40"
+            >
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Submit
+            </button>
           </div>
+        </div>
 
-          {terminalLogs && (
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs max-h-36 overflow-y-auto animate-in slide-in-from-bottom-2 duration-200">
+        {/* Terminal Output */}
+        <div className="bg-black/90 border-t border-zinc-900/80 p-4 flex-shrink-0 min-h-[140px] max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
+          {terminalLogs ? (
+            <div className="font-mono text-xs">
               {terminalLogs.mode === 'error' && (
                 <div className="text-rose-400 flex items-start gap-2">
                   <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
@@ -309,11 +377,11 @@ export default function ProblemDetail() {
 
               {terminalLogs.mode === 'sandbox' && (
                 <div className="space-y-2">
-                  <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800 pb-1">
+                  <div className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-900/60 pb-1">
                     // Sandbox Results
                   </div>
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-zinc-400">
                       <span>Overall:</span>
                       <span
                         className={`font-bold ${
@@ -322,7 +390,7 @@ export default function ProblemDetail() {
                       >
                         {terminalLogs.data.overallStatus}
                       </span>
-                      <span className="text-slate-500">
+                      <span className="text-zinc-500">
                         ({terminalLogs.data.passed}/{terminalLogs.data.total})
                       </span>
                     </div>
@@ -334,12 +402,12 @@ export default function ProblemDetail() {
                           <XCircle className="h-3 w-3 text-rose-400 mt-0.5" />
                         )}
                         <div>
-                          <span className="text-slate-400">Test {idx + 1}:</span>
+                          <span className="text-zinc-400">Test {idx + 1}:</span>
                           <span className={`ml-1 ${r.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {r.status}
                           </span>
                           {!r.passed && (
-                            <div className="text-slate-500 text-[10px]">
+                            <div className="text-zinc-500 text-[10px]">
                               Expected: {r.expectedOutput} | Actual: {r.actualOutput || '(empty)'}
                             </div>
                           )}
@@ -352,7 +420,7 @@ export default function ProblemDetail() {
 
               {terminalLogs.mode === 'production' && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5">
+                  <div className="flex items-center gap-2 border-b border-zinc-900/60 pb-1.5">
                     <span
                       className={`font-bold uppercase tracking-widest ${
                         terminalLogs.data.status?.toLowerCase() === 'accepted'
@@ -363,7 +431,7 @@ export default function ProblemDetail() {
                       Status: {terminalLogs.data.status}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-slate-500 text-[11px]">
+                  <div className="grid grid-cols-3 gap-2 text-zinc-500 text-[11px]">
                     <div>
                       Passed:{' '}
                       <span className="text-white font-bold">
@@ -381,6 +449,11 @@ export default function ProblemDetail() {
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center text-zinc-500 text-sm font-mono">
+              <Terminal className="h-4 w-4 mr-2" />
+              Run your code to see output here...
             </div>
           )}
         </div>
