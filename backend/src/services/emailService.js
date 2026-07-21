@@ -9,9 +9,9 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendOTPEmail = async (email, otp, subject = 'CodeArena - Your OTP Verification Code') => {
+const sendOTPEmail = async (email, otp, subject = 'Codexium - Your OTP Verification Code') => {
     const mailOptions = {
-        from: `"CodeArena" <${process.env.EMAIL_USER}>`,
+        from: `"Codexium" <${process.env.EMAIL_USER}>`,
         to: email,
         subject,
         html: `

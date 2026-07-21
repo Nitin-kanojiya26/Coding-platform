@@ -167,7 +167,6 @@ export default function ProblemDetail() {
                 }`}
               />
             </button>
-            {/* 🔥 Comment Icon with count */}
             <button
               onClick={() => setShowComments(!showComments)}
               className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors ${
@@ -203,7 +202,7 @@ export default function ProblemDetail() {
             </div>
           )}
 
-          {/* Sample Test Cases */}
+          {/* ─── SAMPLE TEST CASES (UPDATED) ─── */}
           {problem?.sampleTestCases?.length > 0 && (
             <div className="border border-zinc-900/80 rounded-xl overflow-hidden">
               <button
@@ -221,7 +220,8 @@ export default function ProblemDetail() {
                   {problem.sampleTestCases.map((tc, i) => (
                     <div key={i} className="bg-zinc-900/20 rounded-lg p-3 text-sm font-mono">
                       <div>
-                        <span className="text-cyan-400">Input:</span> {tc.input}
+                        <span className="text-cyan-400">Input:</span>{' '}
+                        {tc.displayInput || tc.input}   {/* ✅ FIX: show displayInput if exists, else input */}
                       </div>
                       <div>
                         <span className="text-emerald-400">Output:</span> {tc.output}

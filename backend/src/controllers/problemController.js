@@ -59,6 +59,20 @@ exports.createProblem = async (req, res) => {
             createdBy: req.user._id
         };
 
+        // ✅ Ensure every test case has a displayInput
+        if (problemData.sampleTestCases) {
+            problemData.sampleTestCases = problemData.sampleTestCases.map(tc => ({
+                ...tc,
+                displayInput: tc.displayInput || tc.input,
+            }));
+        }
+        if (problemData.hiddenTestCases) {
+            problemData.hiddenTestCases = problemData.hiddenTestCases.map(tc => ({
+                ...tc,
+                displayInput: tc.displayInput || tc.input,
+            }));
+        }
+
         const problem = await Problem.create(problemData);
         const responseProblem = problem.toObject();
         delete responseProblem.hiddenTestCases;
@@ -71,7 +85,6 @@ exports.createProblem = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({ message: 'Problem slug already exists' });
         }
-
         res.status(500).json({ message: error.message });
     }
 };
@@ -138,49 +151,49 @@ exports.updateProblem = async (req, res) => {
     try {
         const updates = { ...req.body };
 
-        // If title changes, regenerate slug
         if (updates.title) {
             updates.slug = createSlug(updates.title);
         }
-
-        // Normalize tags
         if (updates.tags) {
             updates.tags = normalizeTags(updates.tags);
+        }
+
+        // ✅ Ensure displayInput is set for any updated test cases
+        if (updates.sampleTestCases) {
+            updates.sampleTestCases = updates.sampleTestCases.map(tc => ({
+                ...tc,
+                displayInput: tc.displayInput || tc.input,
+            }));
+        }
+        if (updates.hiddenTestCases) {
+            updates.hiddenTestCases = updates.hiddenTestCases.map(tc => ({
+                ...tc,
+                displayInput: tc.displayInput || tc.input,
+            }));
         }
 
         const problem = await Problem.findByIdAndUpdate(
             req.params.id,
             updates,
-            {
-                new: true,
-                runValidators: true
-            }
+            { new: true, runValidators: true }
         ).select("-hiddenTestCases");
 
         if (!problem) {
-            return res.status(404).json({
-                message: "Problem not found"
-            });
+            return res.status(404).json({ message: "Problem not found" });
         }
 
         res.status(200).json({
             status: "success",
             problem
         });
-
     } catch (error) {
-
         if (error.code === 11000) {
-            return res.status(400).json({
-                message: "Problem slug already exists"
-            });
+            return res.status(400).json({ message: "Problem slug already exists" });
         }
-
-        res.status(500).json({
-            message: error.message
-        });
+        res.status(500).json({ message: error.message });
     }
 };
+
 // @desc    Delete a problem
 // @route   DELETE /api/problems/:id
 // @access  Admin
@@ -215,6 +228,7 @@ exports.getProblemById = async (req, res) => {
     try {
 
         const problem = await Problem.findById(req.params.id)
+            .select('+hiddenTestCases') 
             .populate("createdBy", "name email role");
 
         if (!problem) {

@@ -59,6 +59,31 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// @desc    Upload avatar image
+// @route   POST /api/users/avatar
+// @access  Private
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { avatar: avatarUrl },
+      { new: true }
+    ).select('-password');
+
+    res.status(200).json({
+      status: 'success',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 // @desc    Get user statistics
 // @route   GET /api/users/stats
 // @access  Private
@@ -388,5 +413,149 @@ exports.getUserStreak = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ status: 'fail', message: error.message });
+  }
+};
+// ─── Get Public Profile of Another User ──────────────────────
+// @desc    Get public profile by user ID
+// @route   GET /api/users/:id/profile
+// @access  Private (or public – your choice)
+exports.getUserPublicProfile = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId)
+      .select('name avatar role solvedProblems createdAt')
+      .populate('solvedProblems', 'title slug difficulty tags');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get stats by user ID
+// @route   GET /api/users/:id/stats
+// @access  Private
+exports.getUserStatsById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Check user exists
+    const userExists = await User.findById(userId);
+    if (!userExists) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ── Basic stats ──
+    const totalSubmissions = await Submission.countDocuments({ user: userId });
+    const acceptedSubmissions = await Submission.countDocuments({ user: userId, status: 'accepted' });
+    const acceptanceRate = totalSubmissions > 0 ? (acceptedSubmissions / totalSubmissions) * 100 : 0;
+
+    // ── Difficulty breakdown ──
+    const user = await User.findById(userId).populate('solvedProblems', 'difficulty');
+    const difficultyCount = { easy: 0, medium: 0, hard: 0 };
+    user.solvedProblems.forEach(p => {
+      if (p.difficulty === 'easy') difficultyCount.easy++;
+      else if (p.difficulty === 'medium') difficultyCount.medium++;
+      else if (p.difficulty === 'hard') difficultyCount.hard++;
+    });
+
+    // ── Submission dates (for heatmap) ──
+    const submissionDocs = await Submission.find({ user: userId })
+      .select('submittedAt')
+      .lean();
+
+    const submissionDates = submissionDocs.map(s =>
+      s.submittedAt.toISOString().split('T')[0]
+    );
+
+    // ── Active days and max streak ──
+    const uniqueDates = [...new Set(submissionDates)].sort();
+    const activeDays = uniqueDates.length;
+
+    let maxStreak = 0;
+    let streak = 0;
+    let prevDate = null;
+    for (const dateStr of uniqueDates) {
+      const current = new Date(dateStr);
+      if (prevDate === null) {
+        streak = 1;
+      } else {
+        const diff = (current - prevDate) / (1000 * 60 * 60 * 24);
+        if (Math.round(diff) === 1) {
+          streak++;
+        } else if (Math.round(diff) > 1) {
+          streak = 1;
+        }
+      }
+      prevDate = current;
+      maxStreak = Math.max(maxStreak, streak);
+    }
+
+    // ── Recent accepted submissions ──
+    const recentAccepted = await Submission.find({ user: userId, status: 'accepted' })
+      .sort({ submittedAt: -1 })
+      .limit(5)
+      .populate('problem', 'title slug')
+      .select('language submittedAt problem')
+      .lean();
+
+    const formattedRecent = recentAccepted.map(s => ({
+      _id: s._id,
+      problem: s.problem,
+      language: s.language,
+      submittedAt: s.submittedAt,
+    }));
+
+    res.status(200).json({
+      status: 'success',
+      stats: {
+        totalSubmissions,
+        acceptedSubmissions,
+        acceptanceRate: parseFloat(acceptanceRate.toFixed(2)),
+        solved: {
+          easy: difficultyCount.easy,
+          medium: difficultyCount.medium,
+          hard: difficultyCount.hard,
+          total: user.solvedProblems.length,
+        },
+        activeDays,
+        maxStreak,
+        submissionDates,
+        recentAccepted: formattedRecent,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// ─── Search Users by Name ──────────────────────────────────
+// @desc    Search users by name (case-insensitive, partial)
+// @route   GET /api/users/search
+// @access  Private
+exports.searchUsers = async (req, res) => {
+  try {
+    const { name } = req.query;
+    if (!name || name.trim().length < 1) {
+      return res.status(200).json({ users: [] });
+    }
+
+    const regex = new RegExp(name.trim(), 'i');
+    const users = await User.find({ name: regex })
+      .select('name avatar')
+      .limit(10);
+
+    res.status(200).json({
+      status: 'success',
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

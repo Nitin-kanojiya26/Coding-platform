@@ -15,13 +15,13 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
   const { isBookmarked, toggleBookmark, loading: bookmarkLoading } = useBookmark(problem._id);
 
   return (
-    <div className={`group relative border-b border-zinc-900 last:border-0 transition-all duration-200 ${
-      isExpanded ? 'bg-[#0f0f12]/40' : ''
+    <div className={`group relative border-b border-base last:border-0 transition-all duration-200 ${
+      isExpanded ? 'bg-hover/40' : ''
     }`}>
       {/* Background activation hover */}
       <div 
         className={`absolute inset-y-1 -inset-x-3 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 ${
-          isExpanded ? 'opacity-100 bg-[#121214]/50' : 'hover:bg-[#0c0c0e]'
+          isExpanded ? 'opacity-100 bg-hover/50' : 'hover:bg-hover/30'
         }`} 
       />
       
@@ -32,11 +32,11 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
         <div className="flex items-center gap-4 min-w-0 flex-1">
           {/* Accent Indicator Bar */}
           <div className={`w-[3px] h-5 rounded-full self-center transition-all duration-350 ${
-            isExpanded ? 'bg-space-blue h-7 shadow-[0_0_12px_rgba(56,189,248,0.4)]' : 'bg-transparent group-hover:bg-zinc-800'
+            isExpanded ? 'bg-accent h-7 shadow-[0_0_12px_rgba(56,189,248,0.4)]' : 'bg-transparent group-hover:bg-light'
           }`} />
 
           <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pr-4">
-            <h3 className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors duration-150 truncate">
+            <h3 className="text-sm font-medium text-secondary group-hover:text-primary transition-colors duration-150 truncate">
               {problem.title}
             </h3>
             
@@ -48,13 +48,13 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
                 {(problem.tags || []).slice(0, 2).map((tag, idx) => (
                   <span 
                     key={idx} 
-                    className="text-[10px] font-bold tracking-wide text-zinc-300 bg-zinc-900 border border-zinc-700/80 px-2.5 py-0.5 rounded-md shadow-sm transition-colors group-hover:border-zinc-600"
+                    className="text-[10px] font-bold tracking-wide text-secondary bg-hover/60 border border-light/80 px-2.5 py-0.5 rounded-md shadow-sm transition-colors group-hover:border-light"
                   >
                     {tag}
                   </span>
                 ))}
                 {(problem.tags || []).length > 2 && (
-                  <span className="text-[10px] text-zinc-500 font-bold bg-zinc-900/40 border border-zinc-800 px-1.5 py-0.5 rounded-md">
+                  <span className="text-[10px] text-muted font-bold bg-hover/40 border border-base px-1.5 py-0.5 rounded-md">
                     +{problem.tags.length - 2}
                   </span>
                 )}
@@ -67,13 +67,13 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
           <button 
             onClick={(e) => { e.stopPropagation(); toggleBookmark(); }} 
             disabled={bookmarkLoading} 
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-slate-300 transition-colors"
+            className="p-1.5 rounded-lg text-muted hover:text-secondary transition-colors"
           >
             <Bookmark className={`h-4 w-4 transition-all duration-350 ${
-              isBookmarked ? 'fill-space-blue text-space-blue drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' : ''
+              isBookmarked ? 'fill-accent text-accent drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' : ''
             }`} />
           </button>
-          <div className="text-zinc-500 group-hover:text-zinc-300">
+          <div className="text-muted group-hover:text-secondary">
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </div>
@@ -81,14 +81,14 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
 
       {isExpanded && (
         <div className="relative pl-8 pr-4 pb-5 pt-1 space-y-4 animate-in fade-in duration-200">
-          <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap max-w-3xl">
+          <div className="text-secondary text-sm leading-relaxed whitespace-pre-wrap max-w-3xl">
             {problem.description}
           </div>
           
           {problem.constraints && (
             <div className="text-xs space-y-1">
-              <span className="font-bold uppercase tracking-wider block text-zinc-500 text-[9px]">Constraints</span>
-              <p className="font-mono text-xs text-slate-300 bg-[#000000] p-2.5 rounded-lg border border-zinc-800 inline-block">
+              <span className="font-bold uppercase tracking-wider block text-muted text-[9px]">Constraints</span>
+              <p className="font-mono text-xs text-secondary bg-input p-2.5 rounded-lg border border-base inline-block">
                 {problem.constraints}
               </p>
             </div>
@@ -96,22 +96,22 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
 
           {problem.sampleTestCases && problem.sampleTestCases.length > 0 && (
             <div className="space-y-2">
-              <span className="font-bold uppercase tracking-wider block text-zinc-500 text-[9px]">Sample Cases</span>
+              <span className="font-bold uppercase tracking-wider block text-muted text-[9px]">Sample Cases</span>
               <div className="space-y-2">
                 {problem.sampleTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-[#000000] max-w-2xl rounded-lg border border-zinc-800 overflow-hidden">
-                    <div className="grid grid-cols-2 divide-x divide-zinc-800 border-b border-zinc-800 font-mono text-xs">
+                  <div key={idx} className="bg-input max-w-2xl rounded-lg border border-base overflow-hidden">
+                    <div className="grid grid-cols-2 divide-x divide-base border-b border-base font-mono text-xs">
                       <div className="p-2.5">
-                        <span className="text-zinc-500 block text-[9px] uppercase tracking-wider mb-1">Input</span>
-                        <code className="text-slate-200">{tc.input}</code>
+                        <span className="text-muted block text-[9px] uppercase tracking-wider mb-1">Input</span>
+                        <code className="text-secondary">{tc.input}</code>
                       </div>
                       <div className="p-2.5">
-                        <span className="text-zinc-500 block text-[9px] uppercase tracking-wider mb-1">Output</span>
+                        <span className="text-muted block text-[9px] uppercase tracking-wider mb-1">Output</span>
                         <code className="text-emerald-400 font-semibold">{tc.output}</code>
                       </div>
                     </div>
                     {tc.explanation && (
-                      <p className="text-xs text-zinc-400 p-2.5 bg-zinc-900/20">
+                      <p className="text-xs text-muted p-2.5 bg-hover/20">
                         {tc.explanation}
                       </p>
                     )}
@@ -124,7 +124,7 @@ const ProblemItem = ({ problem, isExpanded, onToggle }) => {
           <div className="pt-1">
             <Link 
               to={`/problems/${problem.slug}`} 
-              className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-space-blue hover:text-sky-400 transition-colors group/btn"
+              className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-accent hover:text-accent-hover transition-colors group/btn"
             >
               Open Workspace <span className="transition-transform duration-150 group-hover/btn:translate-x-0.5">→</span>
             </Link>
@@ -145,7 +145,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   
-  // Strict structure tracking to sync with backend 'status' blocks
   const [streakData, setStreakData] = useState({ currentStreak: 0, maxStreak: 0 });
   const [submissions, setSubmissions] = useState([]);
   const [loginDates, setLoginDates] = useState([]);
@@ -165,7 +164,6 @@ export default function Dashboard() {
         setProblems(problemsRes.data?.problems || problemsRes.data?.data?.problems || []);
         setFilteredProblems(problemsRes.data?.problems || problemsRes.data?.data?.problems || []);
         
-        // Exact target matching for response signature: { status: 'success', data: { currentStreak, maxStreak } }
         if (streakRes.data && streakRes.data.data) {
           setStreakData(streakRes.data.data);
         } else if (streakRes.data) {
@@ -205,35 +203,35 @@ export default function Dashboard() {
   const toggleExpand = (id) => setExpandedId(expandedId === id ? null : id);
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-screen bg-[#000000]">
-      <div className="w-5 h-5 border-2 border-zinc-800 border-t-space-blue rounded-full animate-spin" />
+    <div className="flex items-center justify-center min-h-screen bg-primary">
+      <div className="w-5 h-5 border-2 border-base border-t-accent rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#000000] px-4 sm:px-6 py-10 text-zinc-400 font-sans antialiased selection:bg-space-blue/20 selection:text-space-blue">
+    <div className="min-h-screen bg-primary px-4 sm:px-6 py-10 text-muted font-sans antialiased selection:bg-accent/20 selection:text-accent">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Top Header Identity Segment */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-900">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-base">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-wide text-slate-100">
+              <h1 className="text-xl font-bold tracking-wide text-primary">
                 {user?.name || 'Developer Workspace'}
               </h1>
-              <Sparkles className="h-4 w-4 text-sky-400/80 animate-pulse" />
+              <Sparkles className="h-4 w-4 text-accent/80 animate-pulse" />
             </div>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted">
               Run diagnostics, configure sessions, and track problem status.
             </p>
           </div>
           
           {/* Active Streak Flag */}
-          <div className="flex items-center gap-3 bg-[#0a0a0c] border border-zinc-800/80 px-4 py-2 rounded-xl shadow-lg self-start md:self-auto">
+          <div className="flex items-center gap-3 bg-secondary border border-light/80 px-4 py-2 rounded-xl shadow-lg self-start md:self-auto">
             <Flame className="h-4.5 w-4.5 text-amber-500 fill-amber-500" />
             <div>
-              <span className="text-[9px] uppercase font-bold block text-zinc-500 tracking-wider">Current Streak</span>
-              <span className="text-xs font-bold text-slate-100 tracking-tight">
+              <span className="text-[9px] uppercase font-bold block text-muted tracking-wider">Current Streak</span>
+              <span className="text-xs font-bold text-primary tracking-tight">
                 {streakData?.currentStreak ?? 0} Days
               </span>
             </div>
@@ -242,43 +240,43 @@ export default function Dashboard() {
 
         {/* 4 Statistics Metrics Matrix */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
+          <div className="bg-secondary border border-light/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
             <div className="p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
               <CheckCircle className="h-4.5 w-4.5 text-emerald-500" />
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold block text-zinc-500">Solved</span>
-              <span className="text-base font-black text-slate-100">{stats?.solved?.total || 0}</span>
+              <span className="text-[9px] uppercase font-bold block text-muted">Solved</span>
+              <span className="text-base font-black text-primary">{stats?.solved?.total || 0}</span>
             </div>
           </div>
 
-          <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
-            <div className="p-2.5 rounded-xl bg-space-blue/5 border border-space-blue/10">
-              <Trophy className="h-4.5 w-4.5 text-space-blue" />
+          <div className="bg-secondary border border-light/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-accent/5 border border-accent/10">
+              <Trophy className="h-4.5 w-4.5 text-accent" />
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold block text-zinc-500">Acceptance Rate</span>
-              <span className="text-base font-black text-slate-100">{stats?.acceptanceRate || 0}%</span>
+              <span className="text-[9px] uppercase font-bold block text-muted">Acceptance Rate</span>
+              <span className="text-base font-black text-primary">{stats?.acceptanceRate || 0}%</span>
             </div>
           </div>
 
-          <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
+          <div className="bg-secondary border border-light/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
             <div className="p-2.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
               <Target className="h-4.5 w-4.5 text-indigo-400" />
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold block text-zinc-500">Total Runs</span>
-              <span className="text-base font-black text-slate-100">{stats?.totalSubmissions || 0}</span>
+              <span className="text-[9px] uppercase font-bold block text-muted">Total Runs</span>
+              <span className="text-base font-black text-primary">{stats?.totalSubmissions || 0}</span>
             </div>
           </div>
 
-          <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
+          <div className="bg-secondary border border-light/80 rounded-2xl p-4.5 flex items-center gap-3.5 shadow-sm">
             <div className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
               <TrendingUp className="h-4.5 w-4.5 text-amber-500" />
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold block text-zinc-500">Peak Streak</span>
-              <span className="text-base font-black text-slate-100">{streakData?.maxStreak ?? 0} Days</span>
+              <span className="text-[9px] uppercase font-bold block text-muted">Peak Streak</span>
+              <span className="text-base font-black text-primary">{streakData?.maxStreak ?? 0} Days</span>
             </div>
           </div>
         </div>
@@ -287,20 +285,20 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Central Problem Matrix */}
-          <div className="lg:col-span-8 bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-5 space-y-5 shadow-md">
+          <div className="lg:col-span-8 bg-secondary border border-light/80 rounded-2xl p-5 space-y-5 shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-xs font-bold text-slate-200 flex items-center gap-2 tracking-wide">
-                <BookOpen className="h-4 w-4 text-space-blue" /> SYSTEM LOGS / PROBLEMS
+              <h2 className="text-xs font-bold text-secondary flex items-center gap-2 tracking-wide">
+                <BookOpen className="h-4 w-4 text-accent" /> SYSTEM LOGS / PROBLEMS
               </h2>
               
               <div className="relative w-full sm:w-60 group rounded-xl">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600 group-focus-within:text-space-blue transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted group-focus-within:text-accent transition-colors" />
                 <input 
                   type="text" 
                   placeholder="Filter registry..." 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-[#000000] border border-zinc-900 rounded-xl text-slate-200 placeholder-zinc-700 text-xs outline-none transition-all focus:border-zinc-700" 
+                  className="w-full pl-9 pr-4 py-2 bg-input border border-base rounded-xl text-secondary placeholder-muted text-xs outline-none transition-all focus:border-light" 
                 />
               </div>
             </div>
@@ -313,8 +311,8 @@ export default function Dashboard() {
                   onClick={() => setSelectedTag(tag)}
                   className={`px-3 py-1 rounded-md text-[10px] font-bold tracking-wide transition-all border ${
                     selectedTag === tag
-                      ? 'bg-zinc-900 text-white border-zinc-700 shadow-sm'
-                      : 'bg-transparent text-zinc-500 border-transparent hover:text-zinc-300'
+                      ? 'bg-hover text-primary border-light shadow-sm'
+                      : 'bg-transparent text-muted border-transparent hover:text-secondary'
                   }`}
                 >
                   {tag}
@@ -323,9 +321,9 @@ export default function Dashboard() {
             </div>
 
             {/* Structured Rows */}
-            <div className="divide-y divide-zinc-900/60 border-t border-zinc-900/60">
+            <div className="divide-y divide-base/60 border-t border-base/60">
               {filteredProblems.length === 0 ? (
-                <div className="py-12 text-center text-zinc-600 text-xs font-bold tracking-wider">
+                <div className="py-12 text-center text-muted text-xs font-bold tracking-wider">
                   NO REGISTRY ENTRIES DETECTED
                 </div>
               ) : (
@@ -345,27 +343,27 @@ export default function Dashboard() {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Heatmap Section Wrapper */}
-            <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-2 shadow-md">
+            <div className="bg-secondary border border-light/80 rounded-2xl p-2 shadow-md">
               <ActivityHeatmap loginDates={loginDates} mode="login" />
             </div>
 
             {/* System Performance Status Readout */}
-            <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-md">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+            <div className="bg-secondary border border-light/80 rounded-2xl p-5 space-y-4 shadow-md">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
                 Run Diagnostic Output
               </h3>
               <div className="space-y-3 text-xs font-mono">
-                <div className="flex justify-between border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-500">Submissions Run</span>
-                  <span className="text-slate-200 font-bold">{stats?.totalSubmissions || 0}</span>
+                <div className="flex justify-between border-b border-base pb-2">
+                  <span className="text-muted">Submissions Run</span>
+                  <span className="text-secondary font-bold">{stats?.totalSubmissions || 0}</span>
                 </div>
-                <div className="flex justify-between border-b border-zinc-900 pb-2">
-                  <span className="text-zinc-500">Solutions Solved</span>
+                <div className="flex justify-between border-b border-base pb-2">
+                  <span className="text-muted">Solutions Solved</span>
                   <span className="text-emerald-400 font-bold">{stats?.acceptedSubmissions || stats?.solved?.total || 0}</span>
                 </div>
                 <div className="flex justify-between pt-0.5">
-                  <span className="text-zinc-500">Accuracy Rate</span>
-                  <span className="text-space-blue font-bold">{stats?.acceptanceRate || 0}%</span>
+                  <span className="text-muted">Accuracy Rate</span>
+                  <span className="text-accent font-bold">{stats?.acceptanceRate || 0}%</span>
                 </div>
               </div>
             </div>

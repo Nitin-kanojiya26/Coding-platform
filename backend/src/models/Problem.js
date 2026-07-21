@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 
 const testCaseSchema = new mongoose.Schema({
+        displayInput: {
+        type: String,
+    },
     input: {
         type: String,
         required: [true, 'Please provide test case input']

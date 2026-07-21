@@ -22,7 +22,8 @@ import Bookmarks from './pages/Bookmarks';
 import MySubmissions from './pages/MySubmissions';
 import Settings from './pages/Settings';
 import CreateProblem from './pages/CreateProblem';
-
+import PublicProfile from './pages/PublicProfile';
+import EditProblem from './pages/EditProblem';
 function AppRoutes() {
   const { user, loading } = useAuth();
 
@@ -47,13 +48,14 @@ function AppRoutes() {
         <Route path="/problems" element={<ProtectedRoute><Problems /></ProtectedRoute>} />
         <Route path="/problems/:slug" element={<ProtectedRoute><ProblemDetail /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/profile/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/bookmarks" element={<ProtectedRoute><Bookmarks /></ProtectedRoute>} />
         <Route path="/my-submissions" element={<ProtectedRoute><MySubmissions /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/create-problem" element={<AdminRoute><CreateProblem /></AdminRoute>} />
-
+        <Route path="/edit-problem/:id" element={<AdminRoute><EditProblem /></AdminRoute>} />
       </Route>
 
       {/* Fallback */}

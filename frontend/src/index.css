@@ -1,37 +1,74 @@
 @import "tailwindcss";
 
 @theme {
-  /* Color Palette Variables */
-  --color-space-950: #09111e; /* Sidebar */
-  --color-space-900: #0e1726; /* Main BG */
-  --color-space-850: #131c2d; /* Cards */
-  --color-space-800: #162235; /* Pills & Active Inputs */
-  --color-space-700: #1b2536; /* Default Borders */
-  --color-space-blue: #1d4ed8; /* Glow Border Blue */
-
-  /* Glow Utilities */
-  --shadow-blue-glow: 0 0 12px rgba(37, 99, 235, 0.25);
+  /* ─── Dark Mode Colors (Pure Black & Gray) ─── */
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0c;
+  --color-bg-card: #111111;
+  --color-bg-hover: #1a1a1a;
+  --color-bg-input: #000000;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e0e0e0;
+  --color-text-muted: #888888;
+  --color-border: #222222;
+  --color-border-light: #333333;
+  --color-accent: #ffffff;
+  --color-accent-hover: #cccccc;
 }
+
+/* ─── Light Mode Overrides (if you ever want to add a light theme) ── */
+html:not(.dark) {
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #f1f5f9;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #e2e8f0;
+  --color-bg-input: #ffffff;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #1e293b;
+  --color-text-muted: #64748b;
+  --color-border: #cbd5e1;
+  --color-border-light: #d1d5db;
+  --color-accent: #0f172a;
+  --color-accent-hover: #1e293b;
+}
+
 @layer base {
   body {
-    background-color: #0f172a;
-    color: #f1f5f9;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
   }
 }
 
-/* Smooth transitions for all interactive elements */
+/* ─── Utility Classes ────────────────────────────────── */
+@layer utilities {
+  .bg-primary { background-color: var(--color-bg-primary); }
+  .bg-secondary { background-color: var(--color-bg-secondary); }
+  .bg-card { background-color: var(--color-bg-card); }
+  .bg-hover { background-color: var(--color-bg-hover); }
+  .bg-input { background-color: var(--color-bg-input); }
+  .text-primary { color: var(--color-text-primary); }
+  .text-secondary { color: var(--color-text-secondary); }
+  .text-muted { color: var(--color-text-muted); }
+  .border-base { border-color: var(--color-border); }
+  .border-light { border-color: var(--color-border-light); }
+  .border-base\/80 { border-color: rgba(var(--color-border), 0.8); }
+  .accent { color: var(--color-accent); }
+  .accent-bg { background-color: var(--color-accent); }
+}
+
+/* ─── Smooth Transitions ────────────────────────────── */
 * {
-  transition: background-color 0.2s ease, 
-              border-color 0.2s ease, 
-              color 0.2s ease, 
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease,
               opacity 0.2s ease,
               transform 0.15s ease,
               box-shadow 0.2s ease;
 }
 
-/* Custom scrollbar */
+/* ─── Custom Scrollbar ───────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -40,18 +77,18 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #333333;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #555555;
 }
 
-/* Cyber panel with glassmorphism */
+/* ─── Cyber Panel (Glassmorphism) ───────────────────── */
 .cyber-panel {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(135deg, rgba(17, 17, 17, 0.7) 0%, rgba(0, 0, 0, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(12px);
   position: relative;
 }
@@ -62,19 +99,19 @@
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(to bottom right, rgba(255,255,255,0.03), rgba(0,240,255,0.03), transparent, rgba(189,0,255,0.03));
+  background: linear-gradient(to bottom right, rgba(255,255,255,0.02), transparent, rgba(255,255,255,0.02));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
 }
 
-/* Glow effects */
-.glow-cyan:hover { box-shadow: 0 0 30px rgba(0, 240, 255, 0.15); border-color: rgba(0, 240, 255, 0.3); }
-.glow-purple:hover { box-shadow: 0 0 30px rgba(189, 0, 255, 0.15); border-color: rgba(189, 0, 255, 0.3); }
-.glow-emerald:hover { box-shadow: 0 0 30px rgba(0, 255, 102, 0.15); border-color: rgba(0, 255, 102, 0.3); }
+/* ─── Glow Effects (Gray/White) ────────────────────── */
+.glow-cyan:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+.glow-purple:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+.glow-emerald:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
 
-/* Smooth button hover */
+/* ─── Button & Card Hovers ───────────────────────────── */
 .btn-smooth {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -82,16 +119,15 @@
   transform: translateY(-1px);
 }
 
-/* Card hover */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 240, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Loading animation */
+/* ─── Loading Animation ───────────────────────────────── */
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
@@ -100,10 +136,10 @@
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Scanline grid background */
+/* ─── Scanline Grid ───────────────────────────────────── */
 .scanline-grid {
   background-size: 40px 40px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.005) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
 }

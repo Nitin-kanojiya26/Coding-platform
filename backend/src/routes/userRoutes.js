@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
+const upload = require('../middleware/upload');
 const {
   getUserProfile,
   getUserStats,
@@ -12,7 +13,11 @@ const {
   removeBookmark,
   bookmarkProblem,
   getUserStreak,
-  getLoginActivity
+  getLoginActivity,
+  searchUsers,
+  getUserPublicProfile,
+  getUserStatsById,
+  uploadAvatar
 } = require('../controllers/userController');
 
 router.get('/profile', protect, getUserProfile);
@@ -26,4 +31,10 @@ router.delete('/problems/:id/bookmark', protect, removeBookmark);
 router.get('/bookmarks', protect, getBookmarks);
 router.get('/login-activity', protect, getLoginActivity);
 router.get('/streak', protect, getUserStreak);
+router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
+router.get('/search', protect, searchUsers);
+
+// Public profile & stats (by ID)
+router.get('/:id/profile', protect, getUserPublicProfile);
+router.get('/:id/stats', protect, getUserStatsById);
 module.exports = router;

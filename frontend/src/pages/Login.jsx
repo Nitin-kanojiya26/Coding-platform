@@ -20,6 +20,7 @@ export default function Login() {
       navigate('/');
     } catch (err) {
       setError(err || 'Invalid system credentials');
+        setPassword('');
     } finally {
       setLoading(false);
     }
@@ -34,12 +35,16 @@ export default function Login() {
       <div className="z-10 w-full max-w-md space-y-7 rounded-2xl border border-zinc-800/80 bg-[#0a0a0c] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
         
         {/* Brand Header */}
-        <div className="flex flex-col items-center text-center space-y-4">
+        <div className="flex flex-col items-center text-center">
           {/* Logo container using matching vibrant gradient framework */}
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-transform duration-300 hover:scale-105">
-            <Terminal className="h-5 w-5 text-white" />
+          <div className='flex flx-col items center size'>
+          <img
+              src="/Codexium.svg"
+              alt="Codexium Logo"
+              className="w-30 h-25 object-contain opacity-90 mix-blend-screen group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-200 shrink-0"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
           </div>
-          
           <div className="space-y-1">
             <h2 className="text-xl font-bold tracking-wide text-slate-100">
               Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 font-black">Codexium</span>
@@ -99,7 +104,7 @@ export default function Login() {
               to="/forgot-password"
               className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors duration-150"
             >
-              Forgot identity secret?
+              Forgot Password?
             </Link>
           </div>
 
@@ -124,7 +129,7 @@ export default function Login() {
             to="/register" 
             className="font-bold text-space-blue hover:underline transition-colors duration-150"
           >
-            Register Workspace Node
+            Register
           </Link>
         </div>
       </div>

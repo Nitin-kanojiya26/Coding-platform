@@ -4,17 +4,16 @@ import { Calendar, ChevronRight } from 'lucide-react';
 export default function ActivityHeatmap({ 
   submissions = [], 
   loginDates = [], 
-  mode = 'submission'  // 'login' or 'submission'
+  mode = 'submission' 
 }) {
   const scrollRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(true);
 
-  // Build active days based on mode
+  // Parse active days tracking map
   const activeDays = useMemo(() => {
     if (mode === 'login') {
       return new Set(loginDates);
     } else {
-      // submissions mode: we count per day
       const countMap = {};
       submissions.forEach(s => {
         const key = new Date(s.submittedAt).toISOString().split('T')[0];
@@ -24,27 +23,41 @@ export default function ActivityHeatmap({
     }
   }, [mode, loginDates, submissions]);
 
-  // Generate last 365 days
-  const days = useMemo(() => {
-    const arr = [];
-    for (let i = 364; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      arr.push(d);
+  // Group the last 12 months dynamically by calendar months
+  const monthsData = useMemo(() => {
+    const data = [];
+    const today = new Date();
+    
+    // We go back 11 months to show a total of 12 complete/rolling months
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth();
+      
+      // Determine label
+      const monthLabel = targetDate.toLocaleString('default', { month: 'short' });
+      
+      // Find number of days in this specific month
+      // Setting day to 0 of next month returns the last day of current month
+      const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      const daysArray = [];
+      for (let day = 1; day <= totalDaysInMonth; day++) {
+        const d = new Date(year, month, day);
+        // Prevent showing future days if evaluating the current ongoing month
+        if (d <= today) {
+          daysArray.push(d);
+        }
+      }
+      
+      data.push({
+        label: monthLabel,
+        days: daysArray
+      });
     }
-    return arr;
+    return data;
   }, []);
 
-  // Group into weeks
-  const weeks = useMemo(() => {
-    const w = [];
-    for (let i = 0; i < days.length; i += 7) {
-      w.push(days.slice(i, i + 7));
-    }
-    return w;
-  }, [days]);
-
-  // Get intensity based on mode
   const getIntensity = (date) => {
     const key = date.toISOString().split('T')[0];
     if (mode === 'login') {
@@ -59,7 +72,6 @@ export default function ActivityHeatmap({
     }
   };
 
-  // Colors: login uses cyan, submission uses green
   const loginColors = ['bg-slate-800', 'bg-cyan-500'];
   const submissionColors = [
     'bg-slate-800',
@@ -70,7 +82,7 @@ export default function ActivityHeatmap({
   ];
   const colors = mode === 'login' ? loginColors : submissionColors;
 
-  // Compute stats
+  // Calculate stats based on processed system ranges
   const { totalDays, maxStreak } = useMemo(() => {
     let datesArray;
     if (mode === 'login') {
@@ -93,8 +105,6 @@ export default function ActivityHeatmap({
     return { totalDays: total, maxStreak: maxS };
   }, [activeDays, mode]);
 
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
@@ -104,88 +114,64 @@ export default function ActivityHeatmap({
 
   return (
     <div className="space-y-3">
+      {/* Header Panel */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2 text-slate-400">
           <Calendar className="h-4 w-4 text-cyan-400" />
-          <span>{mode === 'login' ? 'Login Activity' : 'Submission Activity'} (Last 365 days)</span>
+          <span>{mode === 'login' ? 'Login Activity' : 'Submission Activity'}</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span>Total days: <span className="text-white font-bold">{totalDays}</span></span>
-          <span>Max streak: <span className="text-orange-400 font-bold">{maxStreak}</span></span>
+          <span>Total days: <strong className="text-white">{totalDays}</strong></span>
+          <span>Max streak: <strong className="text-orange-400">{maxStreak}</strong></span>
         </div>
       </div>
 
       <div className="relative">
-        <div
-          ref={scrollRef}
-          className="overflow-x-auto overflow-y-visible pb-2 scroll-smooth"
-          style={{ maxHeight: '160px' }}
-        >
-          <div className="min-w-max">
-            {/* Month labels */}
-            <div className="flex text-[10px] text-slate-500 mb-1 pl-6">
-              {weeks.map((week, idx) => {
-                const month = week[0]?.toLocaleString('default', { month: 'short' });
-                const prevMonth = idx > 0 ? weeks[idx-1][0]?.getMonth() : -1;
-                const currentMonth = week[0]?.getMonth();
-                if (currentMonth !== undefined && currentMonth !== prevMonth) {
-                  return <div key={idx} style={{ width: '22px' }} className="text-center">{month}</div>;
-                }
-                return <div key={idx} style={{ width: '22px' }} />;
-              })}
-            </div>
-
-            {/* Grid */}
-            <div className="flex gap-1">
-              {/* Day labels */}
-              <div className="flex flex-col gap-1 pr-2 text-[10px] text-slate-500 font-mono">
-                {dayLabels.map((label, i) => (
-                  <div key={i} className="h-3 flex items-center">{label}</div>
-                ))}
-              </div>
-
-              {/* Heatmap grid */}
-              {weeks.map((week, weekIdx) => (
-                <div key={weekIdx} className="flex flex-col gap-1">
-                  {week.map((date, dayIdx) => {
+        <div ref={scrollRef} className="overflow-x-auto overflow-y-visible pb-2 scroll-smooth">
+          <div className="flex gap-4 min-w-max px-1">
+            
+            {/* Map through each individual month container block */}
+            {monthsData.map((monthBlock, mIdx) => (
+              <div key={mIdx} className="flex flex-col items-center">
+                
+                {/* Visual Grid for the specific Month arranged in structural columns */}
+                {/* Using grid-flow-col creates vertical columns packing 6 blocks deep per column */}
+                <div className="grid grid-rows-6 grid-flow-col gap-1">
+                  {monthBlock.days.map((date, dIdx) => {
                     const level = getIntensity(date);
                     const isToday = date.toDateString() === new Date().toDateString();
                     return (
                       <div
-                        key={dayIdx}
-                        className={`w-3 h-3 rounded-sm ${colors[level]} transition-colors duration-150 hover:ring-2 hover:ring-cyan-400 cursor-default ${
-                          isToday ? 'ring-1 ring-cyan-400' : ''
-                        }`}
-                        title={`${date.toLocaleDateString()}: ${
-                          mode === 'login' 
-                            ? (activeDays.has(date.toISOString().split('T')[0]) ? 'Active' : 'Inactive')
-                            : (activeDays[date.toISOString().split('T')[0]] || 0) + ' submissions'
-                        }`}
+                        key={dIdx}
+                        className={`w-3 h-3 rounded-sm ${colors[level]} transition-colors duration-150 hover:ring-2 hover:ring-cyan-400 cursor-default ${isToday ? 'ring-1 ring-cyan-400' : ''}`}
+                        title={`${date.toLocaleDateString()}: ${mode === 'login' ? (activeDays.has(date.toISOString().split('T')[0]) ? 'Active' : 'Inactive') : (activeDays[date.toISOString().split('T')[0]] || 0) + ' submissions'}`}
                       />
                     );
                   })}
                 </div>
-              ))}
-            </div>
+
+                {/* Bottom label containing the distinct Month shorthand name */}
+                <span className="text-[10px] text-slate-500 font-medium mt-2">
+                  {monthBlock.label}
+                </span>
+
+              </div>
+            ))}
+
           </div>
         </div>
 
         {showScrollHint && (
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900/80 text-slate-400 text-xs px-2 py-1 rounded-full animate-pulse">
+          <div className="absolute right-2 top-1/3 bg-slate-900/80 text-slate-400 text-xs px-2 py-1 rounded-full animate-pulse pointer-events-none">
             <ChevronRight className="h-4 w-4 inline" /> scroll
           </div>
         )}
-
-        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-950 to-transparent pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-slate-950 to-transparent pointer-events-none" />
       </div>
 
-      {/* Legend */}
+      {/* Footer Legend */}
       <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
         <span>Less</span>
-        {colors.map((c, i) => (
-          <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
-        ))}
+        {colors.map((c, i) => <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />)}
         <span>More</span>
       </div>
     </div>

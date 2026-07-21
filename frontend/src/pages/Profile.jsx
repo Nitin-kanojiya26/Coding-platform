@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/client';
 import ActivityHeatmap from '../components/ActivityHeatmap';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { 
   Settings, Save, Loader2, Code, Flame, Calendar, 
-  Award, TrendingUp, CheckCircle2, Bookmark
+  Award, TrendingUp, CheckCircle2, Bookmark, Camera
 } from 'lucide-react';
 
 export default function Profile() {
@@ -18,6 +18,12 @@ export default function Profile() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [showEdit, setShowEdit] = useState(false);
+
+  // Avatar upload state
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Data state
   const [stats, setStats] = useState(null);
@@ -51,7 +57,7 @@ export default function Profile() {
   const totalSubmissions = stats?.totalSubmissions || 0;
   const acceptanceRate = stats?.acceptanceRate || 0;
 
-  // Pie chart data explicitly mapped to your color preferences
+  // Pie chart data
   const difficultyData = [
     { name: 'Easy', value: easySolved, color: '#00b8a3' },
     { name: 'Medium', value: mediumSolved, color: '#ffb800' },
@@ -100,14 +106,63 @@ export default function Profile() {
     return { totalActiveDays: total, maxStreak: maxS };
   }, [submissions]);
 
-  // Update profile
+  // ── Avatar file handlers ──
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5MB');
+      return;
+    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setError('');
+  };
+
+  const handleUpload = async () => {
+    if (!avatarFile) return;
+    setUploading(true);
+    setError('');
+    setMessage('');
+    const formData = new FormData();
+    formData.append('avatar', avatarFile);
+    try {
+      const res = await API.post('/users/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data.user) {
+        refreshUser();
+        setAvatar(res.data.user.avatar);
+        setMessage('Avatar updated successfully!');
+        setAvatarPreview(null);
+        setAvatarFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const cancelAvatar = () => {
+    setAvatarPreview(null);
+    setAvatarFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ── Update profile (name only, avatar is handled separately) ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdating(true);
     setError('');
     setMessage('');
     try {
-      const res = await API.put('/users/profile', { name, avatar });
+      const res = await API.put('/users/profile', { name });
       if (res.data.user) {
         refreshUser();
         setMessage('Profile updated.');
@@ -132,19 +187,56 @@ export default function Profile() {
           {/* Main User Card */}
           <div className="bg-[#050507] rounded-xl p-5 border border-zinc-900 shadow-sm">
             <div className="flex items-center gap-4">
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="w-16 h-16 rounded-lg border border-zinc-800 object-cover bg-zinc-900"
-                onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${user?.name || 'User'}&size=120&background=1a1a1a&color=ffffff`;
-                }}
-              />
+              <div className="relative group">
+                <img
+                  src={avatarPreview || avatarUrl}
+                  alt="Avatar"
+                  className="w-16 h-16 rounded-lg border border-zinc-800 object-cover bg-zinc-900"
+                  onError={(e) => {
+                    e.target.src = `https://ui-avatars.com/api/?name=${user?.name || 'User'}&size=120&background=1a1a1a&color=ffffff`;
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  <Camera className="h-5 w-5 text-white" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-base font-semibold text-white truncate">{user?.name || 'User'}</h2>
                 <p className="text-xs text-zinc-500 font-mono truncate">@{user?.email?.split('@')[0] || 'developer'}</p>
               </div>
             </div>
+
+            {/* Avatar upload controls */}
+            {avatarPreview && (
+              <div className="mt-3 p-3 bg-zinc-950 border border-zinc-900 rounded-lg">
+                <p className="text-xs text-cyan-400 font-mono mb-2">New avatar selected</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs font-medium transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Upload'}
+                  </button>
+                  <button
+                    onClick={cancelAvatar}
+                    className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => setShowEdit(!showEdit)}
@@ -167,20 +259,13 @@ export default function Profile() {
                     placeholder="Display name"
                     required
                   />
-                  <input
-                    type="url"
-                    value={avatar}
-                    onChange={(e) => setAvatar(e.target.value)}
-                    className="w-full rounded-md border border-zinc-900 bg-[#050507] px-3 py-1.5 text-xs text-white placeholder-zinc-700 outline-none focus:border-zinc-700"
-                    placeholder="Avatar image URL"
-                  />
                   <button
                     type="submit"
                     disabled={updating}
                     className="w-full py-1.5 bg-zinc-200 hover:bg-white disabled:opacity-50 text-black rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
                   >
                     {updating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                    Save Changes
+                    Save Name
                   </button>
                 </form>
               </div>
@@ -237,7 +322,7 @@ export default function Profile() {
             
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
               
-              {/* Central Ring Wrapper (VinChart Circle) */}
+              {/* Central Ring Wrapper */}
               <div className="md:col-span-4 flex justify-center relative">
                 <div className="w-36 h-36 relative flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
@@ -270,7 +355,7 @@ export default function Profile() {
               {/* Progress Bar Breakdown Panel */}
               <div className="md:col-span-8 space-y-3.5">
                 
-                {/* Easy Element - Green */}
+                {/* Easy */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-mono">
                     <span className="text-[#00b8a3] font-medium">Easy</span>
@@ -284,7 +369,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Medium Element - Yellow */}
+                {/* Medium */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-mono">
                     <span className="text-[#ffb800] font-medium">Medium</span>
@@ -298,7 +383,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Hard Element - Red */}
+                {/* Hard */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-mono">
                     <span className="text-[#ff2d55] font-medium">Hard</span>

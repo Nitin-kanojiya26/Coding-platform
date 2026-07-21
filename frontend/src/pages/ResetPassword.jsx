@@ -50,44 +50,44 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#0f172a] px-4 py-12">
-      <div className="z-10 w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-8 backdrop-blur-xl shadow-2xl">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#000000] px-4 py-12 text-zinc-300 font-sans antialiased">
+      <div className="z-10 w-full max-w-md space-y-6 rounded-xl border border-zinc-900 bg-[#050507] p-8 shadow-2xl">
         <div className="text-center">
           <div className="flex justify-center mb-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <ShieldCheck className="h-6 w-6 text-white" />
+            <div className="h-12 w-12 rounded-lg bg-zinc-950 border border-zinc-900 flex items-center justify-center shadow-md">
+              <ShieldCheck className="h-6 w-6 text-cyan-400" />
             </div>
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Set New Password</h2>
-          <p className="text-sm text-slate-400 mt-1">Enter the OTP sent to your email and create a new password.</p>
+          <p className="text-sm text-zinc-400 mt-1">Enter the OTP sent to your email and create a new password.</p>
         </div>
 
         {message && (
-          <div className="rounded-xl bg-emerald-500/10 p-4 border border-emerald-500/20 text-emerald-400 text-sm animate-in fade-in duration-200">
+          <div className="rounded-lg bg-emerald-500/10 p-4 border border-emerald-500/20 text-emerald-400 text-sm animate-in fade-in duration-200">
             {message}
           </div>
         )}
         {error && (
-          <div className="rounded-xl bg-rose-500/10 p-4 border border-rose-500/20 text-rose-400 text-sm flex items-start gap-2 animate-in fade-in duration-200">
+          <div className="rounded-lg bg-rose-500/10 p-4 border border-rose-500/20 text-rose-400 text-sm flex items-start gap-2 animate-in fade-in duration-200">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            {error}
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email */}
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <Mail className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
                 placeholder="you@example.com"
               />
             </div>
@@ -95,7 +95,7 @@ export default function ResetPassword() {
 
           {/* OTP */}
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               OTP Code
             </label>
             <input
@@ -104,25 +104,25 @@ export default function ResetPassword() {
               maxLength="6"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 px-4 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-center tracking-widest font-mono"
+              className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 text-center tracking-widest font-semibold"
               placeholder="123456"
             />
           </div>
 
           {/* New Password */}
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               New Password
             </label>
             <div className="relative">
-              <Lock className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <Lock className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
               <input
                 type="password"
                 required
                 minLength="6"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
                 placeholder="••••••••"
               />
             </div>
@@ -130,18 +130,18 @@ export default function ResetPassword() {
 
           {/* Confirm Password */}
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
               Confirm Password
             </label>
             <div className="relative">
-              <Lock className="absolute top-3 left-3 h-4 w-4 text-slate-500" />
+              <Lock className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
               <input
                 type="password"
                 required
                 minLength="6"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-2.5 pr-4 pl-10 text-sm text-white placeholder-slate-500 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
                 placeholder="••••••••"
               />
             </div>
@@ -150,14 +150,14 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition-all duration-200 hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+            className="flex w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-sm text-white py-2.5 font-semibold transition-colors duration-200 disabled:opacity-40"
           >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Reset Password'}
+            {loading ? <Loader2 className="h-5 w-5 animate-spin text-cyan-400" /> : 'Reset Password'}
           </button>
         </form>
 
-        <div className="text-center text-sm text-slate-500">
-          <Link to="/login" className="font-medium text-cyan-400 hover:underline transition-colors duration-200">
+        <div className="text-center text-sm pt-2">
+          <Link to="/login" className="text-cyan-400 hover:underline transition-colors duration-200">
             Back to Login
           </Link>
         </div>

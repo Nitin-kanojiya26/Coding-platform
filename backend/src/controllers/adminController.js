@@ -8,7 +8,7 @@ const Submission = require('../models/Submission');
 exports.getDashboardStats = async (req, res) => {
   try {
     // Parallel queries for efficiency
-    const [totalUsers, totalProblems, totalSubmissions, acceptedSubmissions, problemsByDifficulty] =
+    const [totalUsers, totalProblems, totalSubmissions, acceptedSubmissions, problemsByDifficulty,users] =
       await Promise.all([
         User.countDocuments(),
         Problem.countDocuments(),
@@ -17,6 +17,10 @@ exports.getDashboardStats = async (req, res) => {
         Problem.aggregate([
           { $group: { _id: '$difficulty', count: { $sum: 1 } } },
         ]),
+          User.find() // ✅ Fetch users
+          .select('name email role isBanned') // Exclude password and other sensitive fields
+          .limit(50) // Limit for performance (you can remove or increase)
+          .lean(),
       ]);
 
     // Build difficulty object (default 0 if missing)
@@ -42,6 +46,7 @@ exports.getDashboardStats = async (req, res) => {
           medium: difficultyCounts.medium,
           hard: difficultyCounts.hard,
         },
+        users,
       },
     });
   } catch (error) {
