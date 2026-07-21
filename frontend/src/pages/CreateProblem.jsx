@@ -80,16 +80,16 @@ export default function CreateProblem() {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] px-4 sm:px-8 py-12 text-zinc-300 font-sans antialiased">
+    <div className="min-h-screen bg-primary px-4 sm:px-8 py-12 text-secondary font-sans antialiased">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Simple, Clean Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-base">
           <div>
-            <h1 className="text-xl font-semibold text-white tracking-tight">
+            <h1 className="text-xl font-semibold text-primary tracking-tight">
               Create Problem
             </h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <p className="text-sm text-muted mt-1">
               Add a new coding challenge with test cases and runtime limits.
             </p>
           </div>
@@ -114,95 +114,95 @@ export default function CreateProblem() {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Core Details */}
-            <div className="border border-zinc-900 bg-[#050507] rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-zinc-900/50">
-                <LayoutGrid className="h-4 w-4 text-zinc-500" />
-                <h2 className="text-sm font-medium text-white">Problem Details</h2>
+            <div className="border border-base bg-card rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
+                <LayoutGrid className="h-4 w-4 text-muted" />
+                <h2 className="text-sm font-medium text-primary">Problem Details</h2>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Title</label>
+                <label className="text-xs font-medium text-muted">Title</label>
                 <input
                   name="title"
                   value={form.title}
                   onChange={handleChange}
                   required
-                  className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3.5 py-2 text-white placeholder-zinc-700 outline-none focus:border-zinc-700 transition-colors"
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
                   placeholder="e.g., Two Sum"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Description</label>
+                <label className="text-xs font-medium text-muted">Description</label>
                 <textarea
                   name="description"
                   value={form.description}
                   onChange={handleChange}
                   rows="6"
                   required
-                  className="w-full text-sm font-sans rounded-lg border border-zinc-900 bg-zinc-950 px-3.5 py-2 text-white placeholder-zinc-700 outline-none focus:border-zinc-700 transition-colors resize-none leading-relaxed"
+                  className="w-full text-sm font-sans rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors resize-none leading-relaxed"
                   placeholder="Describe the problem objective, inputs, and expected outcomes..."
                 />
               </div>
             </div>
 
             {/* Test Cases */}
-            <div className="border border-zinc-900 bg-[#050507] rounded-xl p-6 space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-zinc-900/50">
-                <Terminal className="h-4 w-4 text-zinc-500" />
-                <h2 className="text-sm font-medium text-white">Test Cases</h2>
+            <div className="border border-base bg-card rounded-xl p-6 space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
+                <Terminal className="h-4 w-4 text-muted" />
+                <h2 className="text-sm font-medium text-primary">Test Cases</h2>
               </div>
 
               {/* Sample Test Cases */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-medium text-zinc-300">Sample Test Cases</h3>
-                    <p className="text-[11px] text-zinc-500">Visible to users in the description.</p>
+                    <h3 className="text-xs font-medium text-secondary">Sample Test Cases</h3>
+                    <p className="text-[11px] text-muted">Visible to users in the description.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => addTestCase('sample')}
-                    className="inline-flex items-center gap-1 text-xs text-space-blue hover:text-white transition-colors"
+                    className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Sample
                   </button>
                 </div>
                 
                 {form.sampleTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-zinc-500 font-mono">
+                  <div key={idx} className="bg-secondary border border-base rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-muted font-mono">
                       <span>Case #{idx + 1}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-500 font-mono block">Input</span>
+                        <span className="text-[10px] text-muted font-mono block">Input</span>
                         <textarea
                           placeholder="Input data"
                           value={tc.input}
                           onChange={(e) => handleTestCaseChange('sample', idx, 'input', e.target.value)}
                           rows="2"
-                          className="w-full text-xs font-mono rounded border border-zinc-900 bg-[#050507] px-3 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 resize-none"
+                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-500 font-mono block">Output</span>
+                        <span className="text-[10px] text-muted font-mono block">Output</span>
                         <textarea
                           placeholder="Expected output"
                           value={tc.output}
                           onChange={(e) => handleTestCaseChange('sample', idx, 'output', e.target.value)}
                           rows="2"
-                          className="w-full text-xs font-mono rounded border border-zinc-900 bg-[#050507] px-3 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 resize-none"
+                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
                         />
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] text-zinc-500 block">Explanation (Optional)</span>
+                      <span className="text-[10px] text-muted block">Explanation (Optional)</span>
                       <input
                         placeholder="Why this output is correct..."
                         value={tc.explanation}
                         onChange={(e) => handleTestCaseChange('sample', idx, 'explanation', e.target.value)}
-                        className="w-full text-xs rounded border border-zinc-900 bg-[#050507] px-3 py-2 text-zinc-400 placeholder-zinc-700 outline-none focus:border-zinc-700"
+                        className="w-full text-xs rounded border border-base bg-primary px-3 py-2 text-muted placeholder-muted outline-none focus:border-light"
                       />
                     </div>
                     {form.sampleTestCases.length > 1 && (
@@ -219,45 +219,45 @@ export default function CreateProblem() {
               </div>
 
               {/* Hidden Test Cases */}
-              <div className="space-y-4 pt-4 border-t border-zinc-900/50">
+              <div className="space-y-4 pt-4 border-t border-base/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-medium text-zinc-300">Hidden Test Cases</h3>
-                    <p className="text-[11px] text-zinc-500">Used for evaluation behind the scenes.</p>
+                    <h3 className="text-xs font-medium text-secondary">Hidden Test Cases</h3>
+                    <p className="text-[11px] text-muted">Used for evaluation behind the scenes.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => addTestCase('hidden')}
-                    className="inline-flex items-center gap-1 text-xs text-space-blue hover:text-white transition-colors"
+                    className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add Hidden Case
                   </button>
                 </div>
                 
                 {form.hiddenTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-zinc-950 border border-zinc-900 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-zinc-500 font-mono">
+                  <div key={idx} className="bg-secondary border border-base rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-muted font-mono">
                       <span>Hidden #{idx + 1}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-500 font-mono block">Input</span>
+                        <span className="text-[10px] text-muted font-mono block">Input</span>
                         <textarea
                           placeholder="Input data"
                           value={tc.input}
                           onChange={(e) => handleTestCaseChange('hidden', idx, 'input', e.target.value)}
                           rows="2"
-                          className="w-full text-xs font-mono rounded border border-zinc-900 bg-[#050507] px-3 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 resize-none"
+                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-500 font-mono block">Output</span>
+                        <span className="text-[10px] text-muted font-mono block">Output</span>
                         <textarea
                           placeholder="Expected output"
                           value={tc.output}
                           onChange={(e) => handleTestCaseChange('hidden', idx, 'output', e.target.value)}
                           rows="2"
-                          className="w-full text-xs font-mono rounded border border-zinc-900 bg-[#050507] px-3 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 resize-none"
+                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
                         />
                       </div>
                     </div>
@@ -279,20 +279,20 @@ export default function CreateProblem() {
 
           {/* Right Sidebar Section */}
           <div className="lg:col-span-1 space-y-4">
-            <div className="border border-zinc-900 bg-[#050507] rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-zinc-900/50">
-                <Sliders className="h-4 w-4 text-zinc-500" />
-                <h2 className="text-sm font-medium text-white">Settings</h2>
+            <div className="border border-base bg-card rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
+                <Sliders className="h-4 w-4 text-muted" />
+                <h2 className="text-sm font-medium text-primary">Settings</h2>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Difficulty</label>
+                <label className="text-xs font-medium text-muted">Difficulty</label>
                 <div className="relative">
                   <select
                     name="difficulty"
                     value={form.difficulty}
                     onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3.5 py-2 text-white outline-none focus:border-zinc-750 cursor-pointer appearance-none"
+                    className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary outline-none focus:border-light cursor-pointer appearance-none"
                   >
                     <option value="easy">Easy</option>
                     <option value="medium">Medium</option>
@@ -302,46 +302,46 @@ export default function CreateProblem() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Tags</label>
+                <label className="text-xs font-medium text-muted">Tags</label>
                 <input
                   value={form.tags.join(', ')}
                   onChange={handleTags}
-                  className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3.5 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 transition-colors"
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-secondary placeholder-muted outline-none focus:border-light transition-colors"
                   placeholder="e.g., arrays, hash-map"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Constraints</label>
+                <label className="text-xs font-medium text-muted">Constraints</label>
                 <textarea
                   name="constraints"
                   value={form.constraints}
                   onChange={handleChange}
                   rows="2"
-                  className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3.5 py-2 text-zinc-300 placeholder-zinc-700 outline-none focus:border-zinc-700 transition-colors resize-none"
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-secondary placeholder-muted outline-none focus:border-light transition-colors resize-none"
                   placeholder="e.g., 1 <= nums.length <= 10^5"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">Time Limit (ms)</label>
+                  <label className="text-xs font-medium text-muted">Time Limit (ms)</label>
                   <input
                     type="number"
                     name="timeLimit"
                     value={form.timeLimit}
                     onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-white outline-none focus:border-zinc-700"
+                    className="w-full text-sm rounded-lg border border-base bg-input px-3 py-2 text-primary outline-none focus:border-light"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">Memory (MB)</label>
+                  <label className="text-xs font-medium text-muted">Memory (MB)</label>
                   <input
                     type="number"
                     name="memoryLimit"
                     value={form.memoryLimit}
                     onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-white outline-none focus:border-zinc-700"
+                    className="w-full text-sm rounded-lg border border-base bg-input px-3 py-2 text-primary outline-none focus:border-light"
                   />
                 </div>
               </div>
@@ -350,7 +350,7 @@ export default function CreateProblem() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-space-blue hover:bg-space-blue/90 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-space-blue/10"
+              className="w-full py-2.5 bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-accent/10"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

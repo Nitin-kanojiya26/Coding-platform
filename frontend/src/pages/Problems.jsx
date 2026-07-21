@@ -11,14 +11,14 @@ const ProblemItem = ({ problem, isSolved, isAttempted }) => {
   const { isBookmarked, toggleBookmark, loading: bookmarkLoading } = useBookmark(problem._id);
 
   return (
-    <div className="group relative border-b border-zinc-900 last:border-0 transition-all duration-200">
+    <div className="group relative border-b border-base last:border-0 transition-all duration-200">
       {/* Subtle Row Hover Effect */}
-      <div className="absolute inset-y-1 -inset-x-3 rounded-xl opacity-0 group-hover:opacity-100 bg-[#0c0c0e] transition-all duration-200" />
+      <div className="absolute inset-y-1 -inset-x-3 rounded-xl opacity-0 group-hover:opacity-100 bg-hover/50 transition-all duration-200" />
       
       <div className="relative flex items-center justify-between py-4 px-3 select-none">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           {/* Active Accent Hover Bar */}
-          <div className="w-[3px] h-5 rounded-full self-center bg-transparent group-hover:bg-space-blue group-hover:shadow-[0_0_12px_rgba(56,189,248,0.4)] transition-all duration-200" />
+          <div className="w-[3px] h-5 rounded-full self-center bg-transparent group-hover:bg-accent group-hover:shadow-[0_0_12px_rgba(56,189,248,0.4)] transition-all duration-200" />
 
           {/* Tri-State Diagnostics Status Icon Block */}
           <div className="flex-shrink-0">
@@ -35,7 +35,7 @@ const ProblemItem = ({ problem, isSolved, isAttempted }) => {
               </div>
             ) : (
               <div className="p-1">
-                <Circle className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                <Circle className="h-4 w-4 text-muted group-hover:text-secondary transition-colors" />
               </div>
             )}
           </div>
@@ -44,7 +44,7 @@ const ProblemItem = ({ problem, isSolved, isAttempted }) => {
           <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pr-4">
             <Link 
               to={`/problems/${problem.slug}`}
-              className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors duration-150 truncate"
+              className="text-sm font-medium text-secondary group-hover:text-primary transition-colors duration-150 truncate"
             >
               {problem.title}
             </Link>
@@ -57,13 +57,13 @@ const ProblemItem = ({ problem, isSolved, isAttempted }) => {
                 {problem.tags.slice(0, 3).map((tag, idx) => (
                   <span 
                     key={idx} 
-                    className="text-[10px] font-bold tracking-wide text-zinc-300 bg-zinc-900 border border-zinc-700/80 px-2.5 py-0.5 rounded-md shadow-sm transition-colors group-hover:border-zinc-600"
+                    className="text-[10px] font-bold tracking-wide text-secondary bg-hover/50 border border-light/80 px-2.5 py-0.5 rounded-md shadow-sm transition-colors group-hover:border-light"
                   >
                     {tag}
                   </span>
                 ))}
                 {problem.tags.length > 3 && (
-                  <span className="text-[10px] text-zinc-500 font-bold bg-zinc-900/40 border border-zinc-800 px-1.5 py-0.5 rounded-md">
+                  <span className="text-[10px] text-muted font-bold bg-hover/40 border border-base px-1.5 py-0.5 rounded-md">
                     +{problem.tags.length - 3}
                   </span>
                 )}
@@ -77,11 +77,11 @@ const ProblemItem = ({ problem, isSolved, isAttempted }) => {
           <button 
             onClick={(e) => { e.stopPropagation(); toggleBookmark(); }} 
             disabled={bookmarkLoading} 
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-slate-300 transition-colors"
+            className="p-1.5 rounded-lg text-muted hover:text-secondary transition-colors"
           >
             <Bookmark className={`h-4 w-4 transition-all duration-350 ${
               isBookmarked 
-                ? 'fill-space-blue text-space-blue drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' 
+                ? 'fill-accent text-accent drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' 
                 : ''
             }`} />
           </button>
@@ -154,43 +154,43 @@ export default function Problems() {
   }, [searchTerm, problems]);
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-screen bg-[#000000]">
-      <div className="w-5 h-5 border-2 border-zinc-800 border-t-space-blue rounded-full animate-spin" />
+    <div className="flex items-center justify-center min-h-screen bg-primary">
+      <div className="w-5 h-5 border-2 border-base border-t-accent rounded-full animate-spin" />
     </div>
   );
 
   return (
     /* OUTER BOX LAYER: Flat Pure Black Base Void Layout */
-    <div className="min-h-screen bg-[#000000] px-6 py-10 text-zinc-400 font-sans antialiased selection:bg-space-blue/20 selection:text-space-blue">
+    <div className="min-h-screen bg-primary px-6 py-10 text-muted font-sans antialiased selection:bg-accent/20 selection:text-accent">
       <div className="max-w-5xl mx-auto space-y-6">
         
         {/* Title Header Block */}
-        <div className="pb-4 border-b border-zinc-900">
-          <h1 className="text-xl font-bold text-slate-100 tracking-wide flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-space-blue" /> Browse Registries
+        <div className="pb-4 border-b border-base">
+          <h1 className="text-xl font-bold text-primary tracking-wide flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-accent" /> Browse Registries
           </h1>
-          <p className="text-xs text-zinc-500 mt-1">
+          <p className="text-xs text-muted mt-1">
             Locate core files, track verification status, and manage workspace bookmarks.
           </p>
         </div>
 
         {/* Pure Black Layered Search Input */}
         <div className="relative group rounded-xl">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-space-blue transition-colors" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors" />
           <input
             type="text"
             placeholder="Search problem index repositories..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-[#0a0a0c] border border-zinc-900 rounded-xl text-slate-200 placeholder-zinc-700 outline-none text-xs transition-all duration-150 focus:border-zinc-700"
+            className="w-full pl-11 pr-4 py-2.5 bg-secondary border border-base rounded-xl text-secondary placeholder-muted outline-none text-xs transition-all duration-150 focus:border-light"
           />
         </div>
 
         {/* Elevated Matte Charcoal Card Panel */}
-        <div className="bg-[#0a0a0c] border border-zinc-800/80 rounded-2xl p-5 space-y-2 shadow-md">
-          <div className="divide-y divide-zinc-900/60">
+        <div className="bg-secondary border border-base/80 rounded-2xl p-5 space-y-2 shadow-md">
+          <div className="divide-y divide-base/60">
             {filtered.length === 0 ? (
-              <div className="py-16 text-center text-zinc-600 text-xs font-mono tracking-wider bg-[#000000] border border-zinc-900 rounded-xl">
+              <div className="py-16 text-center text-muted text-xs font-mono tracking-wider bg-primary border border-base rounded-xl">
                 ZERO SYSTEM REGISTRIES LOCATED
               </div>
             ) : (

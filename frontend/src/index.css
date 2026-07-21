@@ -143,3 +143,26 @@ html:not(.dark) {
     linear-gradient(to right, rgba(255, 255, 255, 0.005) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
 }
+@theme {
+  /* ─── Heatmap Empty Box Color ─── */
+  --heatmap-empty: #2a2a2a;  /* Dark mode = visible dark gray (stands out from pure black) */
+}
+
+/* ─── Light mode override ─────────────────────────────────────── */
+html:not(.dark) {
+  --heatmap-empty: #d1d5db;  /* Light mode = visible light gray (stands out from white) */
+}
+@layer utilities {
+  .bg-heatmap-empty {
+    background-color: var(--heatmap-empty);
+  }
+}
+/* ─── Global Dark Mode Border Override ──────────────────────── */
+html.dark [class*="border-"]:not(.border-transparent):not(.border-none) {
+  border-color: var(--color-border) !important;
+}
+@theme {
+  /* ─── Dark Mode Colors ─── */
+  --color-space-blue: #3b82f6;  /* Choose your accent blue */
+  /* ... other variables ... */
+}

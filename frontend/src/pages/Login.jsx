@@ -39,7 +39,7 @@ export default function Login() {
           {/* Logo container using matching vibrant gradient framework */}
           <div className='flex flx-col items center size'>
           <img
-              src="/Codexium.svg"
+              src="/Codexium.png"
               alt="Codexium Logo"
               className="w-30 h-25 object-contain opacity-90 mix-blend-screen group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-200 shrink-0"
               onError={(e) => { e.target.style.display = 'none'; }}
