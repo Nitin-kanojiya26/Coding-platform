@@ -7,11 +7,45 @@ import {
   Settings, Save, Loader2, Code, Flame, Calendar, 
   Award, TrendingUp, CheckCircle2, Bookmark, Camera
 } from 'lucide-react';
+import { getAvatarSrc } from '../utils/avatar';
 
 // ─── Custom colors for difficulty ──────────────────────────────
-const EASY_COLOR = '#6ee774';   // Dark green
+const EASY_COLOR = '#6ee774';
 const MEDIUM_COLOR = '#ffb800';
 const HARD_COLOR = '#ff2d55';
+
+// ─── Helper to derive 1-2 initial letters ──────────────────────
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+// ─── Chromatic Aberration Initials Avatar Badge ────────────────
+function InitialsAvatar({ name, className = "w-16 h-16 text-lg" }) {
+  const initials = getInitials(name);
+
+  return (
+    <div
+      className={`relative flex items-center justify-center rounded-xl bg-[#121212] border border-white/10 font-bold select-none overflow-hidden shrink-0 ${className}`}
+    >
+      <span
+        className="font-mono text-white tracking-tight"
+        style={{
+          textShadow: `
+            -1.5px -0.5px 0px rgba(56, 189, 248, 0.9), 
+             1.5px  0.5px 0px rgba(249, 115, 22, 0.9)
+          `,
+        }}
+      >
+        {initials}
+      </span>
+    </div>
+  );
+}
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -28,6 +62,7 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const fileInputRef = useRef(null);
 
   // Data state
@@ -62,7 +97,7 @@ export default function Profile() {
   const totalSubmissions = stats?.totalSubmissions || 0;
   const acceptanceRate = stats?.acceptanceRate || 0;
 
-  // Pie chart data – uses dark green for Easy
+  // Pie chart data
   const difficultyData = [
     { name: 'Easy', value: easySolved, color: EASY_COLOR },
     { name: 'Medium', value: mediumSolved, color: MEDIUM_COLOR },
@@ -145,6 +180,7 @@ export default function Profile() {
         setMessage('Avatar updated successfully!');
         setAvatarPreview(null);
         setAvatarFile(null);
+        setImgError(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     } catch (err) {
@@ -180,7 +216,9 @@ export default function Profile() {
     }
   };
 
-  const avatarUrl = avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&size=120&background=1a1a1a&color=ffffff`;
+  const avatarSrc = getAvatarSrc(user?.avatar);
+  const displayAvatar = avatarPreview || avatarSrc;
+  const hasAvatar = Boolean(avatarPreview || (user?.avatar && !imgError));
 
   return (
     <div className="min-h-screen bg-primary px-4 sm:px-8 py-10 text-secondary font-sans antialiased">
@@ -193,17 +231,20 @@ export default function Profile() {
           <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
             <div className="flex items-center gap-4">
               <div className="relative group">
-                <img
-                  src={avatarPreview || avatarUrl}
-                  alt="Avatar"
-                  className="w-16 h-16 rounded-lg border border-light object-cover bg-secondary"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${user?.name || 'User'}&size=120&background=1a1a1a&color=ffffff`;
-                  }}
-                />
+                {hasAvatar ? (
+                  <img
+                    src={displayAvatar}
+                    alt="Avatar"
+                    className="w-16 h-16 rounded-xl border border-light object-cover bg-secondary"
+                    onError={() => setImgError(true)}
+                  />
+                ) : (
+                  <InitialsAvatar name={user?.name} className="w-16 h-16 text-lg" />
+                )}
+
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 >
                   <Camera className="h-5 w-5 text-white" />
                 </button>
@@ -427,7 +468,6 @@ export default function Profile() {
               </div>
             </div>
             
-            {/* Scroll bounds containing grid shifts */}
             <div className="w-full overflow-x-auto scrollbar-none py-1">
               <div className="min-w-[760px]">
                 <ActivityHeatmap submissions={submissions} mode="submission" />
@@ -443,7 +483,6 @@ export default function Profile() {
             <div className="space-y-2">
               {recentAC.length > 0 ? (
                 recentAC.map((s, idx) => {
-                  // Map difficulty to the same colors
                   let difficultyColor = EASY_COLOR;
                   if (s.problem?.difficulty?.toLowerCase() === 'medium') difficultyColor = MEDIUM_COLOR;
                   if (s.problem?.difficulty?.toLowerCase() === 'hard') difficultyColor = HARD_COLOR;

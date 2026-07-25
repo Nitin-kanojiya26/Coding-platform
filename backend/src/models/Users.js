@@ -27,8 +27,8 @@ const userSchema = new mongoose.Schema({
         default: 'user'
     },
     avatar: {
-        type: String,
-        default: '', // or a default avatar URL
+        data:{type : Buffer},
+        contentType:{type: String},
     },
     solvedProblems: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
     bannedAt: { type: Date, default: null },
 
 }, {
-    timestamps: true // Automatically creates 'createdAt' and 'updatedAt' fields
+    timestamps: true 
 });
 
 // Middleware: Automatically hash the password before saving a user document

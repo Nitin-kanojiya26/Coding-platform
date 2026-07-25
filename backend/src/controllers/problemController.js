@@ -1,258 +1,255 @@
 const Problem = require('../models/Problem');
-const jdoodleService = require('../services/jdoodleService'); 
+const judge0Service = require('../services/judge0Service');
+const languageMap = require('../utils/languageMap');
+
+// ─── Helper functions ──────────────────────────────────────────
 const createSlug = (value) => {
-    return value
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 };
 
 const normalizeTags = (tags) => {
-    if (!tags) return [];
-    if (Array.isArray(tags)) {
-        return tags.map((tag) => tag.toString().trim().toLowerCase()).filter(Boolean);
-    }
-    return tags
-        .toString()
-        .split(',')
-        .map((tag) => tag.trim().toLowerCase())
-        .filter(Boolean);
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => tag.toString().trim().toLowerCase()).filter(Boolean);
+  }
+  return tags
+    .toString()
+    .split(',')
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
 };
 
 const escapeRegex = (value) => {
-    return value.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
 const buildProblemQuery = (query) => {
-    const filter = {};
-
-    if (query.difficulty) {
+  const filter = {};
+  if (query.difficulty) {
     filter.difficulty = new RegExp(`^${escapeRegex(query.difficulty.trim())}$`, 'i');
-}
-    const tags = normalizeTags(query.tags);
-    if (tags.length > 0) {
-        filter.tags = { $all: tags };
-    }
-
-    if (query.search) {
-        const searchRegex = new RegExp(escapeRegex(query.search.trim()), 'i');
-        filter.$or = [
-            { title: searchRegex },
-            { description: searchRegex }
-        ];
-    }
-
-    return filter;
+  }
+  const tags = normalizeTags(query.tags);
+  if (tags.length > 0) {
+    filter.tags = { $all: tags };
+  }
+  if (query.search) {
+    const searchRegex = new RegExp(escapeRegex(query.search.trim()), 'i');
+    filter.$or = [
+      { title: searchRegex },
+      { description: searchRegex }
+    ];
+  }
+  return filter;
 };
 
-// @desc    Create a coding problem
-// @route   POST /api/problems
-// @access  Admin
+// Map fallback names in case languageMap uses different key formatting
+const getLanguageId = (lang) => {
+  if (!lang) return null;
+  
+  // If already a valid numeric ID passed from frontend
+  if (typeof lang === 'number' || !isNaN(Number(lang))) {
+    return Number(lang);
+  }
+
+  const normalized = lang.toString().toLowerCase().trim();
+
+  // Try direct lookup from user's languageMap module
+  if (languageMap[normalized]) {
+    return languageMap[normalized];
+  }
+
+  // Common fallbacks for Judge0 CE IDs
+  const fallbackMap = {
+    'cpp': 54,        // C++ (GCC 9.2.0)
+    'c_cpp': 54,
+    'c++': 54,
+    'python': 71,     // Python (3.8.1)
+    'py': 71,
+    'python3': 71,
+    'java': 62,       // Java (OpenJDK 13.0.1)
+    'javascript': 63, // JavaScript (Node.js 12.14.0)
+    'js': 63,
+    'c': 50          // C (GCC 9.2.0)
+  };
+
+  return fallbackMap[normalized] || null;
+};
+
+// ─── CRUD Operations ────────────────────────────────────────────
 exports.createProblem = async (req, res) => {
-    try {
-        const problemData = {
-            ...req.body,
-            slug: req.body.slug ? createSlug(req.body.slug) : createSlug(req.body.title || ''),
-            tags: normalizeTags(req.body.tags),
-            createdBy: req.user._id
-        };
+  try {
+    const problemData = {
+      ...req.body,
+      slug: req.body.slug ? createSlug(req.body.slug) : createSlug(req.body.title || ''),
+      tags: normalizeTags(req.body.tags),
+      createdBy: req.user._id
+    };
 
-        // ✅ Ensure every test case has a displayInput
-        if (problemData.sampleTestCases) {
-            problemData.sampleTestCases = problemData.sampleTestCases.map(tc => ({
-                ...tc,
-                displayInput: tc.displayInput || tc.input,
-            }));
-        }
-        if (problemData.hiddenTestCases) {
-            problemData.hiddenTestCases = problemData.hiddenTestCases.map(tc => ({
-                ...tc,
-                displayInput: tc.displayInput || tc.input,
-            }));
-        }
-
-        const problem = await Problem.create(problemData);
-        const responseProblem = problem.toObject();
-        delete responseProblem.hiddenTestCases;
-
-        res.status(201).json({
-            status: 'success',
-            problem: responseProblem
-        });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ message: 'Problem slug already exists' });
-        }
-        res.status(500).json({ message: error.message });
+    if (problemData.sampleTestCases) {
+      problemData.sampleTestCases = problemData.sampleTestCases.map(tc => ({
+        ...tc,
+        displayInput: tc.displayInput || tc.input,
+      }));
     }
+    if (problemData.hiddenTestCases) {
+      problemData.hiddenTestCases = problemData.hiddenTestCases.map(tc => ({
+        ...tc,
+        displayInput: tc.displayInput || tc.input,
+      }));
+    }
+
+    const problem = await Problem.create(problemData);
+    const responseProblem = problem.toObject();
+    delete responseProblem.hiddenTestCases;
+
+    res.status(201).json({
+      status: 'success',
+      problem: responseProblem
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Problem slug already exists' });
+    }
+    res.status(500).json({ message: error.message });
+  }
 };
 
-// @desc    Get all problems with pagination, filters, and search
-// @route   GET /api/problems
-// @access  Public
 exports.getAllProblems = async (req, res) => {
-    try {
-        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
-        const skip = (page - 1) * limit;
-        const filter = buildProblemQuery(req.query);
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const skip = (page - 1) * limit;
+    const filter = buildProblemQuery(req.query);
 
-        const [problems, total] = await Promise.all([
-            Problem.find(filter)
-                .select('-hiddenTestCases')
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .populate('createdBy', 'name email role'),
-            Problem.countDocuments(filter)
-        ]);
+    const [problems, total] = await Promise.all([
+      Problem.find(filter)
+        .select('-hiddenTestCases')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('createdBy', 'name email role'),
+      Problem.countDocuments(filter)
+    ]);
 
-        res.status(200).json({
-            status: 'success',
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-            count: problems.length,
-            problems
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    res.status(200).json({
+      status: 'success',
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      count: problems.length,
+      problems
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-// @desc    Get one problem by slug
-// @route   GET /api/problems/:slug
-// @access  Public
 exports.getProblemBySlug = async (req, res) => {
-    try {
-        const problem = await Problem.findOne({ slug: req.params.slug.toLowerCase() })
-            .select('-hiddenTestCases')
-            .populate('createdBy', 'name email role');
+  try {
+    const problem = await Problem.findOne({ slug: req.params.slug.toLowerCase() })
+      .select('-hiddenTestCases')
+      .populate('createdBy', 'name email role');
 
-        if (!problem) {
-            return res.status(404).json({ message: 'Problem not found' });
-        }
-
-        res.status(200).json({
-            status: 'success',
-            problem
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
     }
+
+    res.status(200).json({
+      status: 'success',
+      problem
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
-// @desc    Update a problem
-// @route   PUT /api/problems/:id
-// @access  Admin
+
 exports.updateProblem = async (req, res) => {
-    try {
-        const updates = { ...req.body };
+  try {
+    const updates = { ...req.body };
 
-        if (updates.title) {
-            updates.slug = createSlug(updates.title);
-        }
-        if (updates.tags) {
-            updates.tags = normalizeTags(updates.tags);
-        }
-
-        // ✅ Ensure displayInput is set for any updated test cases
-        if (updates.sampleTestCases) {
-            updates.sampleTestCases = updates.sampleTestCases.map(tc => ({
-                ...tc,
-                displayInput: tc.displayInput || tc.input,
-            }));
-        }
-        if (updates.hiddenTestCases) {
-            updates.hiddenTestCases = updates.hiddenTestCases.map(tc => ({
-                ...tc,
-                displayInput: tc.displayInput || tc.input,
-            }));
-        }
-
-        const problem = await Problem.findByIdAndUpdate(
-            req.params.id,
-            updates,
-            { new: true, runValidators: true }
-        ).select("-hiddenTestCases");
-
-        if (!problem) {
-            return res.status(404).json({ message: "Problem not found" });
-        }
-
-        res.status(200).json({
-            status: "success",
-            problem
-        });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ message: "Problem slug already exists" });
-        }
-        res.status(500).json({ message: error.message });
+    if (updates.title) {
+      updates.slug = createSlug(updates.title);
     }
+    if (updates.tags) {
+      updates.tags = normalizeTags(updates.tags);
+    }
+
+    if (updates.sampleTestCases) {
+      updates.sampleTestCases = updates.sampleTestCases.map(tc => ({
+        ...tc,
+        displayInput: tc.displayInput || tc.input,
+      }));
+    }
+    if (updates.hiddenTestCases) {
+      updates.hiddenTestCases = updates.hiddenTestCases.map(tc => ({
+        ...tc,
+        displayInput: tc.displayInput || tc.input,
+      }));
+    }
+
+    const problem = await Problem.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    ).select('-hiddenTestCases');
+
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      problem
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Problem slug already exists' });
+    }
+    res.status(500).json({ message: error.message });
+  }
 };
 
-// @desc    Delete a problem
-// @route   DELETE /api/problems/:id
-// @access  Admin
 exports.deleteProblem = async (req, res) => {
-    try {
-
-        const problem = await Problem.findByIdAndDelete(req.params.id);
-
-        if (!problem) {
-            return res.status(404).json({
-                message: "Problem not found"
-            });
-        }
-
-        res.status(200).json({
-            status: "success",
-            message: "Problem deleted successfully"
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            message: error.message
-        });
-
+  try {
+    const problem = await Problem.findByIdAndDelete(req.params.id);
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
     }
+    res.status(200).json({
+      status: 'success',
+      message: 'Problem deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
-// @desc    Get problem by ID
-// @route   GET /api/problems/id/:id
-// @access  Admin
+
 exports.getProblemById = async (req, res) => {
-    try {
+  try {
+    const problem = await Problem.findById(req.params.id)
+      .select('+hiddenTestCases')
+      .populate('createdBy', 'name email role');
 
-        const problem = await Problem.findById(req.params.id)
-            .select('+hiddenTestCases') 
-            .populate("createdBy", "name email role");
-
-        if (!problem) {
-            return res.status(404).json({
-                message: "Problem not found"
-            });
-        }
-
-        res.status(200).json({
-            status: "success",
-            problem
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            message: error.message
-        });
-
+    if (!problem) {
+      return res.status(404).json({ message: 'Problem not found' });
     }
+
+    res.status(200).json({
+      status: 'success',
+      problem
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
-// @desc    Post a comment on a problem
-// @route   POST /api/problems/:id/comments
-// @access  Private
+
+// ─── Comments ────────────────────────────────────────────────────
 exports.addComment = async (req, res) => {
   try {
     const problemId = req.params.id;
@@ -267,19 +264,14 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ message: 'Problem not found' });
     }
 
-    // Push new comment
     problem.comments.push({
       user: req.user._id,
       text: text.trim(),
     });
 
-    // Save the problem
     await problem.save();
-
-    // Populate the user field for all comments (or just the last one)
     await problem.populate('comments.user', 'name avatar');
 
-    // Get the newly added comment (last in array)
     const newComment = problem.comments[problem.comments.length - 1];
 
     res.status(201).json({
@@ -290,13 +282,10 @@ exports.addComment = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// @desc    Get all comments for a problem
-// @route   GET /api/problems/:id/comments
-// @access  Public (or Private if you want)
+
 exports.getComments = async (req, res) => {
   try {
     const problemId = req.params.id;
-
     const problem = await Problem.findById(problemId)
       .select('comments')
       .populate('comments.user', 'name avatar');
@@ -305,7 +294,6 @@ exports.getComments = async (req, res) => {
       return res.status(404).json({ message: 'Problem not found' });
     }
 
-    // Sort comments by createdAt descending (newest first)
     const comments = problem.comments.sort((a, b) => b.createdAt - a.createdAt);
 
     res.status(200).json({
@@ -317,9 +305,8 @@ exports.getComments = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// @desc    Run code against sample test cases
-// @route   POST /api/problems/:id/run
-// @access  Private (optional – public if you want)
+
+// ─── Run Code (Sandbox) ────────────────────────────────────────
 exports.runSampleTestCases = async (req, res) => {
   try {
     const { id } = req.params;
@@ -334,32 +321,53 @@ exports.runSampleTestCases = async (req, res) => {
       return res.status(404).json({ message: 'Problem not found' });
     }
 
-    // Ensure the problem has sample test cases
     if (!problem.sampleTestCases || problem.sampleTestCases.length === 0) {
       return res.status(400).json({ message: 'This problem has no sample test cases to run' });
     }
 
-    // Use a moderate time limit (e.g., 2000ms) for runs (user can adjust if needed)
-    const { results, overallStatus } = await jdoodleService.runTestCasesDetailed(
-      code,
-      language,
-      problem.sampleTestCases,
-      2000  // default time limit for runs
-    );
+    // Resolve exact Judge0 language_id
+    const languageId = getLanguageId(language);
+    if (!languageId) {
+      return res.status(400).json({ 
+        message: `Unsupported or unmapped language: '${language}'. Please send a valid language string or Judge0 language_id.` 
+      });
+    }
 
-    // Build response
-    const passed = results.filter(r => r.status === 'accepted').length;
-    const total = results.length;
+    console.log(`📥 Processing execution for lang '${language}' (Judge0 ID: ${languageId})`);
+
+    // ✅ Execute via Judge0 Service
+    let executionResult;
+    try {
+      executionResult = await judge0Service.runTestCasesDetailed(
+        code,
+        languageId,
+        problem.sampleTestCases,
+        2000
+      );
+    } catch (serviceError) {
+      console.error('❌ Judge0 service error:', serviceError.message);
+      return res.status(500).json({ message: 'Code execution failed: ' + serviceError.message });
+    }
+
+    // ✅ Guard against undefined or broken service return
+    if (!executionResult || !executionResult.results) {
+      console.error('❌ Judge0 returned invalid response:', executionResult);
+      return res.status(500).json({ message: 'Invalid response from execution engine' });
+    }
+
+    // Destructure response from service
+    const { status: overallStatus, passed, total, results } = executionResult;
 
     res.status(200).json({
       status: 'success',
-      overallStatus,    // 'accepted' if all passed, else first failing status
+      overallStatus,
       passed,
       total,
-      results: results.map(r => ({
+      results: results.map((r) => ({
         input: r.input,
         expectedOutput: r.expectedOutput,
-        actualOutput: r.actualOutput || '',   // we need to add actualOutput in runSingleTestCase
+        actualOutput: r.actualOutput || '',
+        stderr: r.stderr || r.compile_output || '', // Captures compiler output on CE
         passed: r.status === 'accepted',
         status: r.status,
         runtime: r.runtime,
@@ -367,6 +375,7 @@ exports.runSampleTestCases = async (req, res) => {
       })),
     });
   } catch (error) {
+    console.error('🔥 Run error:', error.message);
     res.status(500).json({ message: error.message });
   }
 };

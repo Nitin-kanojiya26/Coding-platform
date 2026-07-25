@@ -62,25 +62,34 @@ exports.updateProfile = async (req, res) => {
 // @desc    Upload avatar image
 // @route   POST /api/users/avatar
 // @access  Private
+// @desc    Upload avatar image (store in DB)
+// @route   POST /api/users/avatar
+// @access  Private
 exports.uploadAvatar = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${req.file.filename}`;
-
+    // Store binary in DB
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { avatar: avatarUrl },
+      {
+        avatar: {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        },
+      },
       { new: true }
-    ).select('-password');
+    ).select('-password -avatar.data');
 
     res.status(200).json({
       status: 'success',
+      message: 'Avatar uploaded successfully',
       user,
     });
   } catch (error) {
+    console.error('Avatar upload error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -548,7 +557,7 @@ exports.searchUsers = async (req, res) => {
 
     const regex = new RegExp(name.trim(), 'i');
     const users = await User.find({ name: regex })
-      .select('name avatar')
+      .select('name avatar role')
       .limit(10);
 
     res.status(200).json({

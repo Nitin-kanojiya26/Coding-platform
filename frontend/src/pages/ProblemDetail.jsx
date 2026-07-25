@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../api/client';
 import Editor from '@monaco-editor/react';
@@ -10,7 +10,6 @@ import {
   Send,
   Loader2,
   MessageSquare,
-  ShieldAlert,
   Bookmark,
   ChevronDown,
   ChevronRight,
@@ -19,10 +18,13 @@ import {
   Copy,
   Check,
   X,
+  ShieldAlert,
+  Clock,
+  HardDrive,
+  CheckCircle2,
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
 
-// Language configuration
 const LANGUAGES = [
   { id: 'cpp', label: 'C++ (GCC 14)', monaco: 'cpp' },
   { id: 'java', label: 'Java (OpenJDK 21)', monaco: 'java' },
@@ -42,15 +44,17 @@ const defaultTemplates = {
 export default function ProblemDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const terminalRef = useRef(null);
 
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [code, setCode] = useState('');
   const [language, setLanguage] = useState('cpp');
+  const [codeByLang, setCodeByLang] = useState(defaultTemplates);
 
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState(null);
+  const [activeTestTab, setActiveTestTab] = useState(0);
 
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -61,33 +65,59 @@ export default function ProblemDetail() {
   const { isBookmarked, toggleBookmark, loading: bookmarkLoading } = useBookmark(problem?._id);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadProblemWorkspace() {
       try {
         const res = await API.get(`/problems/${slug}`);
+        if (!isMounted) return;
+
         const p = res.data.problem || res.data;
         setProblem(p);
 
-        const lang = p.language || 'cpp';
-        setLanguage(lang);
-        setCode(defaultTemplates[lang] || defaultTemplates.cpp);
+        const initialLang = p.language || 'cpp';
+        setLanguage(initialLang);
 
         const cRes = await API.get(`/problems/${p._id}/comments`);
+        if (!isMounted) return;
+
         setComments(cRes.data.comments || cRes.data || []);
       } catch (err) {
-        console.error('Workspace stream broken.', err);
-        navigate('/problems');
+        if (isMounted) navigate('/problems');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
+
     loadProblemWorkspace();
+
+    return () => {
+      isMounted = false;
+    };
   }, [slug, navigate]);
+
+  useEffect(() => {
+    if (terminalLogs && terminalRef.current) {
+      terminalRef.current.scrollTop = 0;
+    }
+  }, [terminalLogs]);
+
+  const activeCode = codeByLang[language] ?? '';
+
+  const handleCodeChange = (val) => {
+    const text = val || '';
+    setCodeByLang((prev) => ({ ...prev, [language]: text }));
+  };
 
   const triggerSandboxRun = async () => {
     setRunning(true);
     setTerminalLogs(null);
+    setActiveTestTab(0);
     try {
-      const res = await API.post(`/problems/${problem._id}/run`, { language, code });
+      const res = await API.post(`/problems/${problem._id}/run`, {
+        language,
+        code: activeCode,
+      });
       setTerminalLogs({ mode: 'sandbox', data: res.data });
     } catch (e) {
       setTerminalLogs({
@@ -103,7 +133,11 @@ export default function ProblemDetail() {
     setSubmitting(true);
     setTerminalLogs(null);
     try {
-      const res = await API.post('/submissions', { problemId: problem._id, language, code });
+      const res = await API.post('/submissions', {
+        problemId: problem._id,
+        language,
+        code: activeCode,
+      });
       setTerminalLogs({ mode: 'production', data: res.data.submission || res.data });
     } catch (e) {
       setTerminalLogs({
@@ -128,7 +162,7 @@ export default function ProblemDetail() {
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(activeCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -143,17 +177,18 @@ export default function ProblemDetail() {
 
   return (
     <div className="h-[calc(100vh-4rem)] overflow-hidden flex flex-col lg:flex-row gap-0 bg-primary text-secondary">
-      
       {/* ─── LEFT PANEL – Problem Description ─── */}
       <div className="lg:w-[38%] flex flex-col overflow-y-auto border-r border-base/80 bg-primary/95">
-        {/* Header */}
         <div className="p-5 border-b border-base/80 flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400 uppercase tracking-wider">
               <Cpu className="h-3.5 w-3.5" />
               Problem
             </div>
-            <h1 className="text-lg font-medium text-primary mt-0.5 truncate">{problem?.title}</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <h1 className="text-lg font-medium text-primary truncate">{problem?.title}</h1>
+              {problem?.difficulty && <DifficultyBadge difficulty={problem.difficulty} />}
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -170,7 +205,9 @@ export default function ProblemDetail() {
             <button
               onClick={() => setShowComments(!showComments)}
               className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm transition-colors ${
-                showComments ? 'text-cyan-400 bg-cyan-500/10' : 'text-muted hover:text-secondary hover:bg-hover/40'
+                showComments
+                  ? 'text-cyan-400 bg-cyan-500/10'
+                  : 'text-muted hover:text-secondary hover:bg-hover/40'
               }`}
             >
               <MessageSquare className="h-5 w-5" />
@@ -179,30 +216,29 @@ export default function ProblemDetail() {
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-5 flex-1">
-          {/* Description */}
           <div className="text-sm leading-relaxed text-secondary whitespace-pre-wrap font-sans">
             {problem?.description}
           </div>
 
-          {/* Constraints */}
           {problem?.constraints && (
             <div>
               <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider mb-1.5">
                 Constraints
               </div>
               <ul className="text-sm space-y-1 text-muted font-mono">
-                {problem.constraints.split('\n').filter(Boolean).map((c, i) => (
-                  <li key={i} className="before:content-['▹'] before:text-cyan-700 before:mr-2">
-                    {c}
-                  </li>
-                ))}
+                {problem.constraints
+                  .split('\n')
+                  .filter(Boolean)
+                  .map((c, i) => (
+                    <li key={i} className="before:content-['▹'] before:text-cyan-700 before:mr-2">
+                      {c}
+                    </li>
+                  ))}
               </ul>
             </div>
           )}
 
-          {/* ─── SAMPLE TEST CASES ─── */}
           {problem?.sampleTestCases?.length > 0 && (
             <div className="border border-base/80 rounded-xl overflow-hidden">
               <button
@@ -221,10 +257,11 @@ export default function ProblemDetail() {
                     <div key={i} className="bg-hover/20 rounded-lg p-3 text-sm font-mono">
                       <div>
                         <span className="text-cyan-400">Input:</span>{' '}
-                        {tc.displayInput || tc.input}
+                        <span className="whitespace-pre-wrap">{tc.displayInput || tc.input}</span>
                       </div>
                       <div>
-                        <span className="text-emerald-400">Output:</span> {tc.output}
+                        <span className="text-emerald-400">Output:</span>{' '}
+                        <span className="whitespace-pre-wrap">{tc.output}</span>
                       </div>
                       {tc.explanation && (
                         <div className="mt-1 text-xs text-muted border-t border-base/60 pt-1.5">
@@ -238,13 +275,10 @@ export default function ProblemDetail() {
             </div>
           )}
 
-          {/* Comments Panel (toggleable) */}
           {showComments && (
             <div className="border-t border-base/80 pt-4 animate-in slide-in-from-bottom-2 duration-200">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-muted">
-                  💬 {comments.length} comments
-                </span>
+                <span className="text-xs font-mono text-muted">💬 {comments.length} comments</span>
                 <button
                   onClick={() => setShowComments(false)}
                   className="text-muted hover:text-secondary p-1 rounded"
@@ -285,7 +319,6 @@ export default function ProblemDetail() {
 
       {/* ─── RIGHT PANEL – Editor & Terminal ─── */}
       <div className="lg:w-[62%] flex flex-col h-full bg-primary">
-        {/* Editor Toolbar */}
         <div className="flex items-center justify-between px-4 py-2 bg-secondary/80 border-b border-base/80 flex-shrink-0">
           <div className="flex items-center gap-3 text-xs text-muted font-mono">
             <span className="text-cyan-400">●</span>
@@ -296,11 +329,7 @@ export default function ProblemDetail() {
           <div className="flex items-center gap-2">
             <select
               value={language}
-              onChange={(e) => {
-                const newLang = e.target.value;
-                setLanguage(newLang);
-                setCode(defaultTemplates[newLang] || defaultTemplates.cpp);
-              }}
+              onChange={(e) => setLanguage(e.target.value)}
               className="bg-input border border-base rounded-lg px-2.5 py-1 text-xs font-mono text-secondary outline-none focus:border-cyan-500 cursor-pointer transition-colors"
             >
               {LANGUAGES.map((lang) => (
@@ -314,19 +343,22 @@ export default function ProblemDetail() {
               className="p-1.5 rounded-lg hover:bg-hover transition-colors text-muted hover:text-primary"
               title="Copy code"
             >
-              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+              {copied ? (
+                <Check className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
             </button>
           </div>
         </div>
 
-        {/* Monaco Editor */}
         <div className="flex-1 min-h-[200px] bg-input">
           <Editor
             height="100%"
             theme="vs-dark"
-            language={LANGUAGES.find(l => l.id === language)?.monaco || 'cpp'}
-            value={code}
-            onChange={(val) => setCode(val || '')}
+            language={LANGUAGES.find((l) => l.id === language)?.monaco || 'cpp'}
+            value={activeCode}
+            onChange={handleCodeChange}
             options={{
               fontSize: 14,
               fontFamily: 'JetBrains Mono, monospace',
@@ -339,7 +371,6 @@ export default function ProblemDetail() {
           />
         </div>
 
-        {/* Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-base/80 bg-secondary/60 flex-shrink-0">
           <span className="font-mono text-[10px] text-muted uppercase tracking-widest">
             ● Online
@@ -350,7 +381,11 @@ export default function ProblemDetail() {
               disabled={running || submitting}
               className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border border-base bg-hover/50 px-4 py-2 text-secondary hover:text-primary transition-all disabled:opacity-40 hover:bg-hover/80"
             >
-              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 text-cyan-400" />}
+              {running ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5 text-cyan-400" />
+              )}
               Run
             </button>
             <button
@@ -358,102 +393,199 @@ export default function ProblemDetail() {
               disabled={running || submitting}
               className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 px-5 py-2 text-white shadow-lg shadow-cyan-500/20 transition-all hover:opacity-90 disabled:opacity-40"
             >
-              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {submitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
               Submit
             </button>
           </div>
         </div>
 
-        {/* Terminal Output */}
-        <div className="bg-primary/90 border-t border-base/80 p-4 flex-shrink-0 min-h-[140px] max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-light">
+        {/* ─── LEETCODE-STYLE TERMINAL OUTPUT ─── */}
+        <div
+          ref={terminalRef}
+          className="bg-[#1e1e1e] border-t border-base/80 p-4 flex-shrink-0 min-h-[170px] max-h-[250px] overflow-y-auto scrollbar-thin scrollbar-thumb-light"
+        >
           {terminalLogs ? (
             <div className="font-mono text-xs">
+              {/* Error Mode */}
               {terminalLogs.mode === 'error' && (
-                <div className="text-rose-400 flex items-start gap-2">
-                  <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>{terminalLogs.out}</p>
-                </div>
-              )}
-
-              {terminalLogs.mode === 'sandbox' && (
-                <div className="space-y-2">
-                  <div className="text-muted text-[10px] font-bold uppercase tracking-wider border-b border-base/60 pb-1">
-                    // Sandbox Results
-                  </div>
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 flex items-start gap-2.5">
+                  <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-muted">
-                      <span>Overall:</span>
-                      <span
-                        className={`font-bold ${
-                          terminalLogs.data.overallStatus === 'accepted' ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {terminalLogs.data.overallStatus}
-                      </span>
-                      <span className="text-muted/60">
-                        ({terminalLogs.data.passed}/{terminalLogs.data.total})
-                      </span>
-                    </div>
-                    {terminalLogs.data.results?.map((r, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs">
-                        {r.passed ? (
-                          <CheckCircle className="h-3 w-3 text-emerald-400 mt-0.5" />
-                        ) : (
-                          <XCircle className="h-3 w-3 text-rose-400 mt-0.5" />
-                        )}
-                        <div>
-                          <span className="text-muted">Test {idx + 1}:</span>
-                          <span className={`ml-1 ${r.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {r.status}
-                          </span>
-                          {!r.passed && (
-                            <div className="text-muted/60 text-[10px]">
-                              Expected: {r.expectedOutput} | Actual: {r.actualOutput || '(empty)'}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                    <span className="font-bold text-rose-300">Compilation / Execution Error</span>
+                    <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-rose-200/90">
+                      {terminalLogs.out}
+                    </p>
                   </div>
                 </div>
               )}
 
-              {terminalLogs.mode === 'production' && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 border-b border-base/60 pb-1.5">
-                    <span
-                      className={`font-bold uppercase tracking-widest ${
-                        terminalLogs.data.status?.toLowerCase() === 'accepted'
-                          ? 'text-emerald-400'
-                          : 'text-rose-400'
-                      }`}
-                    >
-                      Status: {terminalLogs.data.status}
+              {/* Sandbox Run Mode */}
+              {terminalLogs.mode === 'sandbox' && (
+                <div className="space-y-3">
+                  {/* Status Banner */}
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2">
+                      {terminalLogs.data.overallStatus?.toLowerCase() === 'accepted' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-emerald-400 tracking-wide flex items-center gap-1.5">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                            Accepted
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-rose-400 tracking-wide flex items-center gap-1.5">
+                            <XCircle className="h-5 w-5 text-rose-400" />
+                            {terminalLogs.data.overallStatus || 'Wrong Answer'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-zinc-400 font-sans">
+                      {terminalLogs.data.passed} / {terminalLogs.data.total} Testcases Passed
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-muted/70 text-[11px]">
-                    <div>
-                      Passed:{' '}
-                      <span className="text-primary font-bold">
-                        {terminalLogs.data.passedTestCases || 0}/{terminalLogs.data.totalTestCases || 0}
-                      </span>
+
+                  {/* Test Case Tabs */}
+                  {terminalLogs.data.results?.length > 0 && (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        {terminalLogs.data.results.map((r, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveTestTab(idx)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans transition-all ${
+                              activeTestTab === idx
+                                ? 'bg-white/10 text-white font-medium border border-white/20'
+                                : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                r.passed ? 'bg-emerald-400' : 'bg-rose-400'
+                              }`}
+                            />
+                            Case {idx + 1}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Active Test Case Detail Card */}
+                      {terminalLogs.data.results[activeTestTab] && (
+                        <div className="space-y-2 font-mono text-[11px]">
+                          {/* Input */}
+                          <div>
+                            <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">
+                              Input
+                            </div>
+                            <div className="bg-zinc-900/90 border border-white/5 rounded-lg p-2.5 text-zinc-200 whitespace-pre-wrap">
+                              {terminalLogs.data.results[activeTestTab].displayInput ||
+                                terminalLogs.data.results[activeTestTab].input ||
+                                'N/A'}
+                            </div>
+                          </div>
+
+                          {/* Output vs Expected */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">
+                                Output
+                              </div>
+                              <div
+                                className={`border rounded-lg p-2.5 whitespace-pre-wrap ${
+                                  terminalLogs.data.results[activeTestTab].passed
+                                    ? 'bg-zinc-900/90 border-emerald-500/20 text-emerald-300'
+                                    : 'bg-zinc-900/90 border-rose-500/20 text-rose-300'
+                                }`}
+                              >
+                                {terminalLogs.data.results[activeTestTab].actualOutput || '(empty)'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">
+                                Expected Output
+                              </div>
+                              <div className="bg-zinc-900/90 border border-white/5 rounded-lg p-2.5 text-emerald-400 whitespace-pre-wrap">
+                                {terminalLogs.data.results[activeTestTab].expectedOutput || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Production Submission Transmit Mode */}
+              {terminalLogs.mode === 'production' && (
+                <div className="space-y-4">
+                  {/* Status Banner */}
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
                     <div>
-                      Runtime:{' '}
-                      <span className="text-cyan-400 font-bold">{terminalLogs.data.runtime ?? 0} ms</span>
+                      {terminalLogs.data.status?.toLowerCase() === 'accepted' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl font-extrabold text-emerald-400 tracking-wide flex items-center gap-2">
+                            <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                            Accepted
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl font-extrabold text-rose-400 tracking-wide flex items-center gap-2">
+                            <XCircle className="h-6 w-6 text-rose-400" />
+                            {terminalLogs.data.status || 'Wrong Answer'}
+                          </span>
+                        </div>
+                      )}
+                      <div className="text-xs text-zinc-400 mt-1 font-sans">
+                        {terminalLogs.data.passedTestCases ?? 0} /{' '}
+                        {terminalLogs.data.totalTestCases ?? 0} test cases passed.
+                      </div>
                     </div>
-                    <div>
-                      Memory:{' '}
-                      <span className="text-purple-400 font-bold">{terminalLogs.data.memory ?? 0} MB</span>
+                  </div>
+
+                  {/* Metrics Row (LeetCode-style runtime/memory boxes) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Clock className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <div className="text-[10px] text-emerald-300/70 font-sans uppercase tracking-wider">
+                            Runtime
+                          </div>
+                          <div className="text-sm font-bold text-emerald-400 font-mono">
+                            {terminalLogs.data.runtime ?? 0} ms
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <HardDrive className="h-4 w-4 text-purple-400 shrink-0" />
+                        <div>
+                          <div className="text-[10px] text-purple-300/70 font-sans uppercase tracking-wider">
+                            Memory
+                          </div>
+                          <div className="text-sm font-bold text-purple-400 font-mono">
+                            {terminalLogs.data.memory ?? 0} MB
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center text-muted text-sm font-mono">
-              <Terminal className="h-4 w-4 mr-2" />
-              Run your code to see output here...
+            <div className="flex h-full min-h-[120px] items-center justify-center text-zinc-500 text-xs font-mono">
+              <Terminal className="h-4 w-4 mr-2 text-zinc-500" />
+              Run your code to test against sample test cases...
             </div>
           )}
         </div>

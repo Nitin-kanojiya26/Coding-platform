@@ -7,11 +7,65 @@ import {
   Code, Award, TrendingUp, CheckCircle2, 
   ArrowLeft, Calendar, Flame 
 } from 'lucide-react';
+import { getAvatarSrc } from '../utils/avatar';
 
 // ─── Custom colors ──────────────────────────────────────────────
 const EASY_COLOR = '#6ee774';
 const MEDIUM_COLOR = '#ffb800';
 const HARD_COLOR = '#ff2d55';
+
+// ─── Helper to derive 1-2 initial letters ──────────────────────
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+// ─── Chromatic Aberration Initials Avatar Badge ────────────────
+function InitialsAvatar({ name, className = "w-16 h-16 text-lg" }) {
+  const initials = getInitials(name);
+
+  return (
+    <div
+      className={`relative flex items-center justify-center bg-[#121212] border border-white/10 font-bold select-none overflow-hidden shrink-0 ${className}`}
+    >
+      <span
+        className="font-mono text-white tracking-tight"
+        style={{
+          textShadow: `
+            -1.5px -0.5px 0px rgba(56, 189, 248, 0.9), 
+             1.5px  0.5px 0px rgba(249, 115, 22, 0.9)
+          `,
+        }}
+      >
+        {initials}
+      </span>
+    </div>
+  );
+}
+
+// ─── Profile Avatar Component with Fallback Logic ───────────────
+function PublicProfileAvatar({ avatar, name }) {
+  const [imgError, setImgError] = useState(false);
+  const avatarSrc = getAvatarSrc(avatar);
+  const hasAvatar = Boolean(avatar && !imgError);
+
+  if (!hasAvatar) {
+    return <InitialsAvatar name={name} className="w-16 h-16 text-lg rounded-lg" />;
+  }
+
+  return (
+    <img 
+      src={avatarSrc}
+      alt={`${name}'s avatar`} 
+      className="w-16 h-16 rounded-lg border border-light object-cover bg-secondary shrink-0"
+      onError={() => setImgError(true)}
+    />
+  );
+}
 
 export default function PublicProfile() {
   const { id } = useParams();
@@ -65,14 +119,13 @@ export default function PublicProfile() {
         <div className="lg:col-span-4 space-y-5">
           <div className="bg-card rounded-xl p-5 border border-base">
             <div className="flex items-center gap-4">
-              <img 
-                src={profileData.avatar} 
-                alt="Avatar" 
-                className="w-16 h-16 rounded-lg border border-light object-cover bg-secondary" 
+              <PublicProfileAvatar 
+                avatar={profileData.avatar} 
+                name={profileData.name} 
               />
-              <div>
-                <h2 className="text-base font-semibold text-primary">{profileData.name}</h2>
-                <p className="text-xs text-muted font-mono">{profileData.role}</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-primary truncate">{profileData.name}</h2>
+                <p className="text-xs text-muted font-mono truncate">{profileData.role || 'User'}</p>
               </div>
             </div>
             <button 
@@ -159,7 +212,7 @@ export default function PublicProfile() {
             <div className="w-full overflow-x-auto scrollbar-none py-1">
               <div className="min-w-[760px]">
                 <ActivityHeatmap 
-                  submissions={stats.submissionDates.map(date => ({ submittedAt: date }))} 
+                  submissions={stats.submissionDates?.map(date => ({ submittedAt: date })) || []} 
                   mode="submission" 
                 />
               </div>
