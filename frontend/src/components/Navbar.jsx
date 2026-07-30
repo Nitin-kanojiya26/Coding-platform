@@ -236,7 +236,7 @@ export default function Navbar() {
               className="flex items-center gap-1.5 ml-2 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all duration-150 whitespace-nowrap"
             >
               <PlusCircle className="h-3.5 w-3.5" />
-              New Panel
+              New Problem
             </Link>
           )}
         </nav>
@@ -280,7 +280,7 @@ export default function Navbar() {
                 
                 {searchResults.length === 0 && !isSearching ? (
                   <div className="text-[10px] text-muted font-mono text-center py-4">
-                    NO_TRACES_UNRESOLVED
+                    NOT FOUND!
                   </div>
                 ) : (
                   searchResults.map((userNode) => {
@@ -367,7 +367,7 @@ export default function Navbar() {
                     onClick={() => setDropdownOpen(false)}
                   >
                     <User className="h-4 w-4 text-muted" />
-                    Profile Registry
+                    Profile
                   </Link>
                   <Link
                     to="/settings"
@@ -375,7 +375,7 @@ export default function Navbar() {
                     onClick={() => setDropdownOpen(false)}
                   >
                     <Settings className="h-4 w-4 text-muted" />
-                    System Options
+                    Settings
                   </Link>
                   <div className="border-t border-base my-1.5 mx-1" />
                   <button
@@ -383,7 +383,7 @@ export default function Navbar() {
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/5 rounded-xl transition-colors text-left"
                   >
                     <LogOut className="h-4 w-4 text-rose-500" />
-                    Terminate Session
+                    Exit
                   </button>
                 </div>
               </div>
