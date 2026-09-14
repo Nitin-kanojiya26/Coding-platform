@@ -164,7 +164,7 @@ export default function PublicProfile() {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-bold text-primary">{solved.total}</span>
-                    <span className="text-[10px] uppercase tracking-widest text-muted">Solved</span>
+                    <span className="text-[10px] uppercase tracking-widest text-muted">Completed</span>
                   </div>
                 </div>
               </div>
@@ -188,10 +188,10 @@ export default function PublicProfile() {
                   </div>
                 ))}
                 <div className="pt-3 border-t border-base/60 flex items-center justify-between text-xs font-mono text-muted">
-                  <span>Total Submissions: <strong className="text-secondary">{stats.totalSubmissions}</strong></span>
+                  <span>Total Attempts: <strong className="text-secondary">{stats.totalSubmissions}</strong></span>
                   <span className="flex items-center gap-1.5">
                     <TrendingUp className="h-3.5 w-3.5 text-cyan-500" /> 
-                    Acc: <strong className="text-cyan-400">{stats.acceptanceRate}%</strong>
+                    Success Rate: <strong className="text-cyan-400">{stats.acceptanceRate}%</strong>
                   </span>
                 </div>
               </div>
@@ -202,7 +202,7 @@ export default function PublicProfile() {
           <div className="bg-card rounded-xl p-5 border border-base">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs mb-4 pb-2 border-b border-base/40">
               <span className="text-muted font-medium flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-muted" /> Submission Activity
+                <Calendar className="h-3.5 w-3.5 text-muted" /> Activity History
               </span>
               <div className="flex gap-4 font-mono text-muted text-[11px]">
                 <span>Active: <strong className="text-primary">{stats.activeDays} days</strong></span>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Terminal, Mail, Lock, User, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function Register() {
   const { registerRequestOTP, verifyOTP } = useAuth();
@@ -53,17 +54,15 @@ export default function Register() {
         
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-4">
-          {/* Logo container using matching vibrant gradient framework */}
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-transform duration-300 hover:scale-105">
-            <Terminal className="h-5 w-5 text-white" />
-          </div>
+          {/* Unified Logo Component */}
+          <Logo stacked={true} className="justify-center scale-125 origin-top mb-8" />
           
           <div className="space-y-1">
             <h2 className="text-xl font-bold tracking-wide text-slate-100">
-              Initialize <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 font-black">Workspace</span>
+              Create your <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 font-black">Account</span>
             </h2>
             <p className="text-[11px] text-zinc-500 font-medium tracking-normal">
-              Step {step} of 2: {step === 1 ? 'Identity Binding' : 'Node Verification'}
+              Step {step} of 2: {step === 1 ? 'Enter Identity' : 'User Verification'}
             </p>
           </div>
         </div>
@@ -99,7 +98,7 @@ export default function Register() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-xl border border-zinc-900 bg-[#000000] py-2.5 pr-4 pl-10 text-xs text-slate-200 placeholder-zinc-700 outline-none transition-all duration-150 focus:border-zinc-700 focus:bg-[#020202]"
-                  placeholder="John Doe"
+                  placeholder="Nitin Kanojiya"
                 />
               </div>
             </div>
@@ -147,7 +146,7 @@ export default function Register() {
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin text-white" />
               ) : (
-                'Request Security Token'
+                'Request OTP'
               )}
             </button>
           </form>

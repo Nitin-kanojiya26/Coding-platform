@@ -60,7 +60,7 @@ export default function MySubmissions() {
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-accent" />
               <h1 className="text-base font-semibold text-primary tracking-tight">
-                All Submissions
+                All Attempts
               </h1>
             </div>
             <p className="text-xs text-muted">
@@ -72,7 +72,7 @@ export default function MySubmissions() {
         {submissions.length === 0 ? (
           <div className="py-20 text-center border border-dashed border-base rounded-xl bg-card/20 space-y-3">
             <Clock className="h-5 w-5 mx-auto text-muted" />
-            <p className="text-xs font-mono text-muted">NO_SUBMISSIONS_LOGGED</p>
+            <p className="text-xs font-mono text-muted">No attempts logged yet.</p>
             <Link 
               to="/problems" 
               className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors duration-150"

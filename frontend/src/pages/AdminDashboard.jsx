@@ -94,8 +94,8 @@ export default function AdminDashboard() {
   const statCards = [
     { label: 'Active Learners', value: data?.totalUsers || 0, icon: Users, desc: 'Happy coding minds' },
     { label: 'Total Challenges', value: data?.totalProblems || 0, icon: FileText, desc: 'Created for growth' },
-    { label: 'Code Runs', value: data?.totalSubmissions || 0, icon: Code, desc: 'Attempts at learning' },
-    { label: 'Success Moments', value: data?.acceptedSubmissions || 0, icon: CheckCircle, desc: 'Passed with flying colors' },
+    { label: 'Practice Runs', value: data?.totalSubmissions || 0, icon: Code, desc: 'Attempts at learning' },
+    { label: 'Successful Attempts', value: data?.acceptedSubmissions || 0, icon: CheckCircle, desc: 'Passed with flying colors' },
   ];
 
   return (

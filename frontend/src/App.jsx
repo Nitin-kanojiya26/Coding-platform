@@ -6,6 +6,7 @@ import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import { Loader2 } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 // Pages
 import Login from './pages/Login';
@@ -70,6 +71,28 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <AppRoutes />
+          <Toaster 
+            position="top-right" 
+            toastOptions={{
+              style: {
+                background: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #334155',
+              },
+              success: {
+                iconTheme: {
+                  primary: '#22c55e',
+                  secondary: '#1e293b',
+                },
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#1e293b',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -8,15 +8,19 @@ const {
   getProblemSubmissions,
   getSubmissionById,
 } = require('../controllers/submissionController');
+const {
+  submitCodeLimiter,
+  historyLimiter
+} = require('../middleware/rateLimiter');
 
 // All routes require authentication
 router.use(protect);
 
 // POST /api/submissions - create a new submission
-router.route('/').post(createSubmission);
+router.route('/').post(submitCodeLimiter, createSubmission);
 
 // GET /api/submissions/my - get current user's submissions
-router.route('/my').get(getMySubmissions);
+router.route('/my').get(historyLimiter, getMySubmissions);
 
 // GET /api/submissions/problem/:problemId - get submissions for a problem
 router.route('/problem/:problemId').get(getProblemSubmissions);

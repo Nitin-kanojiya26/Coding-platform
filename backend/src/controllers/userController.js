@@ -59,9 +59,7 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// @desc    Upload avatar image
-// @route   POST /api/users/avatar
-// @access  Private
+
 // @desc    Upload avatar image (store in DB)
 // @route   POST /api/users/avatar
 // @access  Private

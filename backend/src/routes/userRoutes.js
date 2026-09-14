@@ -19,19 +19,24 @@ const {
   getUserStatsById,
   uploadAvatar
 } = require('../controllers/userController');
+const {
+  profileUpdateLimiter,
+  bookmarksLimiter,
+  historyLimiter
+} = require('../middleware/rateLimiter');
 
 router.get('/profile', protect, getUserProfile);
 router.get('/stats', protect, getUserStats);
-router.get('/attempted', protect, getAttemptedProblems);
+router.get('/attempted', historyLimiter, protect, getAttemptedProblems);
 router.get('/problems/summary', protect, getProblemSubmissionSummary);
-router.put('/profile', protect, updateProfile);
-router.get('/activity', protect, getRecentActivity);
-router.post('/problems/:id/bookmark', protect, bookmarkProblem);
-router.delete('/problems/:id/bookmark', protect, removeBookmark);
-router.get('/bookmarks', protect, getBookmarks);
+router.put('/profile', profileUpdateLimiter, protect, updateProfile);
+router.get('/activity', historyLimiter, protect, getRecentActivity);
+router.post('/problems/:id/bookmark', bookmarksLimiter, protect, bookmarkProblem);
+router.delete('/problems/:id/bookmark', bookmarksLimiter, protect, removeBookmark);
+router.get('/bookmarks', bookmarksLimiter, protect, getBookmarks);
 router.get('/login-activity', protect, getLoginActivity);
 router.get('/streak', protect, getUserStreak);
-router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
+router.post('/avatar', profileUpdateLimiter, protect, upload.single('avatar'), uploadAvatar);
 router.get('/search', protect, searchUsers);
 
 // Public profile & stats (by ID)

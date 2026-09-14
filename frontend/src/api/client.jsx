@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -21,6 +22,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
+    }
+    if (error.response?.status === 429) {
+      toast.error(error.response?.data?.message || 'Too many requests. Please try again later.');
     }
     return Promise.reject(error);
   }

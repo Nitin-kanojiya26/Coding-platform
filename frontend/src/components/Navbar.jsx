@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import API from '../api/client';
+import Logo from './Logo';
 import {
   LogOut,
   Shield,
@@ -186,28 +187,10 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-base bg-secondary/80 px-4 sm:px-6 backdrop-blur-md transition-colors duration-200">
       <div className="max-w-7xl mx-auto flex h-16 w-full items-center justify-between gap-4">
-        
+
         {/* Brand / Logo Section */}
         <div className="flex items-center gap-6 min-w-0 shrink-0">
-          <Link to="/" className="flex items-center gap-2 group select-none min-w-0">
-            {!logoError ? (
-              <img
-                src="/Codexium.png"
-                alt="Codexium Logo"
-                className="w-10 h-10 object-contain opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-200 shrink-0"
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-center shrink-0">
-                <Terminal className="h-5 w-5 text-accent" />
-              </div>
-            )}
-            <div className="flex flex-col tracking-tight min-w-0">
-              <span className="text-sm font-bold tracking-wide text-primary transition-colors duration-150 group-hover:text-primary truncate">
-                Codex<span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 font-black">ium</span>
-              </span>
-            </div>
-          </Link>
+          <Logo />
         </div>
 
         {/* Center Links */}
@@ -219,11 +202,10 @@ export default function Navbar() {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${
-                  isActive
-                    ? 'bg-hover text-primary border border-light/80 shadow-sm'
-                    : 'text-muted border border-transparent hover:text-secondary hover:bg-hover/40'
-                }`}
+                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${isActive
+                  ? 'bg-hover text-primary border border-light/80 shadow-sm'
+                  : 'text-muted border border-transparent hover:text-secondary hover:bg-hover/40'
+                  }`}
               >
                 <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-muted'}`} />
                 {link.label}
@@ -243,14 +225,13 @@ export default function Navbar() {
 
         {/* Right Area */}
         <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-          
+
           {/* Desktop Search */}
           <div className="relative hidden md:block w-48 lg:w-60" ref={searchRef}>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono transition-all duration-200 ${
-              searchFocused 
-                ? 'bg-primary border-light ring-1 ring-light/50' 
-                : 'bg-secondary/50 border-base hover:border-light'
-            }`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono transition-all duration-200 ${searchFocused
+              ? 'bg-primary border-light ring-1 ring-light/50'
+              : 'bg-secondary/50 border-base hover:border-light'
+              }`}>
               {isSearching ? (
                 <Loader2 className="h-3.5 w-3.5 text-accent animate-spin shrink-0" />
               ) : (
@@ -261,7 +242,7 @@ export default function Navbar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
-                placeholder="PROBE_USER_NODE..."
+                placeholder="Search users..."
                 className="w-full bg-transparent text-[11px] font-bold text-secondary placeholder-muted focus:outline-none"
               />
               {searchQuery && (
@@ -277,7 +258,7 @@ export default function Navbar() {
                 <span className="text-[9px] text-muted px-2.5 py-1.5 block font-mono uppercase tracking-widest border-b border-base/60">
                   Top Result
                 </span>
-                
+
                 {searchResults.length === 0 && !isSearching ? (
                   <div className="text-[10px] text-muted font-mono text-center py-4">
                     NOT FOUND!
@@ -295,10 +276,10 @@ export default function Navbar() {
                           setSearchQuery('');
                         }}
                       >
-                        <NavAvatar 
-                          avatar={userNode.avatar} 
-                          name={userNode.name} 
-                          className="h-6 w-6 text-[10px] rounded-md" 
+                        <NavAvatar
+                          avatar={userNode.avatar}
+                          name={userNode.name}
+                          className="h-6 w-6 text-[10px] rounded-md"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-secondary group-hover:text-primary truncate">
@@ -335,10 +316,10 @@ export default function Navbar() {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 hover:bg-hover/40 rounded-xl p-1 transition-all max-w-[140px] sm:max-w-none"
             >
-              <NavAvatar 
-                avatar={user?.avatar} 
-                name={user?.name} 
-                className="h-8 w-8 sm:h-9 sm:w-9 text-xs rounded-xl" 
+              <NavAvatar
+                avatar={user?.avatar}
+                name={user?.name}
+                className="h-8 w-8 sm:h-9 sm:w-9 text-xs rounded-xl"
               />
               <span className="hidden sm:block text-xs font-bold text-secondary tracking-tight truncate max-w-[80px]">
                 {user?.name}
@@ -350,10 +331,10 @@ export default function Navbar() {
             {dropdownOpen && (
               <div className="absolute right-0 mt-3 w-56 bg-primary border border-light/90 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.95)] overflow-hidden z-50 animate-in fade-in slide-in-from-top-1.5 duration-150">
                 <div className="px-4 py-3.5 border-b border-base bg-secondary/40 flex items-center gap-3">
-                  <NavAvatar 
-                    avatar={user?.avatar} 
-                    name={user?.name} 
-                    className="h-9 w-9 text-xs rounded-xl" 
+                  <NavAvatar
+                    avatar={user?.avatar}
+                    name={user?.name}
+                    className="h-9 w-9 text-xs rounded-xl"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-primary truncate">{user?.name}</p>
@@ -410,7 +391,7 @@ export default function Navbar() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="PROBE_USER_NODE..."
+                placeholder="Search users..."
                 className="w-full bg-transparent text-xs font-bold text-secondary focus:outline-none"
               />
             </div>
@@ -433,10 +414,10 @@ export default function Navbar() {
                           setSearchQuery('');
                         }}
                       >
-                        <NavAvatar 
-                          avatar={userNode.avatar} 
-                          name={userNode.name} 
-                          className="h-5 w-5 text-[9px] rounded" 
+                        <NavAvatar
+                          avatar={userNode.avatar}
+                          name={userNode.name}
+                          className="h-5 w-5 text-[9px] rounded"
                         />
                         <span>{userNode.name}</span>
                       </Link>
@@ -455,11 +436,10 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`flex items-center gap-3 px-4 py-3 text-xs font-bold rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-hover text-primary border border-light'
-                      : 'text-muted hover:text-secondary hover:bg-hover/30'
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 text-xs font-bold rounded-xl transition-all ${isActive
+                    ? 'bg-hover text-primary border border-light'
+                    : 'text-muted hover:text-secondary hover:bg-hover/30'
+                    }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
                   {link.label}

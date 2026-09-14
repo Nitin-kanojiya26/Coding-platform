@@ -221,9 +221,6 @@ export default function Dashboard() {
               </h1>
               <Sparkles className="h-4 w-4 text-accent/80 animate-pulse" />
             </div>
-            <p className="text-xs text-muted">
-              Run diagnostics, configure sessions, and track problem status.
-            </p>
           </div>
           
           {/* Active Streak Flag */}
@@ -288,14 +285,14 @@ export default function Dashboard() {
           <div className="lg:col-span-8 bg-secondary border border-light/80 rounded-2xl p-5 space-y-5 shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xs font-bold text-secondary flex items-center gap-2 tracking-wide">
-                <BookOpen className="h-4 w-4 text-accent" /> SYSTEM LOGS / PROBLEMS
+                <BookOpen className="h-4 w-4 text-accent" /> PROBLEMS
               </h2>
               
               <div className="relative w-full sm:w-60 group rounded-xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted group-focus-within:text-accent transition-colors" />
                 <input 
                   type="text" 
-                  placeholder="Filter registry..." 
+                  placeholder="Search Problems..." 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-input border border-base rounded-xl text-secondary placeholder-muted text-xs outline-none transition-all focus:border-light" 
@@ -324,7 +321,7 @@ export default function Dashboard() {
             <div className="divide-y divide-base/60 border-t border-base/60">
               {filteredProblems.length === 0 ? (
                 <div className="py-12 text-center text-muted text-xs font-bold tracking-wider">
-                  NO REGISTRY ENTRIES DETECTED
+                  NO ENTRIES DETECTED
                 </div>
               ) : (
                 filteredProblems.map((problem) => (
@@ -350,19 +347,19 @@ export default function Dashboard() {
             {/* System Performance Status Readout */}
             <div className="bg-secondary border border-light/80 rounded-2xl p-5 space-y-4 shadow-md">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
-                Run Diagnostic Output
+                Run
               </h3>
               <div className="space-y-3 text-xs font-mono">
                 <div className="flex justify-between border-b border-base pb-2">
-                  <span className="text-muted">Submissions Run</span>
+                  <span className="text-muted">Total Attempts</span>
                   <span className="text-secondary font-bold">{stats?.totalSubmissions || 0}</span>
                 </div>
                 <div className="flex justify-between border-b border-base pb-2">
-                  <span className="text-muted">Solutions Solved</span>
+                  <span className="text-muted">Successful Attempts</span>
                   <span className="text-emerald-400 font-bold">{stats?.acceptedSubmissions || stats?.solved?.total || 0}</span>
                 </div>
                 <div className="flex justify-between pt-0.5">
-                  <span className="text-muted">Accuracy Rate</span>
+                  <span className="text-muted">Success Rate</span>
                   <span className="text-accent font-bold">{stats?.acceptanceRate || 0}%</span>
                 </div>
               </div>

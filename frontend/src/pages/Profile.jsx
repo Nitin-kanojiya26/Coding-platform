@@ -328,7 +328,7 @@ export default function Profile() {
                 Object.entries(languageStats).map(([lang, count]) => (
                   <div key={lang} className="flex justify-between items-center bg-secondary/50 border border-base px-3 py-1.5 rounded-lg">
                     <span className="text-secondary font-medium">{lang}</span>
-                    <span className="text-muted bg-secondary px-2 py-0.5 rounded text-[10px]">{count} solved</span>
+                    <span className="text-muted bg-secondary px-2 py-0.5 rounded text-[10px]">{count} completed</span>
                   </div>
                 ))
               ) : (
@@ -393,7 +393,7 @@ export default function Profile() {
                   {/* Central Overlay */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-bold text-primary tracking-tight">{totalSolved}</span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted mt-0.5">Solved</span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted mt-0.5">Completed</span>
                   </div>
                 </div>
               </div>
@@ -445,10 +445,10 @@ export default function Profile() {
 
                 {/* System Runs Footer */}
                 <div className="pt-3 border-t border-base/60 flex items-center justify-between text-xs font-mono text-muted">
-                  <span>Total Submissions: <strong className="text-secondary">{totalSubmissions}</strong></span>
+                  <span>Total Attempts: <strong className="text-secondary">{totalSubmissions}</strong></span>
                   <span className="flex items-center gap-1.5">
                     <TrendingUp className="h-3.5 w-3.5 text-cyan-500" /> 
-                    Acceptance: <strong className="text-cyan-400">{acceptanceRate}%</strong>
+                    Success Rate: <strong className="text-cyan-400">{acceptanceRate}%</strong>
                   </span>
                 </div>
 
@@ -460,7 +460,7 @@ export default function Profile() {
           <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs mb-4 pb-2 border-b border-base/40">
               <span className="text-muted font-medium flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-muted" /> Submission Activity
+                <Calendar className="h-3.5 w-3.5 text-muted" /> Activity History
               </span>
               <div className="flex gap-4 font-mono text-muted text-[11px]">
                 <span>Active Windows: <strong className="text-primary">{totalActiveDays} days</strong></span>
