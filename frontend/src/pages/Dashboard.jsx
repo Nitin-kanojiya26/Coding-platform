@@ -116,8 +116,13 @@ export default function Dashboard() {
           API.get('/sheets?limit=2'),
         ]);
         
-        setProblems(problemsRes.data?.problems || problemsRes.data?.data?.problems || []);
-        setFilteredProblems(problemsRes.data?.problems || problemsRes.data?.data?.problems || []);
+        const rawProblems = problemsRes.data?.problems || problemsRes.data?.data?.problems || [];
+        const normalizedProblems = rawProblems.map(p => ({
+          ...p,
+          tags: (p.tags || []).map(t => t.toLowerCase())
+        }));
+        setProblems(normalizedProblems);
+        setFilteredProblems(normalizedProblems);
         
         if (streakRes.data && streakRes.data.data) {
           setStreakData(streakRes.data.data);

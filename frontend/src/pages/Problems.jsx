@@ -110,7 +110,11 @@ export default function Problems() {
       API.get('/submissions/my?limit=1000')
     ])
       .then(([problemsRes, subsRes]) => {
-        const problemList = problemsRes.data.problems || [];
+        const rawProblems = problemsRes.data.problems || [];
+        const problemList = rawProblems.map(p => ({
+          ...p,
+          tags: (p.tags || []).map(t => t.toLowerCase())
+        }));
         setProblems(problemList);
         setFiltered(problemList);
         

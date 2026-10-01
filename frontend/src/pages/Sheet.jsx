@@ -21,7 +21,11 @@ export default function Sheet() {
           API.get('/problems?limit=100'),
           API.get('/submissions/my?limit=1000')
         ]);
-        const allProblems = problemsRes.data?.problems || problemsRes.data?.data?.problems || [];
+        const rawProblems = problemsRes.data?.problems || problemsRes.data?.data?.problems || [];
+        const allProblems = rawProblems.map(p => ({
+          ...p,
+          tags: (p.tags || []).map(t => t.toLowerCase())
+        }));
         const sheetProblems = allProblems.filter(p => p.sheetName?.toLowerCase() === sheetId?.toLowerCase());
         setProblems(sheetProblems);
 

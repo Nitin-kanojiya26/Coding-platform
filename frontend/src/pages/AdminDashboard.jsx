@@ -55,7 +55,11 @@ export default function AdminDashboard() {
         API.get('/sheets'),
       ]);
       setData(statsRes.data.data || statsRes.data);
-      setProblems(problemsRes.data.problems || []);
+      const rawProblems = problemsRes.data.problems || [];
+      setProblems(rawProblems.map(p => ({
+        ...p,
+        tags: (p.tags || []).map(t => t.toLowerCase())
+      })));
       setSheets(sheetsRes.data || []);
     } catch (err) {
       console.error('Admin fetch error', err);

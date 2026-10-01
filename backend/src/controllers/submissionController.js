@@ -25,8 +25,8 @@ const getLanguageId = (lang) => {
   const normalized = lang.toString().toLowerCase().trim();
 
   // Try direct lookup from user's languageMap module
-  if (languageMap[normalized]) {
-    return languageMap[normalized];
+  if (languageMap.JUDGE0_LANGUAGE_MAP && languageMap.JUDGE0_LANGUAGE_MAP[normalized]) {
+    return languageMap.JUDGE0_LANGUAGE_MAP[normalized];
   }
 
   // Common fallbacks for Judge0 CE IDs
