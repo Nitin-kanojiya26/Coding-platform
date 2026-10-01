@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import API from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
+let bookmarksPromise = null;
+let bookmarksCache = null;
+
 export function useBookmark(problemId) {
   const { user } = useAuth();
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -12,9 +15,16 @@ export function useBookmark(problemId) {
 
     const checkBookmark = async () => {
       try {
-        const res = await API.get('/users/bookmarks');
-        // ✅ Handle both response shapes
-        const bookmarks = res.data.bookmarks || res.data.data || [];
+        if (!bookmarksPromise) {
+          bookmarksPromise = API.get('/users/bookmarks').then(res => {
+            bookmarksCache = res.data.bookmarks || res.data.data || [];
+            return bookmarksCache;
+          }).catch(err => {
+            bookmarksPromise = null; // reset on error
+            throw err;
+          });
+        }
+        const bookmarks = bookmarksCache || await bookmarksPromise;
         const found = bookmarks.some((b) => b._id.toString() === problemId.toString());
         setIsBookmarked(found);
       } catch (err) {
@@ -31,9 +41,11 @@ export function useBookmark(problemId) {
       if (isBookmarked) {
         await API.delete(`/users/problems/${problemId}/bookmark`);
         setIsBookmarked(false);
+        if (bookmarksCache) bookmarksCache = bookmarksCache.filter(b => b._id.toString() !== problemId.toString());
       } else {
         await API.post(`/users/problems/${problemId}/bookmark`);
         setIsBookmarked(true);
+        if (bookmarksCache) bookmarksCache.push({ _id: problemId });
       }
     } catch (err) {
       console.error('Bookmark toggle failed:', err.response?.data || err.message);

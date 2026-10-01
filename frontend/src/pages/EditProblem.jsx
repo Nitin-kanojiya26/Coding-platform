@@ -16,6 +16,8 @@ export default function EditProblem() {
     description: '',
     difficulty: 'easy',
     tags: [],
+    sheetName: '',
+    topic: '',
     constraints: '',
     timeLimit: 1000,
     memoryLimit: 128,
@@ -34,6 +36,8 @@ export default function EditProblem() {
           description: p.description || '',
           difficulty: p.difficulty || 'easy',
           tags: p.tags || [],
+          sheetName: p.sheetName || '',
+          topic: p.topic || '',
           constraints: p.constraints || '',
           timeLimit: p.timeLimit || 1000,
           memoryLimit: p.memoryLimit || 128,
@@ -337,6 +341,28 @@ export default function EditProblem() {
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
                 </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">Sheet Name (Optional)</label>
+                <input
+                  name="sheetName"
+                  value={form.sheetName}
+                  onChange={handleChange}
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
+                  placeholder="e.g., striver"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">Topic (Optional)</label>
+                <input
+                  name="topic"
+                  value={form.topic}
+                  onChange={handleChange}
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
+                  placeholder="e.g., Arrays"
+                />
               </div>
 
               <div className="space-y-1.5">

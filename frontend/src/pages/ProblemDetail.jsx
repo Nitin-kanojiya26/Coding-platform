@@ -31,14 +31,18 @@ const LANGUAGES = [
   { id: 'python', label: 'Python 3', monaco: 'python' },
   { id: 'javascript', label: 'JavaScript (Node.js)', monaco: 'javascript' },
   { id: 'c', label: 'C (GCC 14)', monaco: 'c' },
+  { id: 'assembly', label: 'Assembly (NASM)', monaco: 'assembly' },
+  { id: 'cobol', label: 'COBOL', monaco: 'cobol' },
 ];
 
 const defaultTemplates = {
   cpp: `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    return 0;\n}`,
-  java: `public class Solution {\n    public static void main(String[] args) {\n        // Your code here\n    }\n}`,
+  java: `public class Main {\n    public static void main(String[] args) {\n        // Your code here\n    }\n}`,
   python: `# Your code here\n`,
   javascript: `// Your code here\n`,
   c: `#include <stdio.h>\n\nint main() {\n    // Your code here\n    return 0;\n}`,
+  assembly: `section .data\n    ; Your code here\n\nsection .text\n    global _start\n\n_start:\n    ; Exit\n    mov eax, 60\n    xor edi, edi\n    syscall`,
+  cobol: `       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SOLUTION.\n       PROCEDURE DIVISION.\n           * Your code here\n           STOP RUN.`
 };
 
 export default function ProblemDetail() {
@@ -49,7 +53,21 @@ export default function ProblemDetail() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('cpp');
-  const [codeByLang, setCodeByLang] = useState(defaultTemplates);
+  const [codeByLang, setCodeByLang] = useState(() => {
+    const saved = localStorage.getItem(`code_${slug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return defaultTemplates;
+      }
+    }
+    return defaultTemplates;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`code_${slug}`, JSON.stringify(codeByLang));
+  }, [codeByLang, slug]);
 
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -221,6 +239,17 @@ export default function ProblemDetail() {
             {problem?.description}
           </div>
 
+          {problem?.tags?.some(tag => ['linked list', 'tree', 'binary tree', 'graph'].includes(tag.toLowerCase())) && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3 mt-4">
+              <div className="flex-shrink-0 mt-0.5 text-amber-400">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+              </div>
+              <div className="text-xs text-amber-400/90 leading-relaxed font-medium">
+                Please strictly construct and use the intended data structure (Nodes, Pointers, Trees, etc.) in your local memory to solve this problem, rather than bypassing it with array manipulation.
+              </div>
+            </div>
+          )}
+
           {problem?.constraints && (
             <div>
               <div className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider mb-1.5">
@@ -318,29 +347,30 @@ export default function ProblemDetail() {
       </div>
 
       {/* ─── RIGHT PANEL – Editor & Terminal ─── */}
-      <div className="lg:w-[62%] flex flex-col h-full bg-primary">
-        <div className="flex items-center justify-between px-4 py-2 bg-secondary/80 border-b border-base/80 flex-shrink-0">
+      <div className="lg:w-[62%] flex flex-col h-full bg-[#0a0a0a] relative">
+        {/* Glassmorphic Top Toolbar */}
+        <div className="flex items-center justify-between px-5 py-3 bg-black/40 backdrop-blur-xl border-b border-white/5 flex-shrink-0 z-10">
           <div className="flex items-center gap-3 text-xs text-muted font-mono">
-            <span className="text-cyan-400">●</span>
-            <span className="uppercase tracking-wider">Workspace</span>
-            <span className="text-muted/50">|</span>
-            <span className="text-muted">Ready</span>
+            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-cyan-500/10 border border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]">
+              <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+            </div>
+            <span className="uppercase tracking-widest text-secondary/90 font-semibold">Workspace</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="bg-input border border-base rounded-lg px-2.5 py-1 text-xs font-mono text-secondary outline-none focus:border-cyan-500 cursor-pointer transition-colors"
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-secondary/90 outline-none hover:bg-white/10 focus:border-cyan-500/50 focus:bg-white/10 cursor-pointer transition-all backdrop-blur-md"
             >
               {LANGUAGES.map((lang) => (
-                <option key={lang.id} value={lang.id}>
+                <option key={lang.id} value={lang.id} className="bg-[#121212]">
                   {lang.label}
                 </option>
               ))}
             </select>
             <button
               onClick={handleCopyCode}
-              className="p-1.5 rounded-lg hover:bg-hover transition-colors text-muted hover:text-primary"
+              className="p-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all text-muted hover:text-primary backdrop-blur-md"
               title="Copy code"
             >
               {copied ? (
@@ -371,32 +401,35 @@ export default function ProblemDetail() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-base/80 bg-secondary/60 flex-shrink-0">
-          <span className="font-mono text-[10px] text-muted uppercase tracking-widest">
-            ● Online
-          </span>
-          <div className="flex gap-2">
+        {/* Glassmorphic Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-3.5 bg-black/40 backdrop-blur-xl border-t border-white/5 flex-shrink-0 z-10 relative">
+          <div className="flex items-center gap-2 font-mono text-[10px] text-muted uppercase tracking-widest">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+            System Ready
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={triggerSandboxRun}
               disabled={running || submitting}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border border-base bg-hover/50 px-4 py-2 text-secondary hover:text-primary transition-all disabled:opacity-40 hover:bg-hover/80"
+              className="group relative flex items-center gap-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-white/10 bg-white/5 px-6 py-2.5 text-secondary hover:text-primary hover:bg-white/10 hover:border-white/20 transition-all duration-300 disabled:opacity-40 backdrop-blur-md"
             >
               {running ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted" />
               ) : (
-                <Play className="h-3.5 w-3.5 text-cyan-400" />
+                <Play className="h-3.5 w-3.5 text-muted group-hover:text-emerald-400 transition-colors" />
               )}
-              Run
+              Run Code
             </button>
+            
             <button
               onClick={triggerProductionTransmit}
               disabled={running || submitting}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 px-5 py-2 text-white shadow-lg shadow-cyan-500/20 transition-all hover:opacity-90 disabled:opacity-40"
+              className="group relative flex items-center gap-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-7 py-2.5 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:shadow-[0_0_30px_rgba(6,182,212,0.25)] hover:bg-cyan-500/20 hover:border-cyan-400/50 transition-all duration-300 disabled:opacity-40 backdrop-blur-md"
             >
               {submitting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Send className="h-3.5 w-3.5" />
+                <Send className="h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               )}
               Submit
             </button>

@@ -212,15 +212,6 @@ export default function Navbar() {
               </Link>
             );
           })}
-          {user?.role === 'admin' && (
-            <Link
-              to="/create-problem"
-              className="flex items-center gap-1.5 ml-2 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-all duration-150 whitespace-nowrap"
-            >
-              <PlusCircle className="h-3.5 w-3.5" />
-              New Problem
-            </Link>
-          )}
         </nav>
 
         {/* Right Area */}

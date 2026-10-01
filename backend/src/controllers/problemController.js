@@ -196,7 +196,7 @@ exports.updateProblem = async (req, res) => {
     const problem = await Problem.findByIdAndUpdate(
       req.params.id,
       updates,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-hiddenTestCases');
 
     if (!problem) {

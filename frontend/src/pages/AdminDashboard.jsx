@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../api/client';
+import toast from 'react-hot-toast';
 import {
   Shield, Users, FileText, Code, CheckCircle, Ban, ShieldCheck,
   Heart, Sparkles, Edit, Trash2, Loader2, Plus, Search,
@@ -10,6 +11,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [problems, setProblems] = useState([]);
+  const [sheets, setSheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [banReasons, setBanReasons] = useState({});
@@ -18,14 +20,43 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState('');
   const [problemSearch, setProblemSearch] = useState('');
 
+  // ── Sheet Form ──
+  const [sheetForm, setSheetForm] = useState({ name: '', description: '', imageUrl: '' });
+
+  const handleCreateSheet = async (e) => {
+    e.preventDefault();
+    if (!sheetForm.name) return;
+    try {
+      await API.post('/sheets', sheetForm);
+      setSheetForm({ name: '', description: '', imageUrl: '' });
+      toast.success('Sheet created successfully!');
+      fetchData(); // Refresh sheets
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create sheet');
+    }
+  };
+
+  const handleDeleteSheet = async (sheetId) => {
+    if (!window.confirm('Delete this sheet permanently?')) return;
+    try {
+      await API.delete(`/sheets/${sheetId}`);
+      toast.success('Sheet deleted successfully!');
+      setSheets((prev) => prev.filter((s) => s._id !== sheetId));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [statsRes, problemsRes] = await Promise.all([
+      const [statsRes, problemsRes, sheetsRes] = await Promise.all([
         API.get('/admin/dashboard'),
         API.get('/problems'),
+        API.get('/sheets'),
       ]);
       setData(statsRes.data.data || statsRes.data);
       setProblems(problemsRes.data.problems || []);
+      setSheets(sheetsRes.data || []);
     } catch (err) {
       console.error('Admin fetch error', err);
     } finally {
@@ -48,10 +79,25 @@ export default function AdminDashboard() {
         await API.put(`/admin/users/${userId}/ban`, { reason });
       }
       await fetchData(); // Refresh
+      toast.success(isCurrentlyBanned ? 'User unbanned' : 'User banned');
     } catch (err) {
-      alert(err.response?.data?.message || 'Action failed');
+      toast.error(err.response?.data?.message || 'Action failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const handlePromote = async (userId) => {
+    if (!window.confirm('Promote this user to Admin?')) return;
+    setActionLoading((prev) => ({ ...prev, [`promote-${userId}`]: true }));
+    try {
+      await API.put(`/admin/users/${userId}/promote`);
+      toast.success('User promoted to Admin');
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Promotion failed');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [`promote-${userId}`]: false }));
     }
   };
 
@@ -62,8 +108,9 @@ export default function AdminDashboard() {
     try {
       await API.delete(`/problems/id/${problemId}`);
       setProblems((prev) => prev.filter((p) => p._id !== problemId));
+      toast.success('Problem deleted successfully!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Delete failed');
+      toast.error(err.response?.data?.message || 'Delete failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`delete-${problemId}`]: false }));
     }
@@ -149,52 +196,89 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        {/* ─── Platform Pulse ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 border border-base rounded-xl bg-card p-6 flex flex-col justify-between gap-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-secondary">
-                <Heart className="h-4 w-4 text-rose-500" />
-                <h2 className="text-sm font-medium text-primary">Platform Pulse</h2>
+        {/* ─── Platform Pulse & Create Sheet ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-1 flex flex-col gap-6">
+            <div className="border border-base rounded-xl bg-card p-6 flex flex-col justify-between gap-6 flex-1">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-secondary">
+                  <Heart className="h-4 w-4 text-rose-500" />
+                  <h2 className="text-sm font-medium text-primary">Platform Pulse</h2>
+                </div>
+                <p className="text-xs text-muted">Acceptance & difficulty distribution.</p>
               </div>
-              <p className="text-xs text-muted">Acceptance & difficulty distribution.</p>
+              <div className="space-y-5">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted">Community Acceptance Rate</span>
+                    <span className="text-space-blue font-semibold">{data?.acceptanceRate || 0}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden border border-base/40">
+                    <div
+                      className="h-full bg-space-blue transition-all duration-500 rounded-full"
+                      style={{ width: `${data?.acceptanceRate || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-base/60 space-y-2">
+                  <span className="text-xs font-medium text-muted block">Challenges by Level</span>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
+                      <div className="text-emerald-400 font-semibold">{data?.problems?.easy || 0}</div>
+                      <div className="text-[10px] text-muted mt-0.5">Easy</div>
+                    </div>
+                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
+                      <div className="text-amber-400 font-semibold">{data?.problems?.medium || 0}</div>
+                      <div className="text-[10px] text-muted mt-0.5">Medium</div>
+                    </div>
+                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
+                      <div className="text-rose-400 font-semibold">{data?.problems?.hard || 0}</div>
+                      <div className="text-[10px] text-muted mt-0.5">Hard</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-5">
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-muted">Community Acceptance Rate</span>
-                  <span className="text-space-blue font-semibold">{data?.acceptanceRate || 0}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden border border-base/40">
-                  <div
-                    className="h-full bg-space-blue transition-all duration-500 rounded-full"
-                    style={{ width: `${data?.acceptanceRate || 0}%` }}
-                  />
-                </div>
+
+            {/* Create Sheet Form */}
+            <div className="border border-base rounded-xl bg-card p-6 flex flex-col justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-sm font-medium text-primary">Create New Sheet</h2>
+                <p className="text-xs text-muted">Add a new problem collection sheet.</p>
               </div>
-              <div className="pt-3 border-t border-base/60 space-y-2">
-                <span className="text-xs font-medium text-muted block">Challenges by Level</span>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                    <div className="text-emerald-400 font-semibold">{data?.problems?.easy || 0}</div>
-                    <div className="text-[10px] text-muted mt-0.5">Easy</div>
-                  </div>
-                  <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                    <div className="text-amber-400 font-semibold">{data?.problems?.medium || 0}</div>
-                    <div className="text-[10px] text-muted mt-0.5">Medium</div>
-                  </div>
-                  <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                    <div className="text-rose-400 font-semibold">{data?.problems?.hard || 0}</div>
-                    <div className="text-[10px] text-muted mt-0.5">Hard</div>
-                  </div>
-                </div>
-              </div>
+              <form onSubmit={handleCreateSheet} className="space-y-3">
+                <input
+                  placeholder="Sheet Name (e.g. Blind 75)"
+                  required
+                  value={sheetForm.name}
+                  onChange={(e) => setSheetForm({ ...sheetForm, name: e.target.value })}
+                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
+                />
+                <input
+                  placeholder="Description"
+                  value={sheetForm.description}
+                  onChange={(e) => setSheetForm({ ...sheetForm, description: e.target.value })}
+                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
+                />
+                <input
+                  placeholder="Image URL (optional)"
+                  value={sheetForm.imageUrl}
+                  onChange={(e) => setSheetForm({ ...sheetForm, imageUrl: e.target.value })}
+                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
+                />
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-blue-800 hover:bg-blue-700 text-white text-xs font-medium rounded transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="h-3 w-3" /> Add Sheet
+                </button>
+              </form>
             </div>
           </div>
 
           {/* ─── User Management with Search ─── */}
-          <div className="lg:col-span-2 border border-base rounded-xl bg-card overflow-hidden flex flex-col">
-            <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="lg:col-span-2 border border-base rounded-xl bg-card overflow-hidden flex flex-col max-h-[550px]">
+            <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
               <div className="space-y-0.5">
                 <h3 className="text-sm font-medium text-primary">Users</h3>
                 <p className="text-xs text-muted">Manage member accounts and access.</p>
@@ -217,7 +301,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-auto custom-scrollbar flex-1">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-base bg-secondary/10 text-xs text-muted">
@@ -251,6 +335,19 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-5 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {u.role !== 'admin' && (
+                              <button
+                                onClick={() => handlePromote(u._id)}
+                                disabled={actionLoading[`promote-${u._id}`]}
+                                className="text-[10px] font-medium px-2 py-1 rounded-full text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20 transition-colors"
+                              >
+                                {actionLoading[`promote-${u._id}`] ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  'Promote'
+                                )}
+                              </button>
+                            )}
                             {!u.isBanned && (
                               <input
                                 type="text"
@@ -291,6 +388,39 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        {/* ─── Manage Sheets ─── */}
+        <div className="border border-base rounded-xl bg-card overflow-hidden flex flex-col">
+          <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div className="space-y-0.5">
+              <h3 className="text-sm font-medium text-primary">Manage Sheets</h3>
+              <p className="text-xs text-muted">View or delete existing problem sheets.</p>
+            </div>
+          </div>
+          <div className="p-5 overflow-x-auto custom-scrollbar">
+            {sheets.length === 0 ? (
+              <p className="text-xs text-muted py-2">No sheets found.</p>
+            ) : (
+              <div className="flex gap-4 pb-2">
+                {sheets.map(sheet => (
+                  <div key={sheet._id} className="min-w-[250px] max-w-[300px] flex justify-between items-center p-4 rounded-xl bg-secondary/30 border border-base hover:border-light/50 transition-colors shadow-sm">
+                    <div className="flex-1 min-w-0 pr-3">
+                      <p className="text-sm font-semibold text-secondary truncate">{sheet.name}</p>
+                      <p className="text-[10px] text-muted truncate mt-0.5">{sheet.slug}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSheet(sheet._id)}
+                      className="text-rose-500 hover:text-rose-400 p-2 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors flex-shrink-0"
+                      title="Delete Sheet"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

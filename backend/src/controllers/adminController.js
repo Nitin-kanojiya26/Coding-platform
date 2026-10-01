@@ -113,3 +113,32 @@ exports.unbanUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Promote a user to admin
+// @route   PUT /api/admin/users/:id/promote
+// @access  Private/Admin
+exports.promoteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'User is already an admin' });
+    }
+
+    user.role = 'admin';
+    await user.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: `User ${user.name} is now an admin`,
+      user: { id: user._id, name: user.name, role: user.role }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

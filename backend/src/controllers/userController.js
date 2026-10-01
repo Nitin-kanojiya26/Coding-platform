@@ -48,7 +48,7 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     res.status(200).json({
@@ -78,7 +78,7 @@ exports.uploadAvatar = async (req, res) => {
           contentType: req.file.mimetype,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password -avatar.data');
 
     res.status(200).json({
@@ -263,7 +263,7 @@ exports.bookmarkProblem = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $addToSet: { bookmarkedProblems: problemId } },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('bookmarkedProblems', 'title slug difficulty tags');
 
     res.status(200).json({
@@ -287,7 +287,7 @@ exports.removeBookmark = async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $pull: { bookmarkedProblems: problemId } },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('bookmarkedProblems', 'title slug difficulty tags');
 
     res.status(200).json({

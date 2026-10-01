@@ -6,8 +6,8 @@ const createLimiter = (windowMs, max, message) => {
     windowMs,
     max,
     message: { message: message || 'Too many requests, please try again later.' },
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    standardHeaders: true, 
+    legacyHeaders: false, 
   });
 };
 
@@ -27,10 +27,10 @@ const submitCodeLimiter = createLimiter(60 * 1000, 20, 'Too many code submission
 const runCodeLimiter = createLimiter(60 * 1000, 30, 'Too many code runs. Please try again after a minute.');
 
 // General Limiters
-const leaderboardLimiter = createLimiter(60 * 1000, 60);
-const bookmarksLimiter = createLimiter(60 * 1000, 60);
-const historyLimiter = createLimiter(60 * 1000, 60);
-const profileUpdateLimiter = createLimiter(60 * 1000, 20, 'Too many profile updates. Please try again after a minute.');
+const leaderboardLimiter = createLimiter(60 * 1000, 1000);
+const bookmarksLimiter = createLimiter(60 * 1000, 1000);
+const historyLimiter = createLimiter(60 * 1000, 1000);
+const profileUpdateLimiter = createLimiter(60 * 1000, 100, 'Too many profile updates. Please try again after a minute.');
 
 module.exports = {
   loginLimiter,

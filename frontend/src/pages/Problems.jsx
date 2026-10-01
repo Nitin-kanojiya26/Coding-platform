@@ -106,7 +106,7 @@ export default function Problems() {
   useEffect(() => {
     // Synchronize problem sets and parse user execution streams for verification states
     Promise.all([
-      API.get('/problems'),
+      API.get('/problems?limit=100'),
       API.get('/submissions/my?limit=1000')
     ])
       .then(([problemsRes, subsRes]) => {
@@ -167,10 +167,10 @@ export default function Problems() {
         {/* Title Header Block */}
         <div className="pb-4 border-b border-base">
           <h1 className="text-xl font-bold text-primary tracking-wide flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-accent" /> Browse Registries
+            <BookOpen className="h-4 w-4 text-accent" /> Explore Problems
           </h1>
           <p className="text-xs text-muted mt-1">
-            Locate core files, track verification status, and manage workspace bookmarks.
+            Discover new challenges, track your progress, and manage your saved bookmarks.
           </p>
         </div>
 

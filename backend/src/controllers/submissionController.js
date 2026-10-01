@@ -119,7 +119,7 @@ exports.createSubmission = async (req, res) => {
         await User.findByIdAndUpdate(
           req.user._id,
           { $addToSet: { solvedProblems: problemId } },
-          { new: true }
+          { returnDocument: 'after' }
         );
       }
 

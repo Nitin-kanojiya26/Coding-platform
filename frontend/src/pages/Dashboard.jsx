@@ -1,134 +1,86 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/client';
 import { useBookmark } from '../hooks/useBookmark';
 import {
   Search, ChevronDown, ChevronUp, Flame, Bookmark,
-  CheckCircle, Trophy, Sparkles, BookOpen, Target, TrendingUp
+  CheckCircle, Trophy, Sparkles, BookOpen, Target, TrendingUp, ChevronRight, Circle
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
 import ActivityHeatmap from '../components/ActivityHeatmap';
 
 // ─── Premium Fluid Problem Row ───────────────────────────
-const ProblemItem = ({ problem, isExpanded, onToggle }) => {
+const ProblemItem = ({ problem, isSolved, isAttempted }) => {
   const { isBookmarked, toggleBookmark, loading: bookmarkLoading } = useBookmark(problem._id);
-
+  const [showAllTags, setShowAllTags] = useState(false);
+  const navigate = useNavigate();
+  
   return (
-    <div className={`group relative border-b border-base last:border-0 transition-all duration-200 ${
-      isExpanded ? 'bg-hover/40' : ''
-    }`}>
-      {/* Background activation hover */}
-      <div 
-        className={`absolute inset-y-1 -inset-x-3 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 ${
-          isExpanded ? 'opacity-100 bg-hover/50' : 'hover:bg-hover/30'
-        }`} 
-      />
-      
-      <div 
-        className="relative flex items-center justify-between py-4 px-3 cursor-pointer select-none" 
-        onClick={() => onToggle(problem._id)}
-      >
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          {/* Accent Indicator Bar */}
-          <div className={`w-[3px] h-5 rounded-full self-center transition-all duration-350 ${
-            isExpanded ? 'bg-accent h-7 shadow-[0_0_12px_rgba(56,189,248,0.4)]' : 'bg-transparent group-hover:bg-light'
-          }`} />
-
-          <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pr-4">
-            <h3 className="text-sm font-medium text-secondary group-hover:text-primary transition-colors duration-150 truncate">
+    <div 
+      onClick={() => navigate(`/problems/${problem.slug}`)}
+      className="border-b border-base last:border-0 hover:bg-hover/40 transition-colors flex flex-col cursor-pointer"
+    >
+      <div className="group flex items-center justify-between py-2.5 px-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex-shrink-0 w-4 flex justify-center">
+            {isSolved ? (
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10" />
+            ) : isAttempted ? (
+              <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-500 flex items-center justify-center">
+                <div className="w-1 h-1 rounded-full bg-amber-500" />
+              </div>
+            ) : (
+              <Circle className="w-3.5 h-3.5 text-muted group-hover:text-primary transition-colors" />
+            )}
+          </div>
+          
+          <div className="min-w-0 flex-1 flex items-center gap-3">
+            <h3 className="text-xs font-medium text-secondary group-hover:text-primary transition-colors truncate">
               {problem.title}
             </h3>
             
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <DifficultyBadge difficulty={problem.difficulty} />
-              
-              {/* High-Visibility Tag Architecture */}
-              <div className="flex items-center gap-1.5">
-                {(problem.tags || []).slice(0, 2).map((tag, idx) => (
-                  <span 
-                    key={idx} 
-                    className="text-[10px] font-bold tracking-wide text-secondary bg-hover/60 border border-light/80 px-2.5 py-0.5 rounded-md shadow-sm transition-colors group-hover:border-light"
-                  >
-                    {tag}
-                  </span>
-                ))}
-                {(problem.tags || []).length > 2 && (
-                  <span className="text-[10px] text-muted font-bold bg-hover/40 border border-base px-1.5 py-0.5 rounded-md">
-                    +{problem.tags.length - 2}
-                  </span>
-                )}
-              </div>
+            {/* Tags preview on one line */}
+            <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
+              {(problem.tags || []).slice(0, 1).map((tag, idx) => (
+                <span key={idx} className="text-[9px] font-bold tracking-wide text-muted bg-input/50 px-1.5 py-0.5 rounded">
+                  {tag}
+                </span>
+              ))}
+              {(problem.tags?.length > 1) && (
+                <button 
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAllTags(!showAllTags); }}
+                  className="text-[9px] text-muted hover:text-secondary flex items-center gap-0.5 px-1 py-0.5 bg-secondary rounded"
+                >
+                  +{problem.tags.length - 1} {showAllTags ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="relative flex items-center gap-3 ml-4 flex-shrink-0">
-          <button 
-            onClick={(e) => { e.stopPropagation(); toggleBookmark(); }} 
-            disabled={bookmarkLoading} 
-            className="p-1.5 rounded-lg text-muted hover:text-secondary transition-colors"
-          >
-            <Bookmark className={`h-4 w-4 transition-all duration-350 ${
-              isBookmarked ? 'fill-accent text-accent drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' : ''
-            }`} />
-          </button>
-          <div className="text-muted group-hover:text-secondary">
-            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <div className="flex items-center gap-6 ml-3 flex-shrink-0">
+          <div className="w-14">
+            <DifficultyBadge difficulty={problem.difficulty} />
           </div>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleBookmark(); }} 
+            disabled={bookmarkLoading} 
+            className="p-1 rounded-md text-muted hover:text-secondary transition-colors"
+          >
+            <Bookmark className={`h-3.5 w-3.5 transition-all duration-300 ${isBookmarked ? 'fill-accent text-accent drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]' : ''}`} />
+          </button>
         </div>
       </div>
-
-      {isExpanded && (
-        <div className="relative pl-8 pr-4 pb-5 pt-1 space-y-4 animate-in fade-in duration-200">
-          <div className="text-secondary text-sm leading-relaxed whitespace-pre-wrap max-w-3xl">
-            {problem.description}
-          </div>
-          
-          {problem.constraints && (
-            <div className="text-xs space-y-1">
-              <span className="font-bold uppercase tracking-wider block text-muted text-[9px]">Constraints</span>
-              <p className="font-mono text-xs text-secondary bg-input p-2.5 rounded-lg border border-base inline-block">
-                {problem.constraints}
-              </p>
-            </div>
-          )}
-
-          {problem.sampleTestCases && problem.sampleTestCases.length > 0 && (
-            <div className="space-y-2">
-              <span className="font-bold uppercase tracking-wider block text-muted text-[9px]">Sample Cases</span>
-              <div className="space-y-2">
-                {problem.sampleTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-input max-w-2xl rounded-lg border border-base overflow-hidden">
-                    <div className="grid grid-cols-2 divide-x divide-base border-b border-base font-mono text-xs">
-                      <div className="p-2.5">
-                        <span className="text-muted block text-[9px] uppercase tracking-wider mb-1">Input</span>
-                        <code className="text-secondary">{tc.input}</code>
-                      </div>
-                      <div className="p-2.5">
-                        <span className="text-muted block text-[9px] uppercase tracking-wider mb-1">Output</span>
-                        <code className="text-emerald-400 font-semibold">{tc.output}</code>
-                      </div>
-                    </div>
-                    {tc.explanation && (
-                      <p className="text-xs text-muted p-2.5 bg-hover/20">
-                        {tc.explanation}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <div className="pt-1">
-            <Link 
-              to={`/problems/${problem.slug}`} 
-              className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-accent hover:text-accent-hover transition-colors group/btn"
-            >
-              Open Workspace <span className="transition-transform duration-150 group-hover/btn:translate-x-0.5">→</span>
-            </Link>
-          </div>
+      
+      {/* Expanded Tags */}
+      {showAllTags && (
+        <div className="px-10 pb-2.5 flex flex-wrap gap-1.5">
+          {(problem.tags || []).map((tag, idx) => (
+            <span key={idx} className="text-[9px] font-bold tracking-wide text-muted bg-input px-1.5 py-0.5 rounded border border-base">
+              {tag}
+            </span>
+          ))}
         </div>
       )}
     </div>
@@ -144,21 +96,24 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [isTagRegistryExpanded, setIsTagRegistryExpanded] = useState(false);
   
   const [streakData, setStreakData] = useState({ currentStreak: 0, maxStreak: 0 });
   const [submissions, setSubmissions] = useState([]);
   const [loginDates, setLoginDates] = useState([]);
   const [stats, setStats] = useState(null);
+  const [sheets, setSheets] = useState([]);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [problemsRes, streakRes, subsRes, statsRes, loginRes] = await Promise.all([
-          API.get('/problems'),
+        const [problemsRes, streakRes, subsRes, statsRes, loginRes, sheetsRes] = await Promise.all([
+          API.get('/problems?limit=100'),
           API.get('/users/streak'),
           API.get('/submissions/my?limit=1000'),
           API.get('/users/stats'),
           API.get('/users/login-activity'),
+          API.get('/sheets?limit=2'),
         ]);
         
         setProblems(problemsRes.data?.problems || problemsRes.data?.data?.problems || []);
@@ -176,6 +131,7 @@ export default function Dashboard() {
         setSubmissions(subsRes.data?.submissions || subsRes.data?.data?.submissions || []);
         setLoginDates(loginRes.data?.data || loginRes.data || []);
         setStats(statsRes.data?.stats || statsRes.data?.data?.stats || null);
+        setSheets(sheetsRes.data || []);
       } catch (err) {
         console.error('Data retrieval synchronization failure', err);
       } finally {
@@ -186,6 +142,45 @@ export default function Dashboard() {
   }, []);
 
   const allTags = ['All', ...new Set(problems.flatMap((p) => p.tags || []))];
+
+  // Calculate Tag Mastery
+  const tagMastery = useMemo(() => {
+    if (!problems.length) return [];
+    
+    const totalByTag = {};
+    problems.forEach(p => {
+      (p.tags || []).forEach(tag => {
+        totalByTag[tag] = (totalByTag[tag] || 0) + 1;
+      });
+    });
+
+    const solvedProblemIds = new Set();
+    submissions.forEach(sub => {
+      if (sub.status === 'Accepted' || sub.status === 'AC') {
+        solvedProblemIds.add(String(sub.problemId || sub.problem?._id || sub.problem));
+      }
+    });
+    user?.solvedProblems?.forEach(p => {
+      solvedProblemIds.add(String(p._id || p));
+    });
+
+    const solvedByTag = {};
+    problems.forEach(p => {
+      if (solvedProblemIds.has(String(p._id))) {
+        (p.tags || []).forEach(tag => {
+          solvedByTag[tag] = (solvedByTag[tag] || 0) + 1;
+        });
+      }
+    });
+
+    const masteryArray = Object.keys(totalByTag).map(tag => {
+      const solved = solvedByTag[tag] || 0;
+      const total = totalByTag[tag];
+      return { tag, solved, total, percentage: total > 0 ? (solved / total) * 100 : 0 };
+    });
+
+    return masteryArray.sort((a, b) => b.solved - a.solved || a.tag.localeCompare(b.tag));
+  }, [problems, submissions, user]);
 
   useEffect(() => {
     let result = problems;
@@ -209,7 +204,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-primary px-4 sm:px-6 py-10 text-muted font-sans antialiased selection:bg-accent/20 selection:text-accent">
+    <div className="min-h-screen bg-primary px-4 sm:px-6 pt-4 pb-10 text-muted font-sans antialiased selection:bg-accent/20 selection:text-accent">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Top Header Identity Segment */}
@@ -282,7 +277,49 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Central Problem Matrix */}
-          <div className="lg:col-span-8 bg-secondary border border-light/80 rounded-2xl p-5 space-y-5 shadow-md">
+          <div className="lg:col-span-8 space-y-6">
+            
+            {/* Curated Sheets Banner */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-primary">Sheets</h2>
+              <Link to="/sheets" className="text-xs font-bold text-cyan-400 hover:text-cyan-300">View All Sheets &rarr;</Link>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sheets.map((sheet, index) => {
+                const colorTheme = index % 2 === 0 ? 'cyan' : 'emerald';
+                return (
+                  <div key={sheet._id} className={`bg-gradient-to-r ${colorTheme === 'cyan' ? 'from-cyan-900/40 to-indigo-900/40 border-cyan-500/30' : 'from-emerald-900/40 to-teal-900/40 border-emerald-500/30'} border rounded-2xl p-5 shadow-lg relative overflow-hidden group flex flex-col justify-between`}>
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                      {sheet.imageUrl ? (
+                        <img src={sheet.imageUrl} alt={sheet.name} className="w-32 h-32 object-cover rounded opacity-30 mix-blend-overlay -translate-y-4 translate-x-4" />
+                      ) : (
+                        <BookOpen className={`w-32 h-32 ${colorTheme === 'cyan' ? 'text-cyan-400' : 'text-emerald-400'} -translate-y-4 translate-x-4`} />
+                      )}
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`bg-${colorTheme}-500/20 text-${colorTheme}-400 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded`}>Sheet</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-white mb-1">{sheet.name}</h2>
+                      <p className={`text-sm ${colorTheme === 'cyan' ? 'text-cyan-100/70' : 'text-emerald-100/70'} mb-4 max-w-md line-clamp-2`}>{sheet.description}</p>
+                    </div>
+                    <div className="relative z-10 mt-2">
+                      <Link to={`/sheets/${sheet.slug}`} className={`inline-flex items-center gap-2 bg-${colorTheme}-500 hover:bg-${colorTheme}-400 text-slate-900 font-bold px-4 py-2 rounded-lg text-sm transition-colors shadow-lg shadow-${colorTheme}-500/20`}>
+                        Continue Solving <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+              {sheets.length === 0 && (
+                <div className="col-span-2 text-center py-6 text-sm text-muted bg-secondary border border-base rounded-2xl">
+                  No sheets created yet. Admins can create them in the Dashboard!
+                </div>
+              )}
+            </div>
+
+            <div className="bg-secondary border border-light/80 rounded-2xl p-5 space-y-5 shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xs font-bold text-secondary flex items-center gap-2 tracking-wide">
                 <BookOpen className="h-4 w-4 text-accent" /> PROBLEMS
@@ -301,39 +338,60 @@ export default function Dashboard() {
             </div>
 
             {/* Tag Registry Navigation Filters */}
-            <div className="flex flex-wrap gap-1.5">
-              {allTags.map((tag) => (
-                <button 
-                  key={tag} 
-                  onClick={() => setSelectedTag(tag)}
-                  className={`px-3 py-1 rounded-md text-[10px] font-bold tracking-wide transition-all border ${
-                    selectedTag === tag
-                      ? 'bg-hover text-primary border-light shadow-sm'
-                      : 'bg-transparent text-muted border-transparent hover:text-secondary'
-                  }`}
+            <div className="flex items-center gap-1.5 w-full">
+              <div className={`flex flex-wrap gap-1.5 flex-1 ${!isTagRegistryExpanded ? 'overflow-hidden h-8' : ''}`}>
+                {allTags.map((tag) => (
+                  <button 
+                    key={tag} 
+                    onClick={() => setSelectedTag(tag)}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold tracking-wide transition-all border shrink-0 h-6 ${
+                      selectedTag === tag
+                        ? 'bg-hover text-primary border-light shadow-sm'
+                        : 'bg-transparent text-muted border-transparent hover:text-secondary'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+              {allTags.length > 5 && (
+                <button
+                  onClick={() => setIsTagRegistryExpanded(!isTagRegistryExpanded)}
+                  className="px-2 py-1 h-6 rounded-md text-[10px] font-bold text-muted bg-secondary hover:text-secondary flex items-center gap-1 shrink-0 transition-colors"
                 >
-                  {tag}
+                  {isTagRegistryExpanded ? (
+                    <><ChevronUp className="w-3 h-3" /> Less</>
+                  ) : (
+                    <><ChevronDown className="w-3 h-3" /> More</>
+                  )}
                 </button>
-              ))}
+              )}
             </div>
 
             {/* Structured Rows */}
-            <div className="divide-y divide-base/60 border-t border-base/60">
+            <div className="divide-y divide-base/60 border-t border-base/60 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-base">
               {filteredProblems.length === 0 ? (
                 <div className="py-12 text-center text-muted text-xs font-bold tracking-wider">
                   NO ENTRIES DETECTED
                 </div>
               ) : (
-                filteredProblems.map((problem) => (
-                  <ProblemItem 
-                    key={problem._id} 
-                    problem={problem} 
-                    isExpanded={expandedId === problem._id} 
-                    onToggle={toggleExpand} 
-                  />
-                ))
+                filteredProblems.map((problem) => {
+                  const currentId = String(problem._id);
+                  const isSolved = submissions.some(sub => (sub.status === 'Accepted' || sub.status === 'AC') && String(sub.problemId || sub.problem?._id || sub.problem) === currentId) || user?.solvedProblems?.some(p => String(p._id || p) === currentId);
+                  const isAttempted = !isSolved && submissions.some(sub => String(sub.problemId || sub.problem?._id || sub.problem) === currentId);
+                  
+                  return (
+                    <ProblemItem 
+                      key={problem._id} 
+                      problem={problem} 
+                      isSolved={isSolved}
+                      isAttempted={isAttempted}
+                    />
+                  );
+                })
               )}
             </div>
+          </div>
           </div>
 
           {/* Right Metrics Columns */}
@@ -363,6 +421,34 @@ export default function Dashboard() {
                   <span className="text-accent font-bold">{stats?.acceptanceRate || 0}%</span>
                 </div>
               </div>
+            </div>
+
+            {/* Skill Mastery (Top Tags) */}
+            <div className="bg-secondary border border-light/80 rounded-2xl p-5 space-y-4 shadow-md">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center justify-between">
+                <span>Skill Mastery</span>
+                <Flame className="w-3.5 h-3.5 text-orange-500" />
+              </h3>
+              {tagMastery.length > 0 ? (
+                <div className="space-y-4 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                  {tagMastery.map(({ tag, solved, total, percentage }) => (
+                    <div key={tag} className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-secondary truncate pr-2 max-w-[120px]" title={tag}>{tag}</span>
+                        <span className="text-muted shrink-0">{solved} / {total}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-input rounded-full overflow-hidden border border-base/40">
+                        <div 
+                          className="h-full bg-gradient-to-r from-accent to-indigo-500 rounded-full transition-all duration-1000"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-muted text-center py-4">Solve problems to see your mastery!</div>
+              )}
             </div>
 
           </div>

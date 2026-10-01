@@ -16,6 +16,8 @@ const JUDGE0_LANGUAGE_MAP = {
   python: 71,      // Python (3.8.1)
   javascript: 63,  // JavaScript (Node.js 12.14.0)
   c: 50,           // C (GCC 9.2.0)
+  assembly: 45,    // Assembly (NASM 2.14.02)
+  cobol: 77,       // COBOL (GnuCOBOL 3.0.0)
 };
 
 function toJudge0LanguageId(langKey) {

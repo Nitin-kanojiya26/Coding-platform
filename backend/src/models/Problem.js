@@ -60,6 +60,14 @@ const problemSchema = new mongoose.Schema({
         enum: ['easy', 'medium', 'hard'],
         required: [true, 'Please provide a difficulty']
     },
+    sheetName: {
+        type: String,
+        default: ''
+    },
+    topic: {
+        type: String,
+        default: ''
+    },
     tags: [{
         type: String,
         lowercase: true,

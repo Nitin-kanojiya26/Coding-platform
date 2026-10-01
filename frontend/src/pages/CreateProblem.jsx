@@ -14,6 +14,8 @@ export default function CreateProblem() {
     description: '',
     difficulty: 'easy',
     tags: [],
+    sheetName: '',
+    topic: '',
     constraints: '',
     timeLimit: 1000,
     memoryLimit: 128,
@@ -69,6 +71,9 @@ export default function CreateProblem() {
     setMessage('');
     try {
       const payload = { ...form };
+      if (payload.sheetName) {
+        payload.sheetName = payload.sheetName.toLowerCase().replace(/\s+/g, '-');
+      }
       await API.post('/problems', payload);
       setMessage('Problem created successfully!');
       setTimeout(() => navigate('/problems'), 1500);
@@ -299,6 +304,28 @@ export default function CreateProblem() {
                     <option value="hard">Hard</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">Sheet Name (Optional)</label>
+                <input
+                  name="sheetName"
+                  value={form.sheetName}
+                  onChange={handleChange}
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
+                  placeholder="e.g., striver"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted">Topic (Optional)</label>
+                <input
+                  name="topic"
+                  value={form.topic}
+                  onChange={handleChange}
+                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
+                  placeholder="e.g., Arrays"
+                />
               </div>
 
               <div className="space-y-1.5">
