@@ -414,7 +414,7 @@ export default function EditProblem() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-accent hover:bg-accent/90 text-primary text-sm font-medium rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-accent/10"
+              className="w-full py-2.5 bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-accent/10"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Problem'}
             </button>

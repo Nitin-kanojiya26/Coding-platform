@@ -57,27 +57,27 @@ export default function Bookmarks() {
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
               <h1 className="text-base font-semibold text-primary tracking-tight">
-                Saved Workspaces
+                Saved Problems
               </h1>
             </div>
             <p className="text-xs text-muted">
-              Personal reference compilation and archived programming items.
+              Access your saved coding challenges for quick review and practice.
             </p>
           </div>
           <div className="text-[11px] font-mono text-muted bg-secondary border border-base px-2.5 py-1 rounded-md self-start sm:self-auto">
-            INDEXED_ITEMS // {bookmarks.length.toString().padStart(2, '0')}
+            Saved: {bookmarks.length.toString()}
           </div>
         </div>
 
         {bookmarks.length === 0 ? (
           <div className="py-20 text-center border border-dashed border-base rounded-xl bg-card space-y-3">
             <Bookmark className="h-5 w-5 mx-auto text-muted" />
-            <p className="text-xs font-mono text-muted">NO_RECORDS_FOUND</p>
+            <p className="text-xs font-medium text-muted">No bookmarks yet</p>
             <Link 
               to="/problems" 
               className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors duration-150"
             >
-              Scan index directory <ArrowUpRight className="h-3 w-3" />
+              Browse Problems <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
         ) : (
