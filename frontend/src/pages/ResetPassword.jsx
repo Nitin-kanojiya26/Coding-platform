@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import API from '../api/client';
 import { Mail, Lock, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Pre-fill email from navigation state (optional)
+
   const [email, setEmail] = useState(location.state?.email || '');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
@@ -18,13 +18,12 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate passwords match
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -33,15 +32,15 @@ export default function ResetPassword() {
     setLoading(true);
     setError('');
     setMessage('');
-    
+
     try {
-      const res = await API.post('/auth/reset-password', { 
-        email, 
-        otp, 
-        password 
+      const res = await API.post('/auth/reset-password', {
+        email,
+        otp,
+        password
       });
       setMessage(res.data.message || 'Password updated successfully.');
-      setTimeout(() => navigate('/login'), 2000);
+      setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset failed. Please check your OTP.');
     } finally {
@@ -50,53 +49,48 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#000000] px-4 py-12 text-zinc-300 font-sans antialiased">
-      <div className="z-10 w-full max-w-md space-y-6 rounded-xl border border-zinc-900 bg-[#050507] p-8 shadow-2xl">
-        <div className="text-center">
-          <div className="flex justify-center mb-3">
-            <div className="h-12 w-12 rounded-lg bg-zinc-950 border border-zinc-900 flex items-center justify-center shadow-md">
-              <ShieldCheck className="h-6 w-6 text-cyan-400" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">Set New Password</h2>
-          <p className="text-sm text-zinc-400 mt-1">Enter the OTP sent to your email and create a new password.</p>
+    <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center px-4 py-8 select-none">
+      <div className="w-full max-w-sm space-y-5 p-6 rounded-md border border-border/40 bg-surface/40">
+        <div className="flex flex-col items-center text-center space-y-2 pb-2">
+          <Logo stacked={true} />
+          <h1 className="text-base font-semibold text-text">Set New Password</h1>
+          <p className="text-xs text-text-muted">Enter the 6-digit code sent to your email and create a new password.</p>
         </div>
 
         {message && (
-          <div className="rounded-lg bg-emerald-500/10 p-4 border border-emerald-500/20 text-emerald-400 text-sm animate-in fade-in duration-200">
-            {message}
+          <div className="flex items-center gap-2 p-2.5 rounded bg-success/10 border border-success/30 text-success text-xs">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            <span>{message}</span>
           </div>
         )}
         {error && (
-          <div className="rounded-lg bg-rose-500/10 p-4 border border-rose-500/20 text-rose-400 text-sm flex items-start gap-2 animate-in fade-in duration-200">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="flex items-center gap-2 p-2.5 rounded bg-danger/10 border border-danger/30 text-danger text-xs">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email */}
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] text-text-muted mb-1 font-medium">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
+              <Mail className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
-                placeholder="you@example.com"
+                className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
+                placeholder="developer@example.com"
               />
             </div>
           </div>
 
-          {/* OTP */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-              OTP Code
+            <label className="block text-[11px] text-text-muted mb-1 font-medium">
+              6-Digit OTP Code
             </label>
             <input
               type="text"
@@ -104,44 +98,41 @@ export default function ResetPassword() {
               maxLength="6"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 text-center tracking-widest font-semibold"
-              placeholder="123456"
+              className="w-full tracking-[0.5em] text-center font-mono rounded border border-border/40 bg-surface-raised/40 py-1.5 text-base text-text focus:outline-none focus:border-border"
+              placeholder="000000"
             />
           </div>
 
-          {/* New Password */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] text-text-muted mb-1 font-medium">
               New Password
             </label>
             <div className="relative">
-              <Lock className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
+              <Lock className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
                 type="password"
                 required
                 minLength="6"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+                className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
                 placeholder="••••••••"
               />
             </div>
           </div>
 
-          {/* Confirm Password */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+            <label className="block text-[11px] text-text-muted mb-1 font-medium">
               Confirm Password
             </label>
             <div className="relative">
-              <Lock className="absolute top-3 left-3 h-4 w-4 text-zinc-500" />
+              <Lock className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
                 type="password"
                 required
-                minLength="6"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-lg border border-zinc-900 bg-zinc-950 py-2.5 pr-4 pl-10 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+                className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
                 placeholder="••••••••"
               />
             </div>
@@ -150,15 +141,15 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-sm text-white py-2.5 font-semibold transition-colors duration-200 disabled:opacity-40"
+            className="w-full py-1.5 rounded bg-text text-bg hover:opacity-90 text-xs font-medium transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin text-cyan-400" /> : 'Reset Password'}
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set New Password'}
           </button>
         </form>
 
-        <div className="text-center text-sm pt-2">
-          <Link to="/login" className="text-cyan-400 hover:underline transition-colors duration-200">
-            Back to Login
+        <div className="text-center text-xs text-text-muted pt-1">
+          <Link to="/login" className="text-text hover:text-accent font-medium underline transition-colors">
+            Back to Sign In
           </Link>
         </div>
       </div>

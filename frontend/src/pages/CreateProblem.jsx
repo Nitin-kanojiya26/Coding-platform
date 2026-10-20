@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api/client';
-import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, LayoutGrid, Sliders, Terminal } from 'lucide-react';
+import { Plus, Trash2, Loader2, CheckCircle, AlertCircle, LayoutGrid, Sliders, Terminal } from 'lucide-react';
 
 export default function CreateProblem() {
   const navigate = useNavigate();
@@ -67,16 +67,13 @@ export default function CreateProblem() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
     setMessage('');
+    setError('');
+
     try {
-      const payload = { ...form };
-      if (payload.sheetName) {
-        payload.sheetName = payload.sheetName.toLowerCase().replace(/\s+/g, '-');
-      }
-      await API.post('/problems', payload);
+      await API.post('/problems', form);
       setMessage('Problem created successfully!');
-      setTimeout(() => navigate('/problems'), 1500);
+      setTimeout(() => navigate('/admin'), 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create problem.');
     } finally {
@@ -85,310 +82,266 @@ export default function CreateProblem() {
   };
 
   return (
-    <div className="min-h-screen bg-primary px-4 sm:px-8 py-12 text-secondary font-sans antialiased">
-      <div className="max-w-5xl mx-auto space-y-6">
-        
-        {/* Simple, Clean Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-base">
-          <div>
-            <h1 className="text-xl font-semibold text-primary tracking-tight">
-              Create Problem
-            </h1>
-            <p className="text-sm text-muted mt-1">
-              Add a new coding challenge with test cases and runtime limits.
-            </p>
+    <div className="w-full space-y-6 pt-1 text-text">
+      {/* Header */}
+      <div className="pb-3 border-b border-border/40">
+        <h1 className="text-base sm:text-lg font-semibold tracking-tight text-text">
+          Create Problem
+        </h1>
+        <p className="text-xs text-text-muted mt-0.5">
+          Add a new coding challenge with test cases and evaluation limits.
+        </p>
+      </div>
+
+      {message && (
+        <div className="flex items-center gap-2 text-xs text-success bg-success/10 p-2.5 rounded border border-success/30">
+          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+          <span>{message}</span>
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-danger bg-danger/10 p-2.5 rounded border border-danger/30">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start text-xs">
+        {/* Left Column: Details & Cases */}
+        <div className="lg:col-span-2 space-y-5">
+          <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-3.5">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-text block flex items-center gap-1.5 pb-2 border-b border-border/30">
+              <LayoutGrid className="h-3.5 w-3.5 text-accent" /> Problem Details
+            </span>
+
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Title</label>
+              <input
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                required
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-3 py-1.5 text-text placeholder-text-muted focus:outline-none focus:border-border"
+                placeholder="e.g., Two Sum"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Description</label>
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                rows="6"
+                required
+                className="w-full text-xs font-sans rounded border border-border/40 bg-surface-raised/40 px-3 py-1.5 text-text placeholder-text-muted focus:outline-none focus:border-border resize-none leading-relaxed"
+                placeholder="Describe problem objective, constraints, and requirements..."
+              />
+            </div>
+          </div>
+
+          {/* Testcases */}
+          <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-4">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-text block flex items-center gap-1.5 pb-2 border-b border-border/30">
+              <Terminal className="h-3.5 w-3.5 text-accent" /> Test Cases
+            </span>
+
+            {/* Sample Testcases */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text">Sample Test Cases</span>
+                <button
+                  type="button"
+                  onClick={() => addTestCase('sample')}
+                  className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> Add Sample
+                </button>
+              </div>
+
+              {form.sampleTestCases.map((tc, idx) => (
+                <div key={idx} className="bg-surface-raised/30 border border-border/30 rounded p-3 space-y-2">
+                  <span className="text-[10px] text-text-muted font-mono block">Sample #{idx + 1}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <textarea
+                      placeholder="Input data"
+                      value={tc.input}
+                      onChange={(e) => handleTestCaseChange('sample', idx, 'input', e.target.value)}
+                      rows="2"
+                      className="w-full text-xs font-mono rounded border border-border/40 bg-surface-raised/40 p-2 text-text placeholder-text-muted focus:outline-none resize-none"
+                    />
+                    <textarea
+                      placeholder="Expected output"
+                      value={tc.output}
+                      onChange={(e) => handleTestCaseChange('sample', idx, 'output', e.target.value)}
+                      rows="2"
+                      className="w-full text-xs font-mono rounded border border-border/40 bg-surface-raised/40 p-2 text-text placeholder-text-muted focus:outline-none resize-none"
+                    />
+                  </div>
+                  <input
+                    placeholder="Explanation (optional)"
+                    value={tc.explanation}
+                    onChange={(e) => handleTestCaseChange('sample', idx, 'explanation', e.target.value)}
+                    className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2 py-1 text-text placeholder-text-muted focus:outline-none"
+                  />
+                  {form.sampleTestCases.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTestCase('sample', idx)}
+                      className="inline-flex items-center gap-1 text-[10px] text-danger hover:underline"
+                    >
+                      <Trash2 className="h-3 w-3" /> Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Hidden Testcases */}
+            <div className="space-y-3 pt-3 border-t border-border/30">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text">Hidden Evaluation Cases</span>
+                <button
+                  type="button"
+                  onClick={() => addTestCase('hidden')}
+                  className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> Add Hidden
+                </button>
+              </div>
+
+              {form.hiddenTestCases.map((tc, idx) => (
+                <div key={idx} className="bg-surface-raised/30 border border-border/30 rounded p-3 space-y-2">
+                  <span className="text-[10px] text-text-muted font-mono block">Hidden #{idx + 1}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <textarea
+                      placeholder="Input data"
+                      value={tc.input}
+                      onChange={(e) => handleTestCaseChange('hidden', idx, 'input', e.target.value)}
+                      rows="2"
+                      className="w-full text-xs font-mono rounded border border-border/40 bg-surface-raised/40 p-2 text-text placeholder-text-muted focus:outline-none resize-none"
+                    />
+                    <textarea
+                      placeholder="Expected output"
+                      value={tc.output}
+                      onChange={(e) => handleTestCaseChange('hidden', idx, 'output', e.target.value)}
+                      rows="2"
+                      className="w-full text-xs font-mono rounded border border-border/40 bg-surface-raised/40 p-2 text-text placeholder-text-muted focus:outline-none resize-none"
+                    />
+                  </div>
+                  {form.hiddenTestCases.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTestCase('hidden', idx)}
+                      className="inline-flex items-center gap-1 text-[10px] text-danger hover:underline"
+                    >
+                      <Trash2 className="h-3 w-3" /> Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Notifications */}
-        {message && (
-          <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10 transition-all">
-            <CheckCircle2 className="h-4 w-4 shrink-0" /> {message}
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center gap-2 text-sm text-rose-400 bg-rose-500/5 p-4 rounded-xl border border-rose-500/10 transition-all">
-            <AlertCircle className="h-4 w-4 shrink-0" /> {error}
-          </div>
-        )}
+        {/* Right Column: Settings */}
+        <div className="space-y-4">
+          <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-3">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-text block flex items-center gap-1.5 pb-2 border-b border-border/30">
+              <Sliders className="h-3.5 w-3.5 text-accent" /> Parameters
+            </span>
 
-        {/* Form Grid Layout */}
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          
-          {/* Left / Main Section */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Core Details */}
-            <div className="border border-base bg-card rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
-                <LayoutGrid className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-medium text-primary">Problem Details</h2>
-              </div>
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Difficulty</label>
+              <select
+                name="difficulty"
+                value={form.difficulty}
+                onChange={handleChange}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text focus:outline-none"
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Title</label>
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Sheet Name (Optional)</label>
+              <input
+                name="sheetName"
+                value={form.sheetName}
+                onChange={handleChange}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted focus:outline-none"
+                placeholder="e.g. blind-75"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Topic (Optional)</label>
+              <input
+                name="topic"
+                value={form.topic}
+                onChange={handleChange}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted focus:outline-none"
+                placeholder="e.g. Arrays"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Tags (Comma-separated)</label>
+              <input
+                value={form.tags.join(', ')}
+                onChange={handleTags}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted focus:outline-none"
+                placeholder="arrays, hash-map, two-pointers"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-text-muted block mb-1">Constraints</label>
+              <textarea
+                name="constraints"
+                value={form.constraints}
+                onChange={handleChange}
+                rows="2"
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted focus:outline-none resize-none"
+                placeholder="1 <= nums.length <= 10^5"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="text-[10px] text-text-muted block mb-0.5">Time Limit (ms)</label>
                 <input
-                  name="title"
-                  value={form.title}
+                  type="number"
+                  name="timeLimit"
+                  value={form.timeLimit}
                   onChange={handleChange}
-                  required
-                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
-                  placeholder="e.g., Two Sum"
+                  className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2 py-1 text-text focus:outline-none"
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Description</label>
-                <textarea
-                  name="description"
-                  value={form.description}
+              <div>
+                <label className="text-[10px] text-text-muted block mb-0.5">Memory Limit (MB)</label>
+                <input
+                  type="number"
+                  name="memoryLimit"
+                  value={form.memoryLimit}
                   onChange={handleChange}
-                  rows="6"
-                  required
-                  className="w-full text-sm font-sans rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors resize-none leading-relaxed"
-                  placeholder="Describe the problem objective, inputs, and expected outcomes..."
+                  className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2 py-1 text-text focus:outline-none"
                 />
               </div>
             </div>
-
-            {/* Test Cases */}
-            <div className="border border-base bg-card rounded-xl p-6 space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
-                <Terminal className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-medium text-primary">Test Cases</h2>
-              </div>
-
-              {/* Sample Test Cases */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-medium text-secondary">Sample Test Cases</h3>
-                    <p className="text-[11px] text-muted">Visible to users in the description.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => addTestCase('sample')}
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Sample
-                  </button>
-                </div>
-                
-                {form.sampleTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-secondary border border-base rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-muted font-mono">
-                      <span>Case #{idx + 1}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted font-mono block">Input</span>
-                        <textarea
-                          placeholder="Input data"
-                          value={tc.input}
-                          onChange={(e) => handleTestCaseChange('sample', idx, 'input', e.target.value)}
-                          rows="2"
-                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted font-mono block">Output</span>
-                        <textarea
-                          placeholder="Expected output"
-                          value={tc.output}
-                          onChange={(e) => handleTestCaseChange('sample', idx, 'output', e.target.value)}
-                          rows="2"
-                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-muted block">Explanation (Optional)</span>
-                      <input
-                        placeholder="Why this output is correct..."
-                        value={tc.explanation}
-                        onChange={(e) => handleTestCaseChange('sample', idx, 'explanation', e.target.value)}
-                        className="w-full text-xs rounded border border-base bg-primary px-3 py-2 text-muted placeholder-muted outline-none focus:border-light"
-                      />
-                    </div>
-                    {form.sampleTestCases.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeTestCase('sample', idx)}
-                        className="inline-flex items-center gap-1 text-xs text-rose-500/80 hover:text-rose-400 transition-colors pt-1"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove case
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Hidden Test Cases */}
-              <div className="space-y-4 pt-4 border-t border-base/50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-medium text-secondary">Hidden Test Cases</h3>
-                    <p className="text-[11px] text-muted">Used for evaluation behind the scenes.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => addTestCase('hidden')}
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:text-primary transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Hidden Case
-                  </button>
-                </div>
-                
-                {form.hiddenTestCases.map((tc, idx) => (
-                  <div key={idx} className="bg-secondary border border-base rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-muted font-mono">
-                      <span>Hidden #{idx + 1}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted font-mono block">Input</span>
-                        <textarea
-                          placeholder="Input data"
-                          value={tc.input}
-                          onChange={(e) => handleTestCaseChange('hidden', idx, 'input', e.target.value)}
-                          rows="2"
-                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted font-mono block">Output</span>
-                        <textarea
-                          placeholder="Expected output"
-                          value={tc.output}
-                          onChange={(e) => handleTestCaseChange('hidden', idx, 'output', e.target.value)}
-                          rows="2"
-                          className="w-full text-xs font-mono rounded border border-base bg-primary px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light resize-none"
-                        />
-                      </div>
-                    </div>
-                    {form.hiddenTestCases.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeTestCase('hidden', idx)}
-                        className="inline-flex items-center gap-1 text-xs text-rose-500/80 hover:text-rose-400 transition-colors pt-1"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove case
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-            </div>
           </div>
 
-          {/* Right Sidebar Section */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="border border-base bg-card rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-base/50">
-                <Sliders className="h-4 w-4 text-muted" />
-                <h2 className="text-sm font-medium text-primary">Settings</h2>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Difficulty</label>
-                <div className="relative">
-                  <select
-                    name="difficulty"
-                    value={form.difficulty}
-                    onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary outline-none focus:border-light cursor-pointer appearance-none"
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Sheet Name (Optional)</label>
-                <input
-                  name="sheetName"
-                  value={form.sheetName}
-                  onChange={handleChange}
-                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
-                  placeholder="e.g., striver"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Topic (Optional)</label>
-                <input
-                  name="topic"
-                  value={form.topic}
-                  onChange={handleChange}
-                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-primary placeholder-muted outline-none focus:border-light transition-colors"
-                  placeholder="e.g., Arrays"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Tags</label>
-                <input
-                  value={form.tags.join(', ')}
-                  onChange={handleTags}
-                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-secondary placeholder-muted outline-none focus:border-light transition-colors"
-                  placeholder="e.g., arrays, hash-map"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted">Constraints</label>
-                <textarea
-                  name="constraints"
-                  value={form.constraints}
-                  onChange={handleChange}
-                  rows="2"
-                  className="w-full text-sm rounded-lg border border-base bg-input px-3.5 py-2 text-secondary placeholder-muted outline-none focus:border-light transition-colors resize-none"
-                  placeholder="e.g., 1 <= nums.length <= 10^5"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted">Time Limit (ms)</label>
-                  <input
-                    type="number"
-                    name="timeLimit"
-                    value={form.timeLimit}
-                    onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-base bg-input px-3 py-2 text-primary outline-none focus:border-light"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted">Memory (MB)</label>
-                  <input
-                    type="number"
-                    name="memoryLimit"
-                    value={form.memoryLimit}
-                    onChange={handleChange}
-                    className="w-full text-sm rounded-lg border border-base bg-input px-3 py-2 text-primary outline-none focus:border-light"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-accent/10"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Create Problem'
-              )}
-            </button>
-          </div>
-
-        </form>
-      </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-text text-bg hover:opacity-90 font-medium text-xs rounded transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Publish Problem'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

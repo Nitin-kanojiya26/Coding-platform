@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '../api/client';
 import toast from 'react-hot-toast';
 import {
-  Shield, Users, FileText, Code, CheckCircle, Ban, ShieldCheck,
+  Shield, Users, FileText, Code, Ban, ShieldCheck,
   Heart, Sparkles, Edit, Trash2, Loader2, Plus, Search,
 } from 'lucide-react';
 
@@ -16,11 +16,11 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState({});
   const [banReasons, setBanReasons] = useState({});
 
-  // ── Search states ──
+  // Search states
   const [userSearch, setUserSearch] = useState('');
   const [problemSearch, setProblemSearch] = useState('');
 
-  // ── Sheet Form ──
+  // Sheet Form
   const [sheetForm, setSheetForm] = useState({ name: '', description: '', imageUrl: '' });
 
   const handleCreateSheet = async (e) => {
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
       await API.post('/sheets', sheetForm);
       setSheetForm({ name: '', description: '', imageUrl: '' });
       toast.success('Sheet created successfully!');
-      fetchData(); // Refresh sheets
+      fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create sheet');
     }
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
       const rawProblems = problemsRes.data.problems || [];
       setProblems(rawProblems.map(p => ({
         ...p,
-        tags: (p.tags || []).map(t => t.toLowerCase())
+        tags: (p.tags || []).map(t => String(t).toLowerCase())
       })));
       setSheets(sheetsRes.data || []);
     } catch (err) {
@@ -72,7 +72,6 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  // ── Ban/Unban handlers ──
   const handleBanToggle = async (userId, isCurrentlyBanned) => {
     setActionLoading((prev) => ({ ...prev, [userId]: true }));
     try {
@@ -82,7 +81,7 @@ export default function AdminDashboard() {
         const reason = banReasons[userId] || 'Policy violation';
         await API.put(`/admin/users/${userId}/ban`, { reason });
       }
-      await fetchData(); // Refresh
+      await fetchData();
       toast.success(isCurrentlyBanned ? 'User unbanned' : 'User banned');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Action failed');
@@ -99,20 +98,19 @@ export default function AdminDashboard() {
       toast.success('User promoted to Admin');
       await fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Promotion failed');
+      toast.error(err.response?.data?.message || 'Action failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`promote-${userId}`]: false }));
     }
   };
 
-  // ── Delete problem ──
   const handleDeleteProblem = async (problemId) => {
     if (!window.confirm('Delete this problem permanently?')) return;
     setActionLoading((prev) => ({ ...prev, [`delete-${problemId}`]: true }));
     try {
-      await API.delete(`/problems/id/${problemId}`);
+      await API.delete(`/problems/${problemId}`);
+      toast.success('Problem deleted');
       setProblems((prev) => prev.filter((p) => p._id !== problemId));
-      toast.success('Problem deleted successfully!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Delete failed');
     } finally {
@@ -120,412 +118,289 @@ export default function AdminDashboard() {
     }
   };
 
-  // ── Edit problem ──
   const handleEditProblem = (problemId) => {
     navigate(`/edit-problem/${problemId}`);
   };
 
-  // ── Filter users and problems ──
-  const filteredUsers = (data?.users || []).filter((u) =>
-    u.name?.toLowerCase().includes(userSearch.toLowerCase())
-  );
-  const filteredProblems = problems.filter((p) =>
-    p.title?.toLowerCase().includes(problemSearch.toLowerCase()) ||
-    p.tags?.some((tag) => tag.toLowerCase().includes(problemSearch.toLowerCase()))
-  );
+  const filteredUsers = (data?.users || []).filter((u) => {
+    const q = userSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredProblems = problems.filter((p) => {
+    const q = problemSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.tags || []).some(t => t.toLowerCase().includes(q))
+    );
+  });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-primary">
-        <Loader2 className="h-5 w-5 border-2 border-zinc-800 border-t-space-blue rounded-full animate-spin" />
+      <div className="w-full space-y-4 pt-2 animate-pulse">
+        <div className="h-6 w-44 bg-surface-raised rounded" />
+        <div className="grid grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-20 bg-surface-raised/30 rounded" />
+          ))}
+        </div>
       </div>
     );
   }
 
   const statCards = [
-    { label: 'Active Learners', value: data?.totalUsers || 0, icon: Users, desc: 'Happy coding minds' },
-    { label: 'Total Challenges', value: data?.totalProblems || 0, icon: FileText, desc: 'Created for growth' },
-    { label: 'Practice Runs', value: data?.totalSubmissions || 0, icon: Code, desc: 'Attempts at learning' },
-    { label: 'Successful Attempts', value: data?.acceptedSubmissions || 0, icon: CheckCircle, desc: 'Passed with flying colors' },
+    { label: 'Total Users', value: data?.totalUsers || 0, icon: Users },
+    { label: 'Total Challenges', value: data?.totalProblems || 0, icon: Code },
+    { label: 'Submissions', value: data?.totalSubmissions || 0, icon: FileText },
+    { label: 'Banned Accounts', value: data?.bannedUsers || 0, icon: Ban },
   ];
 
   return (
-    <div className="min-h-screen bg-primary px-4 sm:px-8 py-12 text-secondary font-sans antialiased selection:bg-space-blue/10 selection:text-space-blue">
-      <div className="max-w-6xl mx-auto space-y-8">
-
-        {/* ─── Header ─── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-base">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-space-blue" />
-              <h1 className="text-lg font-semibold text-primary tracking-tight flex items-center gap-2">
-                Welcome back, Admin! <Sparkles className="h-4 w-4 text-amber-400 inline animate-pulse" />
-              </h1>
-            </div>
-            <p className="text-xs text-muted">
-              Manage users, problems, and monitor platform health.
-            </p>
-          </div>
-          <Link
-            to="/create-problem"
-            className="text-xs text-muted bg-secondary border border-base px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto hover:border-light transition-colors"
-          >
-            <Plus className="h-3 w-3" /> New Problem
-          </Link>
+    <div className="w-full space-y-6 pt-1 text-text">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/40">
+        <div>
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight text-text flex items-center gap-2">
+            <Shield className="h-4 w-4 text-accent" /> Administration Control Panel
+          </h1>
+          <p className="text-xs text-text-muted mt-0.5">
+            Monitor users, manage challenge repositories, and configure study plans.
+          </p>
         </div>
 
-        {/* ─── Stat Cards ─── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map((card, idx) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-card border border-base hover:border-light/80 rounded-xl p-5 flex flex-col justify-between min-h-[120px] transition-all duration-200 hover:-translate-y-0.5 group"
+        <Link
+          to="/create-problem"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-text text-bg hover:opacity-90 rounded transition-opacity self-start sm:self-auto"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>New Problem</span>
+        </Link>
+      </div>
+
+      {/* Stat Strip (Flat) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 border-y border-border/40 text-xs">
+        {statCards.map((card, idx) => {
+          const Icon = card.icon;
+          return (
+            <div key={idx} className={idx > 0 ? 'sm:border-l sm:border-border/30 sm:pl-3' : ''}>
+              <span className="text-[11px] text-text-muted flex items-center gap-1.5">
+                <Icon className="w-3.5 h-3.5 text-text-muted" />
+                <span>{card.label}</span>
+              </span>
+              <span className="font-mono text-sm sm:text-base font-semibold text-text mt-0.5 block">
+                {card.value.toLocaleString()}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Grid: Create Sheet + Users Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left Column: Create Sheet & Pulse */}
+        <div className="space-y-4">
+          <div className="p-4 border border-border/40 bg-surface/40 rounded space-y-3">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-text flex items-center gap-1.5">
+              <Plus className="h-3.5 w-3.5 text-accent" /> Create New Sheet
+            </h2>
+            <form onSubmit={handleCreateSheet} className="space-y-2.5 text-xs">
+              <input
+                placeholder="Sheet Name (e.g. Blind 75)"
+                required
+                value={sheetForm.name}
+                onChange={(e) => setSheetForm({ ...sheetForm, name: e.target.value })}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted outline-none focus:border-border"
+              />
+              <input
+                placeholder="Description"
+                value={sheetForm.description}
+                onChange={(e) => setSheetForm({ ...sheetForm, description: e.target.value })}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted outline-none focus:border-border"
+              />
+              <input
+                placeholder="Image URL (optional)"
+                value={sheetForm.imageUrl}
+                onChange={(e) => setSheetForm({ ...sheetForm, imageUrl: e.target.value })}
+                className="w-full text-xs rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1.5 text-text placeholder-text-muted outline-none focus:border-border"
+              />
+              <button
+                type="submit"
+                className="w-full py-1.5 bg-text text-bg hover:opacity-90 font-medium text-xs rounded transition-opacity"
               >
-                <div className="flex justify-between items-start gap-4">
-                  <span className="text-xs text-muted font-medium group-hover:text-secondary transition-colors">
-                    {card.label}
-                  </span>
-                  <Icon className="h-4 w-4 text-muted group-hover:text-space-blue transition-colors" />
-                </div>
-                <div className="mt-4 space-y-0.5">
-                  <div className="text-2xl font-semibold tracking-tight text-primary">
-                    {card.value.toLocaleString()}
-                  </div>
-                  <p className="text-[11px] text-muted italic">{card.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ─── Platform Pulse & Create Sheet ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            <div className="border border-base rounded-xl bg-card p-6 flex flex-col justify-between gap-6 flex-1">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-secondary">
-                  <Heart className="h-4 w-4 text-rose-500" />
-                  <h2 className="text-sm font-medium text-primary">Platform Pulse</h2>
-                </div>
-                <p className="text-xs text-muted">Acceptance & difficulty distribution.</p>
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted">Community Acceptance Rate</span>
-                    <span className="text-space-blue font-semibold">{data?.acceptanceRate || 0}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden border border-base/40">
-                    <div
-                      className="h-full bg-space-blue transition-all duration-500 rounded-full"
-                      style={{ width: `${data?.acceptanceRate || 0}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="pt-3 border-t border-base/60 space-y-2">
-                  <span className="text-xs font-medium text-muted block">Challenges by Level</span>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                      <div className="text-emerald-400 font-semibold">{data?.problems?.easy || 0}</div>
-                      <div className="text-[10px] text-muted mt-0.5">Easy</div>
-                    </div>
-                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                      <div className="text-amber-400 font-semibold">{data?.problems?.medium || 0}</div>
-                      <div className="text-[10px] text-muted mt-0.5">Medium</div>
-                    </div>
-                    <div className="bg-secondary border border-base p-2 rounded-lg text-center">
-                      <div className="text-rose-400 font-semibold">{data?.problems?.hard || 0}</div>
-                      <div className="text-[10px] text-muted mt-0.5">Hard</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Create Sheet Form */}
-            <div className="border border-base rounded-xl bg-card p-6 flex flex-col justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="text-sm font-medium text-primary">Create New Sheet</h2>
-                <p className="text-xs text-muted">Add a new problem collection sheet.</p>
-              </div>
-              <form onSubmit={handleCreateSheet} className="space-y-3">
-                <input
-                  placeholder="Sheet Name (e.g. Blind 75)"
-                  required
-                  value={sheetForm.name}
-                  onChange={(e) => setSheetForm({ ...sheetForm, name: e.target.value })}
-                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
-                />
-                <input
-                  placeholder="Description"
-                  value={sheetForm.description}
-                  onChange={(e) => setSheetForm({ ...sheetForm, description: e.target.value })}
-                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
-                />
-                <input
-                  placeholder="Image URL (optional)"
-                  value={sheetForm.imageUrl}
-                  onChange={(e) => setSheetForm({ ...sheetForm, imageUrl: e.target.value })}
-                  className="w-full text-xs rounded border border-base bg-input px-3 py-2 text-secondary placeholder-muted outline-none focus:border-light"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2 bg-blue-800 hover:bg-blue-700 text-white text-xs font-medium rounded transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="h-3 w-3" /> Add Sheet
-                </button>
-              </form>
-            </div>
+                Add Sheet
+              </button>
+            </form>
           </div>
 
-          {/* ─── User Management with Search ─── */}
-          <div className="lg:col-span-2 border border-base rounded-xl bg-card overflow-hidden flex flex-col max-h-[550px]">
-            <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-medium text-primary">Users</h3>
-                <p className="text-xs text-muted">Manage member accounts and access.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {/* 🔍 User Search Bar */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted" />
-                  <input
-                    type="text"
-                    placeholder="Search by username..."
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs bg-input border border-light rounded-lg text-primary placeholder-muted focus:border-light outline-none transition-colors w-48"
-                  />
+          {/* Manage Sheets List */}
+          <div className="p-4 border border-border/40 bg-surface/40 rounded space-y-2.5">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-text">Existing Sheets</h3>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {sheets.map(s => (
+                <div key={s._id} className="flex justify-between items-center py-1 border-b border-border/20 last:border-0 text-xs">
+                  <span className="truncate pr-2 font-medium text-text">{s.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSheet(s._id)}
+                    className="text-danger hover:opacity-80 p-0.5"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <span className="text-[10px] font-medium text-muted bg-secondary/60 px-2.5 py-1 rounded-full border border-light">
-                  {filteredUsers.length} of {data?.users?.length || 0}
-                </span>
-              </div>
-            </div>
-
-            <div className="overflow-auto custom-scrollbar flex-1">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-base bg-secondary/10 text-xs text-muted">
-                    <th className="py-2.5 px-5 font-medium">User</th>
-                    <th className="py-2.5 px-5 font-medium">Role</th>
-                    <th className="py-2.5 px-5 font-medium">Status</th>
-                    <th className="py-2.5 px-5 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base/40 text-xs">
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((u) => (
-                      <tr key={u._id} className="group hover:bg-hover/60 transition-colors duration-150">
-                        <td className="py-3 px-5">
-                          <div className="font-medium text-secondary group-hover:text-primary transition-colors">
-                            {u.name || 'Unknown'}
-                          </div>
-                          <div className="text-[11px] text-muted mt-0.5">{u.email || '—'}</div>
-                        </td>
-                        <td className="py-3 px-5 text-muted capitalize">{u.role || 'member'}</td>
-                        <td className="py-3 px-5">
-                          {u.isBanned ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 bg-rose-500/5 border border-rose-500/10 px-2.5 py-0.5 rounded-full">
-                              <Ban className="h-2.5 w-2.5" /> Banned
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-2.5 py-0.5 rounded-full">
-                              <ShieldCheck className="h-2.5 w-2.5" /> Active
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {u.role !== 'admin' && (
-                              <button
-                                onClick={() => handlePromote(u._id)}
-                                disabled={actionLoading[`promote-${u._id}`]}
-                                className="text-[10px] font-medium px-2 py-1 rounded-full text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20 transition-colors"
-                              >
-                                {actionLoading[`promote-${u._id}`] ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  'Promote'
-                                )}
-                              </button>
-                            )}
-                            {!u.isBanned && (
-                              <input
-                                type="text"
-                                placeholder="Reason"
-                                value={banReasons[u._id] || ''}
-                                onChange={(e) => setBanReasons(prev => ({ ...prev, [u._id]: e.target.value }))}
-                                className="w-24 bg-input border border-light rounded px-1.5 py-0.5 text-[10px] text-muted placeholder-muted focus:border-light outline-none"
-                              />
-                            )}
-                            <button
-                              onClick={() => handleBanToggle(u._id, u.isBanned)}
-                              disabled={actionLoading[u._id]}
-                              className={`text-[10px] font-medium px-2 py-1 rounded-full transition-colors ${
-                                u.isBanned
-                                  ? 'text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20'
-                                  : 'text-rose-400 hover:bg-rose-500/10 border border-rose-500/20'
-                              }`}
-                            >
-                              {actionLoading[u._id] ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : u.isBanned ? (
-                                'Unban'
-                              ) : (
-                                'Ban'
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="text-center py-10 text-xs text-muted">
-                        {userSearch ? 'No users match your search.' : 'No users yet.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* ─── Manage Sheets ─── */}
-        <div className="border border-base rounded-xl bg-card overflow-hidden flex flex-col">
-          <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div className="space-y-0.5">
-              <h3 className="text-sm font-medium text-primary">Manage Sheets</h3>
-              <p className="text-xs text-muted">View or delete existing problem sheets.</p>
-            </div>
-          </div>
-          <div className="p-5 overflow-x-auto custom-scrollbar">
-            {sheets.length === 0 ? (
-              <p className="text-xs text-muted py-2">No sheets found.</p>
-            ) : (
-              <div className="flex gap-4 pb-2">
-                {sheets.map(sheet => (
-                  <div key={sheet._id} className="min-w-[250px] max-w-[300px] flex justify-between items-center p-4 rounded-xl bg-secondary/30 border border-base hover:border-light/50 transition-colors shadow-sm">
-                    <div className="flex-1 min-w-0 pr-3">
-                      <p className="text-sm font-semibold text-secondary truncate">{sheet.name}</p>
-                      <p className="text-[10px] text-muted truncate mt-0.5">{sheet.slug}</p>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteSheet(sheet._id)}
-                      className="text-rose-500 hover:text-rose-400 p-2 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors flex-shrink-0"
-                      title="Delete Sheet"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ─── Problem Management with Search ─── */}
-        <div className="border border-base rounded-xl bg-card overflow-hidden">
-          <div className="px-5 py-4 bg-secondary/40 border-b border-base flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div className="space-y-0.5">
-              <h3 className="text-sm font-medium text-primary">Problems</h3>
-              <p className="text-xs text-muted">Edit or remove existing challenges.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {/* 🔍 Problem Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted" />
-                <input
-                  type="text"
-                  placeholder="Search by title or tag..."
-                  value={problemSearch}
-                  onChange={(e) => setProblemSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs bg-input border border-light rounded-lg text-primary placeholder-muted focus:border-light outline-none transition-colors w-48"
-                />
-              </div>
-              <Link
-                to="/create-problem"
-                className="text-[10px] font-medium text-space-blue hover:text-primary transition-colors flex items-center gap-1"
-              >
-                <Plus className="h-3 w-3" /> Add New
-              </Link>
+        {/* Right Column: User Management */}
+        <div className="lg:col-span-2 border border-border/40 bg-surface/40 rounded overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wider text-text">
+              Users ({filteredUsers.length})
+            </span>
+            <div className="relative w-full sm:w-44">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search user..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full pl-7 pr-2.5 py-1 text-xs bg-surface-raised/40 border border-border/40 rounded text-text placeholder-text-muted focus:outline-none"
+              />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
+          <div className="overflow-x-auto max-h-96">
+            <table className="w-full border-collapse text-left text-xs">
               <thead>
-                <tr className="border-b border-base bg-secondary/10 text-xs text-muted">
-                  <th className="py-2.5 px-5 font-medium">Title</th>
-                  <th className="py-2.5 px-5 font-medium">Difficulty</th>
-                  <th className="py-2.5 px-5 font-medium">Tags</th>
-                  <th className="py-2.5 px-5 font-medium text-right">Actions</th>
+                <tr className="border-b border-border/40 text-[11px] font-medium text-text-muted select-none">
+                  <th className="py-2 px-3">User</th>
+                  <th className="py-2 px-3">Role</th>
+                  <th className="py-2 px-3">Status</th>
+                  <th className="py-2 px-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-base/40 text-xs">
-                {filteredProblems.length > 0 ? (
-                  filteredProblems.slice(0, 15).map((p) => (
-                    <tr key={p._id} className="group hover:bg-hover/60 transition-colors duration-150">
-                      <td className="py-3 px-5">
-                        <span className="text-secondary group-hover:text-primary transition-colors">
-                          {p.title}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5">
-                        <span className={`capitalize ${
-                          p.difficulty === 'easy' ? 'text-emerald-400' :
-                          p.difficulty === 'medium' ? 'text-amber-400' : 'text-rose-400'
-                        }`}>
-                          {p.difficulty}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5">
-                        <span className="text-muted text-[10px]">
-                          {(p.tags || []).slice(0, 3).join(', ')}
-                          {(p.tags || []).length > 3 && ` +${p.tags.length - 3}`}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
+              <tbody className="divide-y divide-border/20">
+                {filteredUsers.map((u) => (
+                  <tr key={u._id} className="hover:bg-surface-raised/30 transition-colors">
+                    <td className="py-2 px-3">
+                      <div className="font-medium text-text">{u.name || 'Unknown'}</div>
+                      <div className="text-[10px] text-text-muted font-mono">{u.email || '—'}</div>
+                    </td>
+                    <td className="py-2 px-3 text-text-muted capitalize">{u.role || 'member'}</td>
+                    <td className="py-2 px-3">
+                      {u.isBanned ? (
+                        <span className="text-[10px] text-danger bg-danger/10 px-1.5 py-0.5 rounded">Banned</span>
+                      ) : (
+                        <span className="text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded">Active</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {u.role !== 'admin' && (
                           <button
-                            onClick={() => handleEditProblem(p._id)}
-                            className="p-1.5 rounded hover:bg-hover/60 transition-colors text-muted hover:text-space-blue"
-                            title="Edit"
+                            type="button"
+                            onClick={() => handlePromote(u._id)}
+                            disabled={actionLoading[`promote-${u._id}`]}
+                            className="text-[10px] px-2 py-0.5 rounded border border-border/40 hover:bg-surface-raised text-text transition-colors"
                           >
-                            <Edit className="h-3.5 w-3.5" />
+                            Promote
                           </button>
-                          <button
-                            onClick={() => handleDeleteProblem(p._id)}
-                            disabled={actionLoading[`delete-${p._id}`]}
-                            className="p-1.5 rounded hover:bg-hover/60 transition-colors text-muted hover:text-rose-400"
-                            title="Delete"
-                          >
-                            {actionLoading[`delete-${p._id}`] ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="text-center py-10 text-xs text-muted">
-                      {problemSearch ? 'No problems match your search.' : 'No problems created yet.'}
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleBanToggle(u._id, u.isBanned)}
+                          disabled={actionLoading[u._id]}
+                          className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                            u.isBanned
+                              ? 'text-success hover:bg-success/10 border border-success/30'
+                              : 'text-danger hover:bg-danger/10 border border-danger/30'
+                          }`}
+                        >
+                          {u.isBanned ? 'Unban' : 'Ban'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         </div>
+      </div>
 
+      {/* Problem Management Table */}
+      <div className="border border-border/40 bg-surface/40 rounded overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wider text-text">
+            Problems ({filteredProblems.length})
+          </span>
+          <div className="relative w-full sm:w-48">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search problem..."
+              value={problemSearch}
+              onChange={(e) => setProblemSearch(e.target.value)}
+              className="w-full pl-7 pr-2.5 py-1 text-xs bg-surface-raised/40 border border-border/40 rounded text-text placeholder-text-muted focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-border/40 text-[11px] font-medium text-text-muted select-none">
+                <th className="py-2 px-3">Title</th>
+                <th className="py-2 px-3">Difficulty</th>
+                <th className="py-2 px-3">Tags</th>
+                <th className="py-2 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/20">
+              {filteredProblems.slice(0, 20).map((p) => (
+                <tr key={p._id} className="hover:bg-surface-raised/30 transition-colors">
+                  <td className="py-2 px-3 font-medium text-text">{p.title}</td>
+                  <td className="py-2 px-3 capitalize">
+                    <span className={p.difficulty === 'easy' ? 'text-success' : p.difficulty === 'medium' ? 'text-warning' : 'text-danger'}>
+                      {p.difficulty}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-text-muted text-[11px] font-mono">
+                    {(p.tags || []).slice(0, 3).join(', ')}
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEditProblem(p._id)}
+                        className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteProblem(p._id)}
+                        disabled={actionLoading[`delete-${p._id}`]}
+                        className="p-1 rounded hover:bg-danger/10 text-text-muted hover:text-danger transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

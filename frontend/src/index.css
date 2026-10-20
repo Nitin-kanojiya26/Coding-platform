@@ -1,168 +1,118 @@
 @import "tailwindcss";
 
-@theme {
-  /* ─── Dark Mode Colors (Pure Black & Gray) ─── */
-  --color-bg-primary: #000000;
-  --color-bg-secondary: #0a0a0c;
-  --color-bg-card: #111111;
-  --color-bg-hover: #1a1a1a;
-  --color-bg-input: #000000;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #e0e0e0;
-  --color-text-muted: #888888;
-  --color-border: #222222;
-  --color-border-light: #333333;
-  --color-accent: #ffffff;
-  --color-accent-hover: #cccccc;
+/* ─── Plain Black (Dark) & Plain White (Light) LeetCode-Style Tokens ─── */
+:root, html.dark {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-raised: #141414;
+  --surface-inset: #000000;
+  --border: #222222;
+  --border-subtle: #171717;
+  --text: #ffffff;
+  --text-muted: #8a8a8a;
+  --accent: #ffa116;
+  --accent-blue: #3b82f6;
+  --success: #2cbb5d;
+  --warning: #ffc01e;
+  --danger: #ef4743;
+  --info: #38bdf8;
+
+  --heatmap-empty: #1a1a1a;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
-/* ─── Light Mode Overrides (if you ever want to add a light theme) ── */
+/* Light Mode Overrides (Plain White like LeetCode) */
 html:not(.dark) {
-  --color-bg-primary: #f8fafc;
-  --color-bg-secondary: #f1f5f9;
-  --color-bg-card: #ffffff;
-  --color-bg-hover: #e2e8f0;
-  --color-bg-input: #ffffff;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #1e293b;
-  --color-text-muted: #64748b;
-  --color-border: #cbd5e1;
-  --color-border-light: #d1d5db;
-  --color-accent: #0f172a;
-  --color-accent-hover: #1e293b;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #f7f7f8;
+  --surface-inset: #ffffff;
+  --border: #e5e5e5;
+  --border-subtle: #f0f0f0;
+  --text: #1a1a1a;
+  --text-muted: #737373;
+  --accent: #ffa116;
+  --accent-blue: #2563eb;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #0284c7;
+
+  --heatmap-empty: #e5e7eb;
 }
 
+/* ─── Tailwind v4 Theme Variables ───────────────────────────── */
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-blue: var(--accent-blue);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ─── Base Styles ────────────────────────────────────────────── */
 @layer base {
   body {
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    background-color: var(--bg);
+    color: var(--text);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, pre, kbd, samp {
+    font-family: 'JetBrains Mono', monospace;
   }
 }
 
-/* ─── Utility Classes ────────────────────────────────── */
-@layer utilities {
-  .bg-primary { background-color: var(--color-bg-primary); }
-  .bg-secondary { background-color: var(--color-bg-secondary); }
-  .bg-card { background-color: var(--color-bg-card); }
-  .bg-hover { background-color: var(--color-bg-hover); }
-  .bg-input { background-color: var(--color-bg-input); }
-  .text-primary { color: var(--color-text-primary); }
-  .text-secondary { color: var(--color-text-secondary); }
-  .text-muted { color: var(--color-text-muted); }
-  .border-base { border-color: var(--color-border); }
-  .border-light { border-color: var(--color-border-light); }
-  .border-base\/80 { border-color: rgba(var(--color-border), 0.8); }
-  .accent { color: var(--color-accent); }
-  .accent-bg { background-color: var(--color-accent); }
+/* ─── Simple Interactive Classes ────────────────────────────── */
+.btn-simple {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  transition: all 120ms ease;
+  user-select: none;
+  cursor: pointer;
 }
 
-/* ─── Smooth Transitions ────────────────────────────── */
-* {
-  transition: background-color 0.2s ease,
-              border-color 0.2s ease,
-              color 0.2s ease,
-              opacity 0.2s ease,
-              transform 0.15s ease,
-              box-shadow 0.2s ease;
+.btn-simple:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-color: var(--accent);
 }
 
-/* ─── Custom Scrollbar ───────────────────────────────── */
+.btn-simple:active {
+  transform: scale(0.98);
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: var(--border);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555555;
-}
-
-/* ─── Cyber Panel (Glassmorphism) ───────────────────── */
-.cyber-panel {
-  background: linear-gradient(135deg, rgba(17, 17, 17, 0.7) 0%, rgba(0, 0, 0, 0.9) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  position: relative;
-}
-
-.cyber-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(to bottom right, rgba(255,255,255,0.02), transparent, rgba(255,255,255,0.02));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* ─── Glow Effects (Gray/White) ────────────────────── */
-.glow-cyan:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
-.glow-purple:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
-.glow-emerald:hover { box-shadow: 0 0 30px rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
-
-/* ─── Button & Card Hovers ───────────────────────────── */
-.btn-smooth {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.btn-smooth:hover {
-  transform: translateY(-1px);
-}
-
-.card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.card-hover:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.05);
-}
-
-/* ─── Loading Animation ───────────────────────────────── */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-.pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* ─── Scanline Grid ───────────────────────────────────── */
-.scanline-grid {
-  background-size: 40px 40px;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.005) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
-}
-@theme {
-  /* ─── Heatmap Empty Box Color ─── */
-  --heatmap-empty: #2a2a2a;  /* Dark mode = visible dark gray (stands out from pure black) */
-}
-
-/* ─── Light mode override ─────────────────────────────────────── */
-html:not(.dark) {
-  --heatmap-empty: #d1d5db;  /* Light mode = visible light gray (stands out from white) */
-}
-@layer utilities {
-  .bg-heatmap-empty {
-    background-color: var(--heatmap-empty);
-  }
-}
-/* ─── Global Dark Mode Border Override ──────────────────────── */
-html.dark [class*="border-"]:not(.border-transparent):not(.border-none) {
-  border-color: var(--color-border) !important;
-}
-@theme {
-  /* ─── Dark Mode Colors ─── */
-  --color-space-blue: #3b82f6;  /* Choose your accent blue */
-  /* ... other variables ... */
+  background: var(--text-muted);
 }

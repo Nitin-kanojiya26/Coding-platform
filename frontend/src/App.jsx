@@ -27,6 +27,7 @@ import PublicProfile from './pages/PublicProfile';
 import EditProblem from './pages/EditProblem';
 import Sheet from './pages/Sheet';
 import SheetsList from './pages/SheetsList';
+import SubmissionDetail from './pages/SubmissionDetail';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -51,6 +52,8 @@ function AppRoutes() {
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/problems" element={<ProtectedRoute><Problems /></ProtectedRoute>} />
         <Route path="/problems/:slug" element={<ProtectedRoute><ProblemDetail /></ProtectedRoute>} />
+        <Route path="/problems/:slug/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
+        <Route path="/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
         <Route path="/sheets/:sheetId" element={<ProtectedRoute><Sheet /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/profile/:id" element={<ProtectedRoute><PublicProfile /></ProtectedRoute>} />

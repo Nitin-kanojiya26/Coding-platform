@@ -17,12 +17,11 @@ import {
   Bookmark,
   History,
   ChevronDown,
-  PlusCircle,
   Menu,
   X,
   Search,
   Loader2,
-  Terminal
+  PlusCircle
 } from 'lucide-react';
 import { getAvatarSrc } from '../utils/avatar';
 
@@ -37,12 +36,12 @@ const getInitials = (name) => {
 };
 
 // ─── Chromatic Aberration Initials Avatar Badge ────────────────
-function InitialsAvatar({ name, className = "h-8 w-8 text-xs" }) {
+function InitialsAvatar({ name, className = "h-7 w-7 text-xs" }) {
   const initials = getInitials(name);
 
   return (
     <div
-      className={`relative flex items-center justify-center bg-[#121212] border border-white/10 font-bold select-none overflow-hidden shrink-0 ${className}`}
+      className={`relative flex items-center justify-center bg-[#121212] border border-white/10 font-bold select-none overflow-hidden shrink-0 rounded-md ${className}`}
     >
       <span
         className="font-mono text-white tracking-tight"
@@ -60,7 +59,7 @@ function InitialsAvatar({ name, className = "h-8 w-8 text-xs" }) {
 }
 
 // ─── User Avatar with Error Handling Fallback ───────────────────
-function NavAvatar({ avatar, name, className = "h-8 w-8 sm:h-9 sm:w-9 rounded-xl" }) {
+function NavAvatar({ avatar, name, className = "h-7 w-7 rounded-md" }) {
   const [imgError, setImgError] = useState(false);
   const avatarSrc = getAvatarSrc(avatar);
   const hasAvatar = Boolean(avatar && !imgError);
@@ -73,7 +72,7 @@ function NavAvatar({ avatar, name, className = "h-8 w-8 sm:h-9 sm:w-9 rounded-xl
     <img
       src={avatarSrc}
       alt={name || 'User'}
-      className={`${className} border border-light object-cover bg-primary p-0.5 shrink-0`}
+      className={`${className} border border-border object-cover bg-surface-raised p-0.5 shrink-0`}
       onError={() => setImgError(true)}
     />
   );
@@ -87,7 +86,6 @@ export default function Navbar() {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [logoError, setLogoError] = useState(false);
 
   // Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,13 +100,8 @@ export default function Navbar() {
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/problems', label: 'Problems', icon: Code2 },
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
-    { to: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
     { to: '/my-submissions', label: 'Submissions', icon: History },
   ];
-
-  if (user?.role === 'admin') {
-    navLinks.push({ to: '/admin', label: 'Admin', icon: Shield });
-  }
 
   // Live database scanning with AbortController
   useEffect(() => {
@@ -130,13 +123,13 @@ export default function Navbar() {
         setSearchResults(Array.isArray(rawData) ? rawData : []);
       } catch (err) {
         if (err.name !== 'CanceledError' && err.code !== 'ERR_CANCELED') {
-          console.error('[SYS_ERR]: Profile search query failure:', err);
+          console.error('Profile search query failure:', err);
           setSearchResults([]);
         }
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 250);
 
     return () => {
       clearTimeout(delayDebounceFn);
@@ -185,16 +178,16 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-base bg-secondary/80 px-4 sm:px-6 backdrop-blur-md transition-colors duration-200">
-      <div className="max-w-7xl mx-auto flex h-16 w-full items-center justify-between gap-4">
+    <header className="sticky top-2 sm:top-3 z-40 w-full max-w-7xl mx-auto px-3 sm:px-6">
+      <div className="h-12 sm:h-13 px-3.5 sm:px-4 bg-surface/95 border border-border rounded-lg shadow-xs backdrop-blur-md flex items-center justify-between gap-3 sm:gap-4 transition-colors">
 
         {/* Brand / Logo Section */}
-        <div className="flex items-center gap-6 min-w-0 shrink-0">
+        <div className="flex items-center gap-3.5 shrink-0">
           <Logo />
         </div>
 
-        {/* Center Links */}
-        <nav className="hidden lg:flex items-center gap-1.5 flex-1 justify-start ml-4">
+        {/* Primary Navigation Links */}
+        <nav className="hidden lg:flex items-center gap-1 shrink-0">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = location.pathname === link.to;
@@ -202,31 +195,36 @@ export default function Navbar() {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl transition-all duration-150 ${isActive
-                  ? 'bg-hover text-primary border border-light/80 shadow-sm'
-                  : 'text-muted border border-transparent hover:text-secondary hover:bg-hover/40'
-                  }`}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors select-none ${
+                  isActive
+                    ? 'bg-surface-raised text-text border border-border font-medium'
+                    : 'text-text-muted hover:text-text hover:bg-surface-raised/60'
+                }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-muted'}`} />
-                {link.label}
+                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-text-muted'}`} />
+                <span>{link.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Right Area */}
-        <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+        {/* Reserved Spacious Expansion Area for Future Custom Buttons */}
+        <div className="hidden xl:flex items-center gap-2 flex-1 justify-start ml-2 pl-2 border-l border-border/40 h-4" id="navbar-expansion-zone">
+          {/* User can easily drop extra buttons here in the future without overcrowding */}
+        </div>
+
+        {/* Right Area: Search, Theme Toggle, Profile */}
+        <div className="flex items-center gap-2 sm:gap-3 ml-auto">
 
           {/* Desktop Search */}
-          <div className="relative hidden md:block w-48 lg:w-60" ref={searchRef}>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-mono transition-all duration-200 ${searchFocused
-              ? 'bg-primary border-light ring-1 ring-light/50'
-              : 'bg-secondary/50 border-base hover:border-light'
-              }`}>
+          <div className="relative hidden md:block w-40 lg:w-52" ref={searchRef}>
+            <div className={`flex items-center gap-2 px-2.5 py-1 rounded-md bg-surface-inset border text-xs font-mono transition-colors ${
+              searchFocused ? 'border-accent ring-1 ring-accent' : 'border-border'
+            }`}>
               {isSearching ? (
                 <Loader2 className="h-3.5 w-3.5 text-accent animate-spin shrink-0" />
               ) : (
-                <Search className={`h-3.5 w-3.5 shrink-0 transition-colors ${searchFocused ? 'text-accent' : 'text-muted'}`} />
+                <Search className={`h-3.5 w-3.5 shrink-0 transition-colors ${searchFocused ? 'text-accent' : 'text-text-muted'}`} />
               )}
               <input
                 type="text"
@@ -234,10 +232,10 @@ export default function Navbar() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 placeholder="Search users..."
-                className="w-full bg-transparent text-[11px] font-bold text-secondary placeholder-muted focus:outline-none"
+                className="w-full bg-transparent text-xs text-text placeholder-text-muted font-sans focus:outline-none"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-muted hover:text-secondary">
+                <button onClick={() => setSearchQuery('')} className="text-text-muted hover:text-text">
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -245,14 +243,14 @@ export default function Navbar() {
 
             {/* Search Results Dropdown */}
             {searchFocused && searchQuery.trim() && (
-              <div className="absolute right-0 mt-2 w-64 bg-primary border border-light rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.9)] overflow-hidden z-50 p-1 space-y-0.5 max-h-60 overflow-y-auto">
-                <span className="text-[9px] text-muted px-2.5 py-1.5 block font-mono uppercase tracking-widest border-b border-base/60">
-                  Top Result
+              <div className="absolute right-0 mt-2 w-64 bg-surface border border-border rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.7)] overflow-hidden z-50 p-1 space-y-0.5 max-h-60 overflow-y-auto">
+                <span className="text-[9px] text-text-muted px-2.5 py-1.5 block font-mono uppercase tracking-widest border-b border-border">
+                  Search Results
                 </span>
 
                 {searchResults.length === 0 && !isSearching ? (
-                  <div className="text-[10px] text-muted font-mono text-center py-4">
-                    NOT FOUND!
+                  <div className="text-xs text-text-muted text-center py-4">
+                    No users found
                   </div>
                 ) : (
                   searchResults.map((userNode) => {
@@ -261,7 +259,7 @@ export default function Navbar() {
                       <Link
                         key={targetId}
                         to={`/profile/${targetId}`}
-                        className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-hover/50 text-left transition-colors group"
+                        className="flex items-center gap-2.5 p-2 rounded-md hover:bg-surface-raised text-left transition-colors group"
                         onClick={() => {
                           setSearchFocused(false);
                           setSearchQuery('');
@@ -273,10 +271,10 @@ export default function Navbar() {
                           className="h-6 w-6 text-[10px] rounded-md"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-secondary group-hover:text-primary truncate">
+                          <p className="text-xs font-medium text-text group-hover:text-accent truncate">
                             {userNode.name}
                           </p>
-                          <p className="text-[9px] font-mono text-muted truncate">
+                          <p className="text-[10px] font-mono text-text-muted truncate">
                             {userNode.role || 'member'}
                           </p>
                         </div>
@@ -291,11 +289,12 @@ export default function Navbar() {
           {/* Theme Switcher */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-xl text-muted hover:bg-hover/50 hover:text-secondary transition-colors shrink-0"
-            title="Switch Environment Theme"
+            className="p-1.5 text-text-muted hover:text-text transition-all shrink-0"
+            title="Toggle theme"
+            aria-label="Toggle theme"
           >
             {darkMode ? (
-              <Sun className="h-4 w-4 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]" />
+              <Sun className="h-4 w-4 text-warning" />
             ) : (
               <Moon className="h-4 w-4 text-accent" />
             )}
@@ -305,57 +304,83 @@ export default function Navbar() {
           <div className="relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 hover:bg-hover/40 rounded-xl p-1 transition-all max-w-[140px] sm:max-w-none"
+              className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface-raised/50 transition-all max-w-[140px] sm:max-w-none"
             >
               <NavAvatar
                 avatar={user?.avatar}
                 name={user?.name}
-                className="h-8 w-8 sm:h-9 sm:w-9 text-xs rounded-xl"
+                className="h-6 w-6 text-[10px] rounded-md"
               />
-              <span className="hidden sm:block text-xs font-bold text-secondary tracking-tight truncate max-w-[80px]">
-                {user?.name}
+              <span className="hidden sm:block text-xs font-medium text-text truncate max-w-[90px]">
+                {user?.name || 'Developer'}
               </span>
-              <ChevronDown className={`h-3.5 w-3.5 text-muted transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-3 w-3 text-text-muted transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Profile Dropdown */}
             {dropdownOpen && (
-              <div className="absolute right-0 mt-3 w-56 bg-primary border border-light/90 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.95)] overflow-hidden z-50 animate-in fade-in slide-in-from-top-1.5 duration-150">
-                <div className="px-4 py-3.5 border-b border-base bg-secondary/40 flex items-center gap-3">
+              <div className="absolute right-0 mt-2 w-56 bg-surface border border-border rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.6)] overflow-hidden z-50 animate-in fade-in duration-150">
+                <div className="px-3.5 py-2.5 border-b border-border bg-surface-raised/40 flex items-center gap-2.5">
                   <NavAvatar
                     avatar={user?.avatar}
                     name={user?.name}
-                    className="h-9 w-9 text-xs rounded-xl"
+                    className="h-8 w-8 text-xs rounded-md"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-primary truncate">{user?.name}</p>
-                    <p className="text-[10px] text-muted font-mono truncate mt-0.5">{user?.email}</p>
+                    <p className="text-xs font-semibold text-text truncate">{user?.name}</p>
+                    <p className="text-[10px] text-text-muted font-mono truncate">{user?.email}</p>
                   </div>
                 </div>
                 <div className="p-1.5 space-y-0.5">
                   <Link
                     to="/profile"
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-muted hover:text-secondary hover:bg-hover/50 rounded-xl transition-colors"
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
                     onClick={() => setDropdownOpen(false)}
                   >
-                    <User className="h-4 w-4 text-muted" />
-                    Profile
+                    <User className="h-3.5 w-3.5 text-text-muted" />
+                    <span>Profile</span>
+                  </Link>
+                  <Link
+                    to="/bookmarks"
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    <Bookmark className="h-3.5 w-3.5 text-text-muted" />
+                    <span>Bookmarks</span>
+                  </Link>
+                  <Link
+                    to="/my-submissions"
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    <History className="h-3.5 w-3.5 text-text-muted" />
+                    <span>Submissions</span>
                   </Link>
                   <Link
                     to="/settings"
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-muted hover:text-secondary hover:bg-hover/50 rounded-xl transition-colors"
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
                     onClick={() => setDropdownOpen(false)}
                   >
-                    <Settings className="h-4 w-4 text-muted" />
-                    Settings
+                    <Settings className="h-3.5 w-3.5 text-text-muted" />
+                    <span>Settings</span>
                   </Link>
-                  <div className="border-t border-base my-1.5 mx-1" />
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      <Shield className="h-3.5 w-3.5 text-accent" />
+                      <span>Admin Panel</span>
+                    </Link>
+                  )}
+                  <div className="border-t border-border my-1 mx-1" />
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/5 rounded-xl transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-danger hover:bg-danger/10 rounded-md transition-colors text-left"
                   >
-                    <LogOut className="h-4 w-4 text-rose-500" />
-                    Exit
+                    <LogOut className="h-3.5 w-3.5 text-danger" />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               </div>
@@ -365,32 +390,33 @@ export default function Navbar() {
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-xl text-muted hover:bg-hover/50 hover:text-secondary lg:hidden transition-colors shrink-0"
+            className="p-1.5 rounded-md text-text-muted hover:text-text hover:bg-surface-raised/50 lg:hidden transition-colors shrink-0"
+            aria-label="Toggle navigation"
           >
-            {mobileMenuOpen ? <X className="h-4 w-4 text-secondary" /> : <Menu className="h-4 w-4 text-secondary" />}
+            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden absolute left-0 right-0 top-16 bg-primary border-b border-base shadow-2xl p-4 space-y-3 animate-in slide-in-from-top-4 duration-200 z-30">
+        <div className="lg:hidden mt-2 bg-surface border border-border rounded-lg shadow-2xl p-3 space-y-2.5 animate-in slide-in-from-top-2 duration-150 z-30">
           <div className="relative w-full">
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-base bg-secondary font-mono">
-              {isSearching ? <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" /> : <Search className="h-3.5 w-3.5 text-muted" />}
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-surface-inset font-mono text-xs">
+              {isSearching ? <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" /> : <Search className="h-3.5 w-3.5 text-text-muted" />}
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search users..."
-                className="w-full bg-transparent text-xs font-bold text-secondary focus:outline-none"
+                className="w-full bg-transparent text-xs text-text focus:outline-none"
               />
             </div>
             {searchQuery.trim() && (
-              <div className="absolute left-0 right-0 mt-1 bg-primary border border-base rounded-xl shadow-xl p-1 z-50 max-h-48 overflow-y-auto">
+              <div className="absolute left-0 right-0 mt-1 bg-surface border border-border rounded-md shadow-xl p-1 z-50 max-h-48 overflow-y-auto">
                 {searchResults.length === 0 && !isSearching ? (
-                  <div className="text-[10px] text-muted font-mono text-center py-3">
-                    NO_TRACES_UNRESOLVED
+                  <div className="text-[10px] text-text-muted font-mono text-center py-2">
+                    No users found
                   </div>
                 ) : (
                   searchResults.map((userNode) => {
@@ -399,7 +425,7 @@ export default function Navbar() {
                       <Link
                         key={targetId}
                         to={`/profile/${targetId}`}
-                        className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-hover/50 text-left text-xs text-secondary font-bold"
+                        className="flex items-center gap-2 p-1.5 rounded-md hover:bg-surface-raised text-left text-xs text-text font-medium"
                         onClick={() => {
                           setMobileMenuOpen(false);
                           setSearchQuery('');
@@ -408,7 +434,7 @@ export default function Navbar() {
                         <NavAvatar
                           avatar={userNode.avatar}
                           name={userNode.name}
-                          className="h-5 w-5 text-[9px] rounded"
+                          className="h-5 w-5 text-[9px] rounded-md"
                         />
                         <span>{userNode.name}</span>
                       </Link>
@@ -419,7 +445,7 @@ export default function Navbar() {
             )}
           </div>
 
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.to;
@@ -427,26 +453,36 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`flex items-center gap-3 px-4 py-3 text-xs font-bold rounded-xl transition-all ${isActive
-                    ? 'bg-hover text-primary border border-light'
-                    : 'text-muted hover:text-secondary hover:bg-hover/30'
-                    }`}
+                  className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                    isActive
+                      ? 'bg-surface-raised text-text border border-border'
+                      : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                  }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? 'text-accent' : 'text-muted'}`} />
-                  {link.label}
+                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-text-muted'}`} />
+                  <span>{link.label}</span>
                 </Link>
               );
             })}
           </div>
 
           {user?.role === 'admin' && (
-            <div className="pt-2 border-t border-base">
+            <div className="pt-2 border-t border-border space-y-1">
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md text-text-muted hover:text-text hover:bg-surface-raised/40 transition-all"
+              >
+                <Shield className="h-3.5 w-3.5 text-accent" />
+                <span>Admin Panel</span>
+              </Link>
               <Link
                 to="/create-problem"
-                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-xs font-bold rounded-xl bg-accent text-primary hover:bg-accent/90 shadow-md transition-all"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium rounded-md bg-accent text-bg hover:opacity-90 transition-all"
               >
-                <PlusCircle className="h-4 w-4" />
-                Create New Panel
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span>Create Problem</span>
               </Link>
             </div>
           )}

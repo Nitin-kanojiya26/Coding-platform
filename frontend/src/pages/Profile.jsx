@@ -1,48 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/client';
 import ActivityHeatmap from '../components/ActivityHeatmap';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { 
-  Settings, Save, Loader2, Code, Flame, Calendar, 
-  Award, TrendingUp, CheckCircle2, Bookmark, Camera
+import {
+  Settings, Save, Loader2, Code, Flame, Calendar,
+  TrendingUp, CheckCircle, Bookmark, Camera
 } from 'lucide-react';
 import { getAvatarSrc } from '../utils/avatar';
 
-// ─── Custom colors for difficulty ──────────────────────────────
-const EASY_COLOR = '#6ee774';
-const MEDIUM_COLOR = '#ffb800';
-const HARD_COLOR = '#ff2d55';
-
-// ─── Helper to derive 1-2 initial letters ──────────────────────
-const getInitials = (name) => {
-  if (!name) return 'U';
-  const words = name.trim().split(/\s+/);
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-};
-
-// ─── Chromatic Aberration Initials Avatar Badge ────────────────
-function InitialsAvatar({ name, className = "w-16 h-16 text-lg" }) {
-  const initials = getInitials(name);
+// ─── Minimal Initials Avatar ────────────────────────────────────
+function InitialsAvatar({ name, className = "w-14 h-14 text-sm" }) {
+  const initials = (name || 'U').trim().slice(0, 2).toUpperCase();
 
   return (
     <div
-      className={`relative flex items-center justify-center rounded-xl bg-[#121212] border border-white/10 font-bold select-none overflow-hidden shrink-0 ${className}`}
+      className={`flex items-center justify-center bg-surface-raised border border-border/60 font-mono text-text font-medium select-none overflow-hidden shrink-0 rounded ${className}`}
     >
-      <span
-        className="font-mono text-white tracking-tight"
-        style={{
-          textShadow: `
-            -1.5px -0.5px 0px rgba(56, 189, 248, 0.9), 
-             1.5px  0.5px 0px rgba(249, 115, 22, 0.9)
-          `,
-        }}
-      >
-        {initials}
-      </span>
+      <span>{initials}</span>
     </div>
   );
 }
@@ -52,7 +27,6 @@ export default function Profile() {
 
   // Profile edit state
   const [name, setName] = useState(user?.name || '');
-  const [avatar, setAvatar] = useState(user?.avatar || '');
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -69,19 +43,21 @@ export default function Profile() {
   const [stats, setStats] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
+  const [loginDates, setLoginDates] = useState([]);
 
-  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, subsRes, bookmarksRes] = await Promise.all([
+        const [statsRes, subsRes, bookmarksRes, loginRes] = await Promise.all([
           API.get('/users/stats').catch(() => ({ data: {} })),
-          API.get('/submissions/my?limit=10000').catch(() => ({ data: {} })),
-          API.get('/users/bookmarks').catch(() => ({ data: {} }))
+          API.get('/submissions/my?limit=1000').catch(() => ({ data: {} })),
+          API.get('/users/bookmarks').catch(() => ({ data: {} })),
+          API.get('/users/login-activity').catch(() => ({ data: {} })),
         ]);
-        setStats(statsRes.data.stats || {});
-        setSubmissions(subsRes.data.submissions || []);
-        setBookmarks(bookmarksRes.data.bookmarks || []);
+        setStats(statsRes.data.stats || statsRes.data?.data?.stats || {});
+        setSubmissions(subsRes.data.submissions || subsRes.data?.data?.submissions || []);
+        setBookmarks(bookmarksRes.data.bookmarks || bookmarksRes.data || []);
+        setLoginDates(loginRes.data?.data || loginRes.data || []);
       } catch (err) {
         console.error('Profile fetch error', err);
       }
@@ -89,7 +65,6 @@ export default function Profile() {
     fetchData();
   }, []);
 
-  // Derived stats
   const totalSolved = stats?.solved?.total || 0;
   const easySolved = stats?.solved?.easy || 0;
   const mediumSolved = stats?.solved?.medium || 0;
@@ -97,18 +72,12 @@ export default function Profile() {
   const totalSubmissions = stats?.totalSubmissions || 0;
   const acceptanceRate = stats?.acceptanceRate || 0;
 
-  // Pie chart data
-  const difficultyData = [
-    { name: 'Easy', value: easySolved, color: EASY_COLOR },
-    { name: 'Medium', value: mediumSolved, color: MEDIUM_COLOR },
-    { name: 'Hard', value: hardSolved, color: HARD_COLOR },
-  ];
-
   // Language breakdown
   const languageStats = useMemo(() => {
     const map = {};
     submissions.forEach(s => {
-      if (s.status === 'accepted' && s.language) {
+      const st = (s.status || '').toLowerCase();
+      if ((st === 'accepted' || st === 'ac') && s.language) {
         map[s.language] = (map[s.language] || 0) + 1;
       }
     });
@@ -118,17 +87,21 @@ export default function Profile() {
   // Recent accepted submissions
   const recentAC = useMemo(() => {
     return submissions
-      .filter(s => s.status === 'accepted')
+      .filter(s => {
+        const st = (s.status || '').toLowerCase();
+        return st === 'accepted' || st === 'ac';
+      })
       .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-      .slice(0, 5);
+      .slice(0, 6);
   }, [submissions]);
 
-  // Activity days and streak
+  // Streak & Active Days
   const { totalActiveDays, maxStreak } = useMemo(() => {
-    const dates = new Set();
+    const dates = new Set(loginDates || []);
     submissions.forEach(s => {
-      const d = new Date(s.submittedAt).toISOString().split('T')[0];
-      dates.add(d);
+      if (s.submittedAt) {
+        dates.add(new Date(s.submittedAt).toISOString().split('T')[0]);
+      }
     });
     const sorted = Array.from(dates).sort();
     const total = sorted.length;
@@ -137,16 +110,16 @@ export default function Profile() {
       const cur = new Date(d);
       if (prev === null) streak = 1;
       else {
-        const diff = (cur - prev) / (1000 * 60 * 60 * 24);
+        const diff = Math.round((cur - prev) / (1000 * 60 * 60 * 24));
         streak = diff === 1 ? streak + 1 : 1;
       }
       prev = cur;
       maxS = Math.max(maxS, streak);
     }
     return { totalActiveDays: total, maxStreak: maxS };
-  }, [submissions]);
+  }, [submissions, loginDates]);
 
-  // ── Avatar file handlers ──
+  // Avatar file handlers
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -176,7 +149,6 @@ export default function Profile() {
       });
       if (res.data.user) {
         refreshUser();
-        setAvatar(res.data.user.avatar);
         setMessage('Avatar updated successfully!');
         setAvatarPreview(null);
         setAvatarFile(null);
@@ -196,7 +168,6 @@ export default function Profile() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // ── Update profile (name only) ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdating(true);
@@ -221,32 +192,34 @@ export default function Profile() {
   const hasAvatar = Boolean(avatarPreview || (user?.avatar && !imgError));
 
   return (
-    <div className="min-h-screen bg-primary px-4 sm:px-8 py-10 text-secondary font-sans antialiased">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* ─── Left Sidebar Panel ────────────────────────────── */}
+    <div className="w-full space-y-6 pt-1">
+      {/* Two Column Flat Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        {/* ─── Left Sidebar (~33% width) ─── */}
         <div className="lg:col-span-4 space-y-5">
-          
-          {/* Main User Card */}
-          <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
+          {/* User Bio Card (Flat) */}
+          <div className="space-y-3 pb-5 border-b border-border/40">
+            <div className="flex items-center gap-3">
+              <div className="relative group shrink-0">
                 {hasAvatar ? (
                   <img
                     src={displayAvatar}
                     alt="Avatar"
-                    className="w-16 h-16 rounded-xl border border-light object-cover bg-secondary"
+                    className="w-14 h-14 rounded border border-border/60 object-cover bg-surface-raised"
                     onError={() => setImgError(true)}
                   />
                 ) : (
-                  <InitialsAvatar name={user?.name} className="w-16 h-16 text-lg" />
+                  <InitialsAvatar name={user?.name} className="w-14 h-14 text-sm" />
                 )}
 
                 <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="absolute inset-0 flex items-center justify-center bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                  title="Change avatar"
                 >
-                  <Camera className="h-5 w-5 text-white" />
+                  <Camera className="h-4 w-4" />
                 </button>
                 <input
                   ref={fileInputRef}
@@ -256,27 +229,37 @@ export default function Profile() {
                   className="hidden"
                 />
               </div>
+
               <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold text-primary truncate">{user?.name || 'User'}</h2>
-                <p className="text-xs text-muted font-mono truncate">@{user?.email?.split('@')[0] || 'developer'}</p>
+                <h1 className="text-sm sm:text-base font-semibold text-text truncate">
+                  {user?.name || 'Developer'}
+                </h1>
+                <p className="text-xs text-text-muted font-mono truncate">
+                  @{user?.email?.split('@')[0] || 'user'}
+                </p>
+                <span className="inline-block mt-1 text-[10px] font-mono uppercase tracking-wider text-text-muted bg-surface-raised px-1.5 py-0.5 rounded">
+                  {user?.role || 'member'}
+                </span>
               </div>
             </div>
 
-            {/* Avatar upload controls */}
+            {/* Avatar upload status */}
             {avatarPreview && (
-              <div className="mt-3 p-3 bg-secondary border border-base rounded-lg">
-                <p className="text-xs text-cyan-400 font-mono mb-2">New avatar selected</p>
+              <div className="p-2.5 bg-surface-raised/40 border border-border/40 rounded space-y-2 text-xs">
+                <p className="text-[11px] text-accent">New avatar preview ready</p>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={handleUpload}
                     disabled={uploading}
-                    className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs font-medium transition disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-2.5 py-1 bg-accent text-bg rounded text-xs font-medium transition disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Upload'}
+                    {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Avatar'}
                   </button>
                   <button
+                    type="button"
                     onClick={cancelAvatar}
-                    className="px-4 py-1.5 bg-hover hover:bg-hover/80 rounded text-xs"
+                    className="px-2 py-1 text-xs text-text-muted hover:text-text"
                   >
                     Cancel
                   </button>
@@ -284,231 +267,195 @@ export default function Profile() {
               </div>
             )}
 
+            {/* Edit Profile Toggle Button */}
             <button
+              type="button"
               onClick={() => setShowEdit(!showEdit)}
-              className="mt-4 w-full py-1.5 rounded-lg border border-base bg-secondary hover:bg-hover text-xs text-muted hover:text-secondary flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-1.5 rounded border border-border/40 bg-surface-raised/30 hover:bg-surface-raised text-xs text-text flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Settings className="h-3.5 w-3.5" />
-              {showEdit ? 'Cancel Changes' : 'Edit Profile'}
+              <Settings className="h-3.5 w-3.5 text-text-muted" />
+              <span>{showEdit ? 'Cancel Edit' : 'Edit Profile'}</span>
             </button>
 
+            {/* Inline Name Edit Form */}
             {showEdit && (
-              <div className="mt-4 p-4 bg-secondary rounded-lg border border-base text-left">
-                {message && <div className="text-emerald-400 text-xs mb-2 font-mono">{message}</div>}
-                {error && <div className="text-rose-400 text-xs mb-2 font-mono">{error}</div>}
-                <form onSubmit={handleSubmit} className="space-y-3">
+              <form onSubmit={handleSubmit} className="pt-2 space-y-2 text-xs">
+                {message && <div className="text-success text-[11px] font-mono">{message}</div>}
+                {error && <div className="text-danger text-[11px] font-mono">{error}</div>}
+                <div>
+                  <label className="text-[11px] text-text-muted block mb-1">Display Name</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full rounded-md border border-base bg-primary px-3 py-1.5 text-xs text-primary placeholder-muted outline-none focus:border-light"
-                    placeholder="Display name"
+                    className="w-full rounded border border-border/40 bg-surface-raised/40 px-2.5 py-1 text-xs text-text focus:outline-none focus:border-border"
                     required
                   />
-                  <button
-                    type="submit"
-                    disabled={updating}
-                    className="w-full py-1.5 bg-zinc-200 hover:bg-white disabled:opacity-50 text-black rounded-md text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    {updating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                    Save Name
-                  </button>
-                </form>
-              </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="w-full py-1 bg-text text-bg rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-opacity disabled:opacity-50"
+                >
+                  {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  <span>Save Name</span>
+                </button>
+              </form>
             )}
           </div>
 
-          {/* Languages Panel */}
-          <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted flex items-center gap-2 pb-3 border-b border-base/60">
-              <Code className="h-3.5 w-3.5" /> Core Languages
-            </h3>
-            <div className="mt-3 space-y-2 text-xs font-mono">
+          {/* Core Languages Flat List */}
+          <div className="space-y-2.5 pb-5 border-b border-border/40">
+            <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
+              <Code className="h-3.5 w-3.5" /> Solved by Language
+            </span>
+            <div className="space-y-1.5 text-xs">
               {Object.keys(languageStats).length > 0 ? (
                 Object.entries(languageStats).map(([lang, count]) => (
-                  <div key={lang} className="flex justify-between items-center bg-secondary/50 border border-base px-3 py-1.5 rounded-lg">
-                    <span className="text-secondary font-medium">{lang}</span>
-                    <span className="text-muted bg-secondary px-2 py-0.5 rounded text-[10px]">{count} completed</span>
+                  <div key={lang} className="flex justify-between items-center py-1 border-b border-border/20 last:border-0">
+                    <span className="text-text capitalize font-mono text-[11px]">{lang}</span>
+                    <span className="text-text-muted font-mono text-[11px]">{count} problems</span>
                   </div>
                 ))
               ) : (
-                <p className="text-muted italic py-1">No execution history recorded.</p>
+                <p className="text-xs text-text-muted">No language data recorded yet.</p>
               )}
             </div>
           </div>
 
-          {/* Bookmarked Container Panel */}
-          <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted flex items-center gap-2 pb-3 border-b border-base/60">
-              <Bookmark className="h-3.5 w-3.5" /> Bookmarked Problems
-            </h3>
-            <div className="mt-3 space-y-2 text-xs font-mono">
+          {/* Bookmarks Quick List */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
+                <Bookmark className="h-3.5 w-3.5" /> Saved Bookmarks
+              </span>
+              <Link to="/bookmarks" className="text-[11px] text-text-muted hover:text-text">
+                View all ({bookmarks.length})
+              </Link>
+            </div>
+            <div className="space-y-1.5 text-xs">
               {bookmarks.length > 0 ? (
                 bookmarks.slice(0, 5).map((b) => (
-                  <div key={b._id} className="text-secondary bg-secondary border border-base hover:border-light transition-colors rounded-lg px-3 py-2 truncate cursor-pointer">
-                    {b.title || 'Untitled Asset'}
-                  </div>
+                  <Link
+                    key={b._id}
+                    to={`/problems/${b.slug || b._id}`}
+                    className="block py-1 text-text hover:text-accent transition-colors truncate text-xs"
+                  >
+                    • {b.title || 'Problem'}
+                  </Link>
                 ))
               ) : (
-                <p className="text-muted italic py-1">No bookmarked problems saved.</p>
+                <p className="text-xs text-text-muted">No saved bookmarks.</p>
               )}
             </div>
           </div>
-
         </div>
 
-        {/* ─── Right LeetCode Layout Metrics Panels ───────────── */}
-        <div className="lg:col-span-8 space-y-5">
+        {/* ─── Right Column: Telemetry & History (~67% width) ─── */}
+        <div className="lg:col-span-8 space-y-6">
 
-          {/* LeetCode Asymmetric Progress Box */}
-          <div className="bg-card rounded-xl p-6 border border-base shadow-sm">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted mb-6 flex items-center gap-2">
-              <Award className="h-3.5 w-3.5" /> Session Progress Metrics
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              
-              {/* Central Ring Wrapper */}
-              <div className="md:col-span-4 flex justify-center relative">
-                <div className="w-36 h-36 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={difficultyData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={54}
-                        outerRadius={66}
-                        paddingAngle={4}
-                        dataKey="value"
-                        stroke="transparent"
-                      >
-                        {difficultyData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.value > 0 ? entry.color : '#2a2a2a'} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  
-                  {/* Central Overlay */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-bold text-primary tracking-tight">{totalSolved}</span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted mt-0.5">Completed</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Bar Breakdown Panel */}
-              <div className="md:col-span-8 space-y-3.5">
-                
-                {/* Easy */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-[#6ee774] font-medium">Easy</span>
-                    <span className="text-primary font-medium">{easySolved}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-secondary border border-base rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#6ee774] rounded-full transition-all duration-500" 
-                      style={{ width: `${totalSolved > 0 ? (easySolved / totalSolved) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Medium */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-[#ffb800] font-medium">Medium</span>
-                    <span className="text-primary font-medium">{mediumSolved}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-secondary border border-base rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#ffb800] rounded-full transition-all duration-500" 
-                      style={{ width: `${totalSolved > 0 ? (mediumSolved / totalSolved) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Hard */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-[#ff2d55] font-medium">Hard</span>
-                    <span className="text-primary font-medium">{hardSolved}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-secondary border border-base rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#ff2d55] rounded-full transition-all duration-500" 
-                      style={{ width: `${totalSolved > 0 ? (hardSolved / totalSolved) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* System Runs Footer */}
-                <div className="pt-3 border-t border-base/60 flex items-center justify-between text-xs font-mono text-muted">
-                  <span>Total Attempts: <strong className="text-secondary">{totalSubmissions}</strong></span>
-                  <span className="flex items-center gap-1.5">
-                    <TrendingUp className="h-3.5 w-3.5 text-cyan-500" /> 
-                    Success Rate: <strong className="text-cyan-400">{acceptanceRate}%</strong>
-                  </span>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          {/* Heatmap Grid Wrapper Container */}
-          <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs mb-4 pb-2 border-b border-base/40">
-              <span className="text-muted font-medium flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-muted" /> Activity History
+          {/* Session Progress Breakdown (Flat) */}
+          <div className="space-y-3 pb-5 border-b border-border/40">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-text">Solved Problems</span>
+              <span className="font-mono text-text-muted text-[11px]">
+                {totalSolved} solved
               </span>
-              <div className="flex gap-4 font-mono text-muted text-[11px]">
-                <span>Active Windows: <strong className="text-primary">{totalActiveDays} days</strong></span>
-                <span>Max Chain: <strong className="text-amber-500">{maxStreak} days</strong></span>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-1.5 bg-surface-raised/50 rounded-full overflow-hidden flex">
+              <div
+                className="bg-success h-full transition-all duration-300"
+                style={{ width: `${totalSolved > 0 ? (easySolved / totalSolved) * 100 : 0}%` }}
+              />
+              <div
+                className="bg-warning h-full transition-all duration-300"
+                style={{ width: `${totalSolved > 0 ? (mediumSolved / totalSolved) * 100 : 0}%` }}
+              />
+              <div
+                className="bg-danger h-full transition-all duration-300"
+                style={{ width: `${totalSolved > 0 ? (hardSolved / totalSolved) * 100 : 0}%` }}
+              />
+            </div>
+
+            {/* Difficulty Metrics Rows */}
+            <div className="grid grid-cols-3 gap-3 pt-1 text-xs">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-success" />
+                  <span className="text-text-muted text-[11px]">Easy</span>
+                </div>
+                <span className="font-mono text-xs text-text font-medium">{easySolved}</span>
+              </div>
+
+              <div className="space-y-0.5 border-l border-border/30 pl-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-warning" />
+                  <span className="text-text-muted text-[11px]">Medium</span>
+                </div>
+                <span className="font-mono text-xs text-text font-medium">{mediumSolved}</span>
+              </div>
+
+              <div className="space-y-0.5 border-l border-border/30 pl-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-danger" />
+                  <span className="text-text-muted text-[11px]">Hard</span>
+                </div>
+                <span className="font-mono text-xs text-text font-medium">{hardSolved}</span>
               </div>
             </div>
-            
-            <div className="w-full overflow-x-auto scrollbar-none py-1">
-              <div className="min-w-[760px]">
-                <ActivityHeatmap submissions={submissions} mode="submission" />
-              </div>
+
+            {/* Attempts & Rate */}
+            <div className="flex items-center justify-between text-xs pt-2 border-t border-border/20 text-text-muted">
+              <span>Total Attempts: <strong className="font-mono text-text">{totalSubmissions}</strong></span>
+              <span>Acceptance Rate: <strong className="font-mono text-accent">{acceptanceRate}%</strong></span>
             </div>
           </div>
 
-          {/* Validation Log List */}
-          <div className="bg-card rounded-xl p-5 border border-base shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted mb-3 pb-2 border-b border-base/40">
-              <Flame className="h-3.5 w-3.5 text-amber-500" /> Recent Accepted Solutions
-            </div>
-            <div className="space-y-2">
-              {recentAC.length > 0 ? (
-                recentAC.map((s, idx) => {
-                  let difficultyColor = EASY_COLOR;
-                  if (s.problem?.difficulty?.toLowerCase() === 'medium') difficultyColor = MEDIUM_COLOR;
-                  if (s.problem?.difficulty?.toLowerCase() === 'hard') difficultyColor = HARD_COLOR;
+          {/* Activity Calendar (Flush, No Card) */}
+          <div className="space-y-2 pb-5 border-b border-border/40">
+            <ActivityHeatmap
+              submissions={submissions}
+              loginDates={loginDates}
+              mode="auto"
+            />
+          </div>
 
-                  return (
-                    <div key={idx} className="flex justify-between items-center bg-secondary/60 border border-base/70 px-4 py-2.5 rounded-lg text-xs transition-colors hover:border-light">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-[#1b5e20] shrink-0" />
-                        <span className="text-secondary font-medium truncate max-w-[180px] sm:max-w-md">
-                          {s.problem?.title || 'Unknown Asset'}
-                        </span>
-                        <span className={`text-[11px] font-mono font-medium tracking-wide`} style={{ color: difficultyColor }}>
-                          {s.problem?.difficulty || 'Easy'}
-                        </span>
-                      </div>
-                      <span className="text-muted font-mono text-[11px] shrink-0">{new Date(s.submittedAt).toLocaleDateString()}</span>
+          {/* Recent Accepted Solutions Flat List */}
+          <div className="space-y-2.5">
+            <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
+              <Flame className="h-3.5 w-3.5 text-warning" /> Recent Accepted Solutions
+            </span>
+
+            {recentAC.length > 0 ? (
+              <div className="border-t border-border/40 divide-y divide-border/25">
+                {recentAC.map((s, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-2 px-1 text-xs hover:bg-surface-raised/30 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
+                      <Link
+                        to={`/problems/${s.problem?.slug || s.problem?._id || '#'}`}
+                        className="text-text hover:text-accent transition-colors truncate max-w-[200px] sm:max-w-md font-normal"
+                      >
+                        {s.problem?.title || 'Problem'}
+                      </Link>
                     </div>
-                  );
-                })
-              ) : (
-                <p className="text-muted font-mono text-xs italic py-2">No active completions logged in this cycle.</p>
-              )}
-            </div>
+
+                    <div className="flex items-center gap-3 shrink-0 text-[11px] font-mono text-text-muted">
+                      <span className="capitalize">{s.language || 'code'}</span>
+                      <span>{s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : ''}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">No accepted solutions yet.</p>
+            )}
           </div>
 
         </div>
+
       </div>
     </div>
   );

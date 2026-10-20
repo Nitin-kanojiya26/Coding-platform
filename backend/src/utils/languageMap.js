@@ -1,14 +1,4 @@
-// backend/src/utils/languageMap.js
 
-// Maps the string ids used in the frontend (LANGUAGES array in ProblemDetail.jsx)
-// to the numeric language_id values Judge0 requires.
-//
-// ⚠️ IMPORTANT: these numeric IDs must match what YOUR Judge0 instance actually
-// has installed. Confirm by hitting:
-//   GET {JUDGE0_API_URL}/languages
-// on your instance and cross-referencing the "id" + "name" fields.
-// The values below are correct for the public Judge0 CE API as of writing,
-// but self-hosted instances can differ (missing images, different versions).
 
 const JUDGE0_LANGUAGE_MAP = {
   cpp: 54,        // C++ (GCC 9.2.0) - swap to your GCC 14 image's id if different

@@ -264,3 +264,157 @@ exports.getSubmissionById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Get aggregate submission statistics & rate graph telemetry for a problem
+// @route   GET /api/submissions/problem/:problemId/stats
+// @access  Private
+exports.getProblemStats = async (req, res) => {
+  try {
+    const { problemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(problemId)) {
+      return res.status(400).json({ message: 'Invalid problem ID' });
+    }
+
+    const allSubmissions = await Submission.find({ problem: problemId })
+      .select('status runtime memory language createdAt user')
+      .lean();
+
+    const total = allSubmissions.length;
+    let accepted = 0;
+    let wrongAnswer = 0;
+    let timeLimit = 0;
+    let runtimeError = 0;
+    let compileError = 0;
+
+    const acceptedRuntimes = [];
+    const acceptedMemories = [];
+    const uniqueUsers = new Set();
+    const uniqueAcceptedUsers = new Set();
+
+    allSubmissions.forEach((s) => {
+      const uId = String(s.user);
+      uniqueUsers.add(uId);
+
+      const st = (s.status || '').toLowerCase();
+      if (st === 'accepted' || st === 'ac') {
+        accepted++;
+        uniqueAcceptedUsers.add(uId);
+        if (typeof s.runtime === 'number' && !isNaN(s.runtime) && s.runtime >= 0) {
+          acceptedRuntimes.push(s.runtime);
+        }
+        if (typeof s.memory === 'number' && !isNaN(s.memory) && s.memory >= 0) {
+          acceptedMemories.push(s.memory);
+        }
+      } else if (st === 'wrong_answer' || st === 'wrong answer' || st === 'wa') {
+        wrongAnswer++;
+      } else if (st.includes('time_limit') || st === 'tle') {
+        timeLimit++;
+      } else if (st.includes('runtime') || st === 'rte') {
+        runtimeError++;
+      } else if (st.includes('compil') || st === 'ce') {
+        compileError++;
+      }
+    });
+
+    const other = Math.max(0, total - (accepted + wrongAnswer + timeLimit + runtimeError + compileError));
+    const acceptanceRate = total > 0 ? parseFloat(((accepted / total) * 100).toFixed(1)) : 0;
+    const userAcceptanceRate = uniqueUsers.size > 0 
+      ? parseFloat(((uniqueAcceptedUsers.size / uniqueUsers.size) * 100).toFixed(1)) 
+      : 0;
+
+    // Build 5 runtime histogram buckets
+    let runtimeBuckets = [];
+    if (acceptedRuntimes.length > 0) {
+      acceptedRuntimes.sort((a, b) => a - b);
+      const minR = acceptedRuntimes[0];
+      const maxR = acceptedRuntimes[acceptedRuntimes.length - 1];
+
+      // Clean interval bounds
+      const lower = Math.max(0, Math.floor(minR / 10) * 10);
+      const upper = Math.max(lower + 25, Math.ceil((maxR + 5) / 10) * 10);
+      const step = Math.max(1, Math.ceil((upper - lower) / 5));
+
+      for (let i = 0; i < 5; i++) {
+        const start = lower + i * step;
+        const end = start + step;
+        const count = acceptedRuntimes.filter((r) => r >= start && (i === 4 ? r <= end : r < end)).length;
+        const percentage = parseFloat(((count / acceptedRuntimes.length) * 100).toFixed(1));
+        runtimeBuckets.push({
+          label: `${start}-${end}ms`,
+          range: [start, end],
+          count,
+          percentage,
+        });
+      }
+    } else {
+      runtimeBuckets = [
+        { label: '0-10ms', range: [0, 10], count: 0, percentage: 0 },
+        { label: '10-20ms', range: [10, 20], count: 0, percentage: 0 },
+        { label: '20-30ms', range: [20, 30], count: 0, percentage: 0 },
+        { label: '30-40ms', range: [30, 40], count: 0, percentage: 0 },
+        { label: '40-50ms', range: [40, 50], count: 0, percentage: 0 },
+      ];
+    }
+
+    // Build 5 memory histogram buckets
+    let memoryBuckets = [];
+    if (acceptedMemories.length > 0) {
+      acceptedMemories.sort((a, b) => a - b);
+      const minM = acceptedMemories[0];
+      const maxM = acceptedMemories[acceptedMemories.length - 1];
+
+      const lowerM = Math.max(0, Math.floor(minM / 5) * 5);
+      const upperM = Math.max(lowerM + 15, Math.ceil((maxM + 2) / 5) * 5);
+      const stepM = Math.max(1, Math.round((upperM - lowerM) / 5));
+
+      for (let i = 0; i < 5; i++) {
+        const start = lowerM + i * stepM;
+        const end = start + stepM;
+        const count = acceptedMemories.filter((m) => m >= start && (i === 4 ? m <= end : m < end)).length;
+        const percentage = parseFloat(((count / acceptedMemories.length) * 100).toFixed(1));
+        memoryBuckets.push({
+          label: `${start}-${end}MB`,
+          range: [start, end],
+          count,
+          percentage,
+        });
+      }
+    } else {
+      memoryBuckets = [
+        { label: '0-10MB', range: [0, 10], count: 0, percentage: 0 },
+        { label: '10-20MB', range: [10, 20], count: 0, percentage: 0 },
+        { label: '20-30MB', range: [20, 30], count: 0, percentage: 0 },
+        { label: '30-40MB', range: [30, 40], count: 0, percentage: 0 },
+        { label: '40-50MB', range: [40, 50], count: 0, percentage: 0 },
+      ];
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        totalSubmissions: total,
+        acceptedSubmissions: accepted,
+        acceptanceRate,
+        userAcceptanceRate,
+        totalUsers: uniqueUsers.size,
+        acceptedUsers: uniqueAcceptedUsers.size,
+        verdictCounts: {
+          accepted,
+          wrongAnswer,
+          timeLimit,
+          runtimeError,
+          compileError,
+          other,
+        },
+        runtimeBuckets,
+        memoryBuckets,
+        acceptedRuntimes,
+        acceptedMemories,
+      },
+    });
+  } catch (error) {
+    console.error('🔥 getProblemStats error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+};

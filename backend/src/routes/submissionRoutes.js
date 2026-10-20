@@ -7,6 +7,7 @@ const {
   getMySubmissions,
   getProblemSubmissions,
   getSubmissionById,
+  getProblemStats,
 } = require('../controllers/submissionController');
 const {
   submitCodeLimiter,
@@ -21,6 +22,9 @@ router.route('/').post(submitCodeLimiter, createSubmission);
 
 // GET /api/submissions/my - get current user's submissions
 router.route('/my').get(historyLimiter, getMySubmissions);
+
+// GET /api/submissions/problem/:problemId/stats - get aggregate submission telemetry
+router.route('/problem/:problemId/stats').get(getProblemStats);
 
 // GET /api/submissions/problem/:problemId - get submissions for a problem
 router.route('/problem/:problemId').get(getProblemSubmissions);

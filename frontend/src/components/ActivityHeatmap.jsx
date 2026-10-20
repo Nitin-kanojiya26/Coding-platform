@@ -1,27 +1,44 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Calendar, ChevronRight } from 'lucide-react';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { Calendar } from 'lucide-react';
 
+/**
+ * LeetCode-Style Submission / Activity Calendar
+ * - Flat, compact, information-dense
+ * - No decorative cards, gradients, or heavy borders
+ * - Authentic LeetCode color levels
+ */
 export default function ActivityHeatmap({
   submissions = [],
   loginDates = [],
-  mode = 'submission'
+  mode = 'auto' // 'auto' | 'submission' | 'login'
 }) {
   const scrollRef = useRef(null);
-  const [showScrollHint, setShowScrollHint] = useState(true);
 
-  const activeDays = useMemo(() => {
-    if (mode === 'login') {
-      return new Set(loginDates);
-    } else {
-      const countMap = {};
-      submissions.forEach(s => {
+  // Aggregate daily counts across both submissions and login events
+  const dailyCounts = useMemo(() => {
+    const counts = {};
+
+    // In 'auto' or 'submission' mode, map submissions
+    if (mode === 'auto' || mode === 'submission') {
+      submissions.forEach((s) => {
+        if (!s.submittedAt) return;
         const key = new Date(s.submittedAt).toISOString().split('T')[0];
-        countMap[key] = (countMap[key] || 0) + 1;
+        counts[key] = (counts[key] || 0) + 1;
       });
-      return countMap;
     }
-  }, [mode, loginDates, submissions]);
 
+    // In 'auto' or 'login' mode, ensure login dates are registered (at least 1 activity)
+    if (mode === 'auto' || mode === 'login') {
+      loginDates.forEach((d) => {
+        const key = typeof d === 'string' ? d.split('T')[0] : new Date(d).toISOString().split('T')[0];
+        if (!counts[key]) counts[key] = 1;
+      });
+    }
+
+    return counts;
+  }, [submissions, loginDates, mode]);
+
+  // Compute 12 past months
   const monthsData = useMemo(() => {
     const data = [];
     const today = new Date();
@@ -43,114 +60,119 @@ export default function ActivityHeatmap({
 
   const getIntensity = (date) => {
     const key = date.toISOString().split('T')[0];
-    if (mode === 'login') {
-      return activeDays.has(key) ? 1 : 0;
-    } else {
-      const count = activeDays[key] || 0;
-      if (count === 0) return 0;
-      if (count <= 2) return 1;
-      if (count <= 4) return 2;
-      if (count <= 6) return 3;
-      return 4;
-    }
+    const count = dailyCounts[key] || 0;
+    if (count === 0) return 0;
+    if (count === 1) return 1;
+    if (count <= 3) return 2;
+    if (count <= 5) return 3;
+    return 4;
   };
 
-  // 🔥 Empty box uses CSS variable – adapts to theme
-  // Filled boxes keep their original colors (green/cyan)
-  const emptyClass = 'bg-heatmap-empty';
-  const colors = mode === 'login'
-    ? [emptyClass, 'bg-cyan-500']
-    : [
-        emptyClass,
-        'bg-emerald-950',
-        'bg-emerald-700',
-        'bg-emerald-500',
-        'bg-emerald-300',
-      ];
+  // Authentic LeetCode submission calendar palette
+  const colors = [
+    'bg-surface-raised/40 border border-border/20', // Level 0: empty
+    'bg-[#0e4429] border border-[#006d32]/20',      // Level 1: light emerald
+    'bg-[#006d32] border border-[#26a641]/20',      // Level 2: medium emerald
+    'bg-[#26a641] border border-[#39d353]/20',      // Level 3: bright emerald
+    'bg-[#2cbb5d] border border-emerald-400/30',     // Level 4: vibrant LeetCode emerald
+  ];
 
-  const { totalDays, maxStreak } = useMemo(() => {
-    let datesArray;
-    if (mode === 'login') {
-      datesArray = Array.from(activeDays).sort();
-    } else {
-      datesArray = Object.keys(activeDays).sort();
-    }
-    const total = datesArray.length;
-    let streak = 0, maxS = 0, prev = null;
-    for (const d of datesArray) {
+  const { totalDays, maxStreak, totalActivities } = useMemo(() => {
+    const activeDateKeys = Object.keys(dailyCounts).sort();
+    const total = activeDateKeys.length;
+    let totalActs = 0;
+    activeDateKeys.forEach((k) => {
+      totalActs += dailyCounts[k];
+    });
+
+    let streak = 0;
+    let maxS = 0;
+    let prev = null;
+    for (const d of activeDateKeys) {
       const cur = new Date(d);
-      if (prev === null) streak = 1;
-      else {
-        const diff = (cur - prev) / (1000 * 60 * 60 * 24);
+      if (prev === null) {
+        streak = 1;
+      } else {
+        const diff = Math.round((cur - prev) / (1000 * 60 * 60 * 24));
         streak = diff === 1 ? streak + 1 : 1;
       }
       prev = cur;
       maxS = Math.max(maxS, streak);
     }
-    return { totalDays: total, maxStreak: maxS };
-  }, [activeDays, mode]);
+    return { totalDays: total, maxStreak: maxS, totalActivities: totalActs };
+  }, [dailyCounts]);
 
+  // Scroll to latest days automatically
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-      setTimeout(() => setShowScrollHint(false), 3000);
     }
   }, []);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2 text-muted">
-          <Calendar className="h-4 w-4 text-cyan-400" />
-          <span>{mode === 'login' ? 'Login Activity' : 'Submission Activity'}</span>
+    <div className="space-y-2">
+      {/* Header Info */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+        <div className="flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <span className="font-mono font-medium text-text">{totalActivities}</span>
+          <span className="text-text-muted">submissions in the past year</span>
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted">
-          <span>Total days: <strong className="text-primary">{totalDays}</strong></span>
-          <span>Max streak: <strong className="text-orange-400">{maxStreak}</strong></span>
+        <div className="flex items-center gap-2.5 text-[11px] text-text-muted">
+          <span>
+            Total active days: <strong className="text-text font-mono">{totalDays}</strong>
+          </span>
+          <span className="text-border/80">•</span>
+          <span>
+            Max streak: <strong className="text-text font-mono">{maxStreak}</strong> days
+          </span>
         </div>
       </div>
 
-      <div className="relative">
-        <div ref={scrollRef} className="overflow-x-auto overflow-y-visible pb-2 scroll-smooth">
-          <div className="flex gap-4 min-w-max px-1">
-            {monthsData.map((monthBlock, mIdx) => (
-              <div key={mIdx} className="flex flex-col items-center">
-                <div className="grid grid-rows-6 grid-flow-col gap-1">
-                  {monthBlock.days.map((date, dIdx) => {
-                    const level = getIntensity(date);
-                    const isToday = date.toDateString() === new Date().toDateString();
-                    return (
-                      <div
-                        key={dIdx}
-                        className={`w-3 h-3 rounded-sm ${colors[level]} transition-colors duration-150 hover:ring-2 hover:ring-cyan-400 cursor-default ${isToday ? 'ring-1 ring-cyan-400' : ''}`}
-                        title={`${date.toLocaleDateString()}: ${
-                          mode === 'login'
-                            ? activeDays.has(date.toISOString().split('T')[0]) ? 'Active' : 'Inactive'
-                            : (activeDays[date.toISOString().split('T')[0]] || 0) + ' submissions'
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                <span className="text-[10px] text-muted font-medium mt-2">
-                  {monthBlock.label}
-                </span>
+      {/* Heatmap Grid */}
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto pb-1 scroll-smooth"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <div className="flex gap-3 min-w-max py-1">
+          {monthsData.map((monthBlock, mIdx) => (
+            <div key={mIdx} className="flex flex-col items-center">
+              <div className="grid grid-rows-7 grid-flow-col gap-1">
+                {monthBlock.days.map((date, dIdx) => {
+                  const level = getIntensity(date);
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  const key = date.toISOString().split('T')[0];
+                  const count = dailyCounts[key] || 0;
+
+                  return (
+                    <div
+                      key={dIdx}
+                      className={`w-2.5 h-2.5 rounded-[2px] ${colors[level]} transition-all duration-150 hover:brightness-125 cursor-default ${
+                        isToday ? 'ring-1 ring-text/50' : ''
+                      }`}
+                      title={`${date.toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}: ${count} submission${count === 1 ? '' : 's'}`}
+                    />
+                  );
+                })}
               </div>
-            ))}
-          </div>
+              <span className="text-[10px] text-text-muted font-mono mt-1.5 select-none">
+                {monthBlock.label}
+              </span>
+            </div>
+          ))}
         </div>
-
-        {showScrollHint && (
-          <div className="absolute right-2 top-1/3 bg-secondary/80 text-muted text-xs px-2 py-1 rounded-full animate-pulse pointer-events-none">
-            <ChevronRight className="h-4 w-4 inline" /> scroll
-          </div>
-        )}
       </div>
 
-      <div className="flex items-center justify-end gap-1 text-xs text-muted">
+      {/* Bottom Legend */}
+      <div className="flex items-center justify-end gap-1.5 text-[10px] text-text-muted pt-0.5">
         <span>Less</span>
         {colors.map((c, i) => (
-          <div key={i} className={`w-3 h-3 rounded-sm ${c}`} />
+          <div key={i} className={`w-2.5 h-2.5 rounded-[2px] ${c}`} />
         ))}
         <span>More</span>
       </div>
