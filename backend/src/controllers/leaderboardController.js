@@ -1,5 +1,6 @@
 const User = require('../models/Users');
 const Submission = require('../models/Submission');
+const redis = require('../config/redis');
 
 // @desc    Get platform leaderboard
 // @route   GET /api/leaderboard
@@ -10,6 +11,13 @@ exports.getLeaderboard = async (req, res) => {
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
+
+    // Check Redis cache first
+    const cacheKey = `leaderboard:${pageNum}:${limitNum}`;
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
 
     // Aggregate user stats
     const pipeline = [
@@ -80,7 +88,7 @@ exports.getLeaderboard = async (req, res) => {
       ...user,
     }));
 
-    res.status(200).json({
+    const responsePayload = {
       status: 'success',
       page: pageNum,
       limit: limitNum,
@@ -88,7 +96,12 @@ exports.getLeaderboard = async (req, res) => {
       totalPages: Math.ceil(totalUsers / limitNum),
       count: rankedLeaderboard.length,
       leaderboard: rankedLeaderboard,
-    });
+    };
+
+    // Store in Redis with 60s TTL
+    await redis.setex(cacheKey, 60, JSON.stringify(responsePayload));
+
+    res.status(200).json(responsePayload);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

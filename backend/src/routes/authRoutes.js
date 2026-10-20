@@ -2,13 +2,13 @@
 const express = require('express');
 const router = express.Router();
 
-const { 
-    registerUser, 
-    verifyOTP, 
-    loginUser,
-    getMe,
-    requestPasswordResetOTP,
-    resetPasswordWithOTP
+const {
+  registerUser,
+  verifyOTP,
+  loginUser,
+  getMe,
+  requestPasswordResetOTP,
+  resetPasswordWithOTP
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const {

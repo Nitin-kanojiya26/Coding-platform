@@ -48,7 +48,7 @@ function InitialsAvatar({ name, className = "h-7 w-7 text-xs" }) {
         style={{
           textShadow: `
             -1px -0.5px 0px rgba(56, 189, 248, 0.9), 
-             1px  0.5px 0px rgba(249, 115, 22, 0.9)
+             1px  0.5px 0px rgba(59, 130, 246, 0.9)
           `,
         }}
       >
@@ -201,7 +201,7 @@ export default function Navbar() {
                     : 'text-text-muted hover:text-text hover:bg-surface-raised/60'
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-text-muted'}`} />
+                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
                 <span>{link.label}</span>
               </Link>
             );
@@ -219,12 +219,12 @@ export default function Navbar() {
           {/* Desktop Search */}
           <div className="relative hidden md:block w-40 lg:w-52" ref={searchRef}>
             <div className={`flex items-center gap-2 px-2.5 py-1 rounded-md bg-surface-inset border text-xs font-mono transition-colors ${
-              searchFocused ? 'border-accent ring-1 ring-accent' : 'border-border'
+              searchFocused ? 'border-accent-blue ring-1 ring-accent-blue' : 'border-border'
             }`}>
               {isSearching ? (
-                <Loader2 className="h-3.5 w-3.5 text-accent animate-spin shrink-0" />
+                <Loader2 className="h-3.5 w-3.5 text-accent-blue animate-spin shrink-0" />
               ) : (
-                <Search className={`h-3.5 w-3.5 shrink-0 transition-colors ${searchFocused ? 'text-accent' : 'text-text-muted'}`} />
+                <Search className={`h-3.5 w-3.5 shrink-0 transition-colors ${searchFocused ? 'text-accent-blue' : 'text-text-muted'}`} />
               )}
               <input
                 type="text"
@@ -271,7 +271,7 @@ export default function Navbar() {
                           className="h-6 w-6 text-[10px] rounded-md"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-text group-hover:text-accent truncate">
+                          <p className="text-xs font-medium text-text group-hover:text-accent-blue truncate">
                             {userNode.name}
                           </p>
                           <p className="text-[10px] font-mono text-text-muted truncate">
@@ -296,7 +296,7 @@ export default function Navbar() {
             {darkMode ? (
               <Sun className="h-4 w-4 text-warning" />
             ) : (
-              <Moon className="h-4 w-4 text-accent" />
+              <Moon className="h-4 w-4 text-accent-blue" />
             )}
           </button>
 
@@ -370,7 +370,7 @@ export default function Navbar() {
                       className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised rounded-md transition-colors"
                       onClick={() => setDropdownOpen(false)}
                     >
-                      <Shield className="h-3.5 w-3.5 text-accent" />
+                      <Shield className="h-3.5 w-3.5 text-accent-blue" />
                       <span>Admin Panel</span>
                     </Link>
                   )}
@@ -403,7 +403,7 @@ export default function Navbar() {
         <div className="lg:hidden mt-2 bg-surface border border-border rounded-lg shadow-2xl p-3 space-y-2.5 animate-in slide-in-from-top-2 duration-150 z-30">
           <div className="relative w-full">
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-surface-inset font-mono text-xs">
-              {isSearching ? <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" /> : <Search className="h-3.5 w-3.5 text-text-muted" />}
+              {isSearching ? <Loader2 className="h-3.5 w-3.5 text-accent-blue animate-spin" /> : <Search className="h-3.5 w-3.5 text-text-muted" />}
               <input
                 type="text"
                 value={searchQuery}
@@ -459,7 +459,7 @@ export default function Navbar() {
                       : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent' : 'text-text-muted'}`} />
+                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -473,13 +473,13 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md text-text-muted hover:text-text hover:bg-surface-raised/40 transition-all"
               >
-                <Shield className="h-3.5 w-3.5 text-accent" />
+                <Shield className="h-3.5 w-3.5 text-accent-blue" />
                 <span>Admin Panel</span>
               </Link>
               <Link
                 to="/create-problem"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium rounded-md bg-accent text-bg hover:opacity-90 transition-all"
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium rounded-md bg-accent-blue text-white hover:opacity-90 transition-all"
               >
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span>Create Problem</span>

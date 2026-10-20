@@ -6,7 +6,7 @@ export default function Logo({ className = "", stacked = false }) {
   return (
     <Link to="/" className={`flex ${stacked ? 'flex-col items-center justify-center gap-2.5' : 'items-center gap-2'} group select-none min-w-0 ${className}`}>
       {/* Code-Based Logo Mark */}
-      <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-surface-raised border border-border group-hover:border-accent/60 transition-all shrink-0 overflow-hidden">
+      <div className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-surface-raised border border-border group-hover:border-accent-blue/60 transition-all shrink-0 overflow-hidden">
         <Terminal className="h-4.5 w-4.5 text-text relative z-10" strokeWidth={2} />
       </div>
       

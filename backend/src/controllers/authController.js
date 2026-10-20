@@ -1,8 +1,8 @@
-// backend/src/controllers/authController.js
 const User = require('../models/Users');
 const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
 const Login = require('../models/Login');
+const redis = require('../config/redis');
 const { sendOTPEmail } = require('../services/emailService');
 
 // Helper to sign JWT tokens
@@ -29,17 +29,18 @@ exports.registerUser = async (req, res) => {
 
         const generatedOtp = generateOTP();
 
-        await OTP.findOneAndDelete({ email: email.toLowerCase() });
-
-        await OTP.create({ 
-            name, 
-            email: email.toLowerCase(), 
-            password, 
+        const otpCacheKey = `otp:register:${email.toLowerCase()}`;
+        const otpData = {
+            name,
+            email: email.toLowerCase(),
+            password,
             otp: generatedOtp,
             purpose: 'register'
-        });
-
-        await sendOTPEmail(email, generatedOtp, 'CodeArena - Verify Your Email Account');
+        };  
+        // Store in Redis for 5 minutes (auto-expires without DB bloat)
+        await redis.setex(otpCacheKey, 300, JSON.stringify(otpData));
+        
+        await sendOTPEmail(email, generatedOtp, 'Codexium - Verify Your Email Account');
 
         res.status(200).json({
             status: 'success',
@@ -54,30 +55,27 @@ exports.registerUser = async (req, res) => {
 // @route   POST /api/auth/verify-otp
 exports.verifyOTP = async (req, res) => {
     try {
-        console.log("👉 Data received from Postman:", req.body);
         const { email, otp } = req.body;
 
         if (!email || !otp) {
             return res.status(400).json({ message: 'Please provide email and OTP code' });
         }
-
-        const tempUser = await OTP.findOne({ email: email.toLowerCase(), purpose: 'register' });
-        if (!tempUser || tempUser.otp !== otp) {
+        const otpCacheKey = `otp:register:${email.toLowerCase()}`;
+        const cachedOtpData = await redis.get(otpCacheKey);
+        if(!cachedOtpData){
             return res.status(400).json({ message: 'Invalid or expired OTP code' });
         }
-
-        if (!tempUser.name || !tempUser.password) {
-            await OTP.deleteOne({ _id: tempUser._id });
-            return res.status(400).json({ message: 'Registration OTP data is incomplete. Please register again.' });
+        const otpData = JSON.parse(cachedOtpData);
+        if (otpData.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP code' });
         }
-
         const permanentUser = await User.create({
-            name: tempUser.name,
-            email: tempUser.email,
-            password: tempUser.password
+            name: otpData.name,
+            email: otpData.email,
+            password: otpData.password
         });
 
-        await OTP.deleteOne({ _id: tempUser._id });
+        await redis.del(otpCacheKey);
 
         res.status(201).json({
             status: 'success',

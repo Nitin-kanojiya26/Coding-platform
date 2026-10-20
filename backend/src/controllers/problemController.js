@@ -1,7 +1,7 @@
 const Problem = require('../models/Problem');
 const judge0Service = require('../services/judge0Service');
 const languageMap = require('../utils/languageMap');
-
+const redis = require('../config/redis');
 // ─── Helper functions ──────────────────────────────────────────
 const createSlug = (value) => {
   return value
@@ -152,6 +152,18 @@ exports.getAllProblems = async (req, res) => {
 
 exports.getProblemBySlug = async (req, res) => {
   try {
+    const slug = req.params.slug.toLowerCase();
+
+    // check in redis
+    const cacheKey = `problem:${slug}`;
+    const cachedProblem = await redis.get(cacheKey);
+    if (cachedProblem) {
+      return res.status(200).json({
+        status: 'success',
+        problem: JSON.parse(cachedProblem)
+      });
+    }
+    // Fetch from DB
     const problem = await Problem.findOne({ slug: req.params.slug.toLowerCase() })
       .select('-hiddenTestCases')
       .populate('createdBy', 'name email role');
@@ -159,7 +171,9 @@ exports.getProblemBySlug = async (req, res) => {
     if (!problem) {
       return res.status(404).json({ message: 'Problem not found' });
     }
-
+    // for 1 hour problem will be cached
+    await redis.setex(cacheKey, 3600, JSON.stringify(problem));
+    
     res.status(200).json({
       status: 'success',
       problem
@@ -203,6 +217,11 @@ exports.updateProblem = async (req, res) => {
       return res.status(404).json({ message: 'Problem not found' });
     }
 
+    // Invalidate Redis cache for this problem
+    if (problem.slug) {
+      await redis.del(`problem:${problem.slug.toLowerCase()}`);
+    }
+
     res.status(200).json({
       status: 'success',
       problem
@@ -221,6 +240,12 @@ exports.deleteProblem = async (req, res) => {
     if (!problem) {
       return res.status(404).json({ message: 'Problem not found' });
     }
+
+    // Invalidate Redis cache for this problem
+    if (problem.slug) {
+      await redis.del(`problem:${problem.slug.toLowerCase()}`);
+    }
+
     res.status(200).json({
       status: 'success',
       message: 'Problem deleted successfully'
