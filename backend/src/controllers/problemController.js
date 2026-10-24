@@ -153,17 +153,22 @@ exports.getAllProblems = async (req, res) => {
 exports.getProblemBySlug = async (req, res) => {
   try {
     const slug = req.params.slug.toLowerCase();
-
-    // check in redis
+    const useCache = process.env.USE_CACHE !== 'false';
     const cacheKey = `problem:${slug}`;
-    const cachedProblem = await redis.get(cacheKey);
-    if (cachedProblem) {
-      return res.status(200).json({
-        status: 'success',
-        problem: JSON.parse(cachedProblem)
-      });
+
+    // 1. Check Redis cache if caching is enabled
+    if (useCache) {
+      const cachedProblem = await redis.get(cacheKey);
+      if (cachedProblem) {
+        return res.status(200).json({
+          status: 'success',
+          source: 'cache',
+          problem: JSON.parse(cachedProblem)
+        });
+      }
     }
-    // Fetch from DB
+
+    // 2. Fetch directly from MongoDB (cache miss or USE_CACHE=false)
     const problem = await Problem.findOne({ slug: req.params.slug.toLowerCase() })
       .select('-hiddenTestCases')
       .populate('createdBy', 'name email role');
@@ -171,11 +176,15 @@ exports.getProblemBySlug = async (req, res) => {
     if (!problem) {
       return res.status(404).json({ message: 'Problem not found' });
     }
-    // for 1 hour problem will be cached
-    await redis.setex(cacheKey, 3600, JSON.stringify(problem));
+
+    // 3. Store in Redis cache if caching is enabled (1 hour TTL)
+    if (useCache) {
+      await redis.setex(cacheKey, 3600, JSON.stringify(problem));
+    }
     
     res.status(200).json({
       status: 'success',
+      source: 'database',
       problem
     });
   } catch (error) {

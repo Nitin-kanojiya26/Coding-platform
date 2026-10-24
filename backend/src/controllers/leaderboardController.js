@@ -11,12 +11,18 @@ exports.getLeaderboard = async (req, res) => {
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * limitNum;
-
-    // Check Redis cache first
+    const useCache = process.env.USE_CACHE !== 'false';
     const cacheKey = `leaderboard:${pageNum}:${limitNum}`;
-    const cachedData = await redis.get(cacheKey);
-    if (cachedData) {
-      return res.status(200).json(JSON.parse(cachedData));
+
+    // 1. Check Redis cache if caching is enabled
+    if (useCache) {
+      const cachedData = await redis.get(cacheKey);
+      if (cachedData) {
+        return res.status(200).json({
+          ...JSON.parse(cachedData),
+          source: 'cache'
+        });
+      }
     }
 
     // Aggregate user stats
@@ -90,6 +96,7 @@ exports.getLeaderboard = async (req, res) => {
 
     const responsePayload = {
       status: 'success',
+      source: 'database',
       page: pageNum,
       limit: limitNum,
       totalUsers,
@@ -98,8 +105,10 @@ exports.getLeaderboard = async (req, res) => {
       leaderboard: rankedLeaderboard,
     };
 
-    // Store in Redis with 60s TTL
-    await redis.setex(cacheKey, 60, JSON.stringify(responsePayload));
+    // 2. Store in Redis with 60s TTL if caching is enabled
+    if (useCache) {
+      await redis.setex(cacheKey, 60, JSON.stringify(responsePayload));
+    }
 
     res.status(200).json(responsePayload);
   } catch (error) {

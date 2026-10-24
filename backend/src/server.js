@@ -20,8 +20,8 @@ app.use('/api/sheets', require('./routes/sheetRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 5. Start Server Listener
 const PORT = process.env.PORT || 5000;
-connectDB().then(()=> {
+connectDB().then(() => {
     app.listen(PORT, () => {
-    console.log(`🚀 Server spinning up from src/ on port ${PORT}`);
-     })
-})
+        console.log(`🚀 Server spinning up on port ${PORT}`);
+    });
+});

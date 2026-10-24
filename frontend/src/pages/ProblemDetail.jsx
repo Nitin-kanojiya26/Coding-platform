@@ -281,7 +281,27 @@ export default function ProblemDetail() {
         language,
         code: activeCode,
       });
-      const submissionData = res.data.submission || res.data;
+      let submissionData = res.data.submission || res.data;
+      const subId = res.data.submissionId || submissionData?._id;
+
+      // Poll until BullMQ background worker finishes judging
+      if (subId && submissionData.status === 'pending') {
+        const maxAttempts = 30;
+        for (let i = 0; i < maxAttempts; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          try {
+            const pollRes = await API.get(`/submissions/${subId}`);
+            const updated = pollRes.data.submission || pollRes.data;
+            if (updated && updated.status !== 'pending') {
+              submissionData = updated;
+              break;
+            }
+          } catch (pollErr) {
+            console.error('Polling error:', pollErr);
+          }
+        }
+      }
+
       setTerminalLogs({ mode: 'production', data: submissionData });
 
       // Refresh submissions telemetry and rate stats immediately

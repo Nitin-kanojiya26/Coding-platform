@@ -4,6 +4,7 @@ const User = require('../models/Users');
 const mongoose = require('mongoose');
 const judge0Service = require('../services/judge0Service');
 const languageMap = require('../utils/languageMap');
+const { submissionQueue } = require('../queues/submissionQueue');
 
 // Helper for pagination
 const getPagination = (page, limit) => {
@@ -89,13 +90,17 @@ exports.createSubmission = async (req, res) => {
       totalTestCases: testCasesToRun.length,
     });
 
-    // 4. Run code against hidden test cases via Judge0
-    try {
-      const testCases = testCasesToRun.map((tc) => ({
-        input: tc.input || '',
-        output: tc.output || '',
-      }));
+    const testCases = testCasesToRun.map((tc) => ({
+      input: tc.input || '',
+      output: tc.output || '',
+    }));
 
+    // ─── ARCHITECTURE TOGGLE: SUBMIT_MODE=sync vs SUBMIT_MODE=queue ───
+    const submitMode = (process.env.SUBMIT_MODE || 'queue').toLowerCase();
+    const isSyncMode = submitMode === 'sync';
+
+    if (isSyncMode) {
+      // OLD SYNCHRONOUS ROUTE (Before BullMQ / Baseline benchmark)
       const result = await judge0Service.runAllTestCases(
         code,
         languageId,
@@ -103,7 +108,6 @@ exports.createSubmission = async (req, res) => {
         problem.timeLimit || 2000
       );
 
-      // 5. Update submission record with execution results
       submission.status = result.status;
       submission.runtime = result.runtime;
       submission.memory = result.memory;
@@ -114,33 +118,41 @@ exports.createSubmission = async (req, res) => {
       }
       await submission.save();
 
-      // 6. If accepted, add problem to user's solved list
+      // If accepted, add problem to user's solvedProblems
       if (result.status === 'accepted') {
         await User.findByIdAndUpdate(
           req.user._id,
-          { $addToSet: { solvedProblems: problemId } },
-          { returnDocument: 'after' }
+          { $addToSet: { solvedProblems: problem._id } },
+          { new: true }
         );
       }
 
-      // 7. Return final response
       return res.status(201).json({
         status: 'success',
+        mode: 'sync',
         submission,
       });
-    } catch (execError) {
-      console.error('❌ Judge0 execution error during submission:', execError.message);
-
-      // Mark submission as internal error / execution failure
-      submission.status = 'execution_error';
-      submission.runtime = null;
-      submission.memory = null;
-      await submission.save();
-
-      return res.status(500).json({
-        message: 'Code execution failed: ' + execError.message,
-      });
     }
+
+    // NEW BULLMQ ASYNC QUEUE ROUTE (After BullMQ / Production mode)
+    await submissionQueue.add('execute-submission', {
+      submissionId: submission._id,
+      code,
+      languageId,
+      testCases,
+      timeLimit: problem.timeLimit || 2000,
+      userId: req.user._id,
+      problemId: problem._id,
+    });
+
+    return res.status(202).json({
+      status: 'success',
+      mode: 'queue',
+      message: 'Submission queued successfully',
+      submissionId: submission._id,
+      submissionStatus: 'pending',
+      submission,
+    });
   } catch (error) {
     console.error('🔥 createSubmission controller error:', error.message);
     res.status(500).json({ message: error.message });

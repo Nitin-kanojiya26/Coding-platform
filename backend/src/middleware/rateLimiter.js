@@ -4,7 +4,7 @@ const redisClient = require('../config/redis');
 
 // Helper function to create limiters backed by Redis with isolated keys
 const createLimiter = (prefix, windowMs, max, message) => {
-  return rateLimit({
+  const limiter = rateLimit({
     windowMs,
     max,
     message: { message: message || 'Too many requests, please try again later.' },
@@ -15,6 +15,14 @@ const createLimiter = (prefix, windowMs, max, message) => {
       prefix: `rl:${prefix}:`,
     }),
   });
+
+  // If DISABLE_RATE_LIMIT=true (for capacity / benchmark tests), bypass rate limiter completely
+  return (req, res, next) => {
+    if (process.env.DISABLE_RATE_LIMIT === 'true') {
+      return next();
+    }
+    return limiter(req, res, next);
+  };
 };
 
 // Auth Limiters (isolated keys)
