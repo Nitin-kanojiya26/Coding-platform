@@ -100,9 +100,9 @@ export default function Navbar() {
   const navLinks = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/problems', label: 'Problems', icon: Code2 },
-    { to: '/build', label: 'Build Mode', icon: Boxes, isBuildMode: true },
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { to: '/my-submissions', label: 'Submissions', icon: History },
+    { to: '/build', label: 'Build Mode', icon: Boxes, isBuildMode: true },
   ];
 
   // Live database scanning with AbortController
