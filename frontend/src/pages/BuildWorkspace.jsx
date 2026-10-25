@@ -31,7 +31,14 @@ import {
   Check,
   Copy,
   AlertCircle,
-  Info
+  Info,
+  FolderTree,
+  Plus,
+  Trash2,
+  X,
+  Layers,
+  FilePlus,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function BuildWorkspace() {
@@ -42,10 +49,19 @@ export default function BuildWorkspace() {
   // Problem & workspace state
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [code, setCode] = useState('');
   const [leftTab, setLeftTab] = useState('brief'); // 'brief' | 'endpoints' | 'contract' | 'history'
   const [mobileTab, setMobileTab] = useState('code'); // 'brief' | 'code' | 'results' (for < 1024px)
   const [showResetModal, setShowResetModal] = useState(false);
+
+  // ─── Multi-File State (Stage 2) ───
+  const [files, setFiles] = useState([
+    { path: 'index.js', content: '' }
+  ]);
+  const [activeFilePath, setActiveFilePath] = useState('index.js');
+  const [openTabs, setOpenTabs] = useState(['index.js']);
+  const [showNewFileInput, setShowNewFileInput] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [fileExplorerOpen, setFileExplorerOpen] = useState(true);
 
   // Submissions & evaluation state
   const [submissionId, setSubmissionId] = useState(null);
@@ -58,14 +74,15 @@ export default function BuildWorkspace() {
   // Console drawer state
   const [consoleOpen, setConsoleOpen] = useState(true);
 
-  // Expandable test items (for visible failed tests)
+  // Expandable test items & group states
   const [expandedTests, setExpandedTests] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   // Monaco editor reference
   const editorRef = useRef(null);
   const pollTimerRef = useRef(null);
 
-  // 1. Fetch problem details
+  // 1. Fetch problem details and load multi-file starter
   useEffect(() => {
     let isMounted = true;
     async function fetchProblem() {
@@ -76,14 +93,33 @@ export default function BuildWorkspace() {
           const p = res.data.problem;
           setProblem(p);
 
-          // Initialize starter file
-          const starter = p.starterFiles?.find((f) => f.path === 'index.js')?.content ||
-            p.starterFiles?.[0]?.content ||
-            `const express = require('express');\nconst app = express();\n\napp.use(express.json());\n\n// TODO: Implement your routes\n\nconst PORT = process.env.PORT || 3000;\napp.listen(PORT, '0.0.0.0', () => {\n  console.log(\`Server listening on 0.0.0.0:\${PORT}\`);\n});\n`;
+          // Prepare starter files
+          const initialStarterFiles = (p.starterFiles && p.starterFiles.length > 0)
+            ? p.starterFiles.map((f) => ({ path: f.path, content: f.content }))
+            : [
+                {
+                  path: 'index.js',
+                  content: `const express = require('express');\nconst app = express();\n\napp.use(express.json());\n\n// TODO: Implement your routes\n\nconst PORT = process.env.PORT || 3000;\napp.listen(PORT, '0.0.0.0', () => {\n  console.log(\`Server listening on 0.0.0.0:\${PORT}\`);\n});\n`,
+                },
+              ];
 
-          // Restore local draft if exists, else starter
-          const savedDraft = localStorage.getItem(`build_code_${slug}`);
-          setCode(savedDraft || starter);
+          // Restore local draft if exists, else starter files
+          const savedDraft = localStorage.getItem(`build_files_${slug}`);
+          if (savedDraft) {
+            try {
+              const parsed = JSON.parse(savedDraft);
+              if (Array.isArray(parsed) && parsed.length > 0 && parsed.some((f) => f.path === 'index.js')) {
+                setFiles(parsed);
+                setOpenTabs(parsed.map((f) => f.path));
+                setActiveFilePath(parsed[0].path);
+                return;
+              }
+            } catch (_) {}
+          }
+
+          setFiles(initialStarterFiles);
+          setOpenTabs(initialStarterFiles.map((f) => f.path));
+          setActiveFilePath(initialStarterFiles[0]?.path || 'index.js');
         }
       } catch (err) {
         console.error('Failed to load problem:', err);
@@ -119,25 +155,117 @@ export default function BuildWorkspace() {
     }
   };
 
-  // Save code to localStorage on edit
+  // Active file content lookup
+  const activeFileContent = useMemo(() => {
+    const f = files.find((file) => file.path === activeFilePath);
+    return f ? f.content : '';
+  }, [files, activeFilePath]);
+
+  // Update active file content & save draft to localStorage
   const handleCodeChange = (newVal) => {
-    setCode(newVal || '');
+    const updated = files.map((file) =>
+      file.path === activeFilePath ? { ...file, content: newVal || '' } : file
+    );
+    setFiles(updated);
     if (slug) {
-      localStorage.setItem(`build_code_${slug}`, newVal || '');
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(updated));
+    }
+  };
+
+  // Add new file
+  const handleCreateFile = () => {
+    let raw = newFileName.trim().replace(/\\/g, '/');
+    if (raw.startsWith('/')) raw = raw.slice(1);
+
+    if (!raw) {
+      toast.error('Please enter a valid filename.');
+      return;
+    }
+
+    if (raw.includes('..')) {
+      toast.error('Directory traversal (..) is not allowed.');
+      return;
+    }
+
+    if (files.some((f) => f.path.toLowerCase() === raw.toLowerCase())) {
+      toast.error('A file with this path already exists.');
+      return;
+    }
+
+    if (files.length >= 20) {
+      toast.error('Maximum limit of 20 files reached.');
+      return;
+    }
+
+    const defaultContent = `// ${raw}\n\n`;
+    const newFileList = [...files, { path: raw, content: defaultContent }];
+    setFiles(newFileList);
+
+    if (!openTabs.includes(raw)) {
+      setOpenTabs([...openTabs, raw]);
+    }
+    setActiveFilePath(raw);
+    setNewFileName('');
+    setShowNewFileInput(false);
+
+    if (slug) {
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
+    }
+    toast.success(`Created file "${raw}"`);
+  };
+
+  // Delete file
+  const handleDeleteFile = (pathToDelete, e) => {
+    if (e) e.stopPropagation();
+    if (pathToDelete === 'index.js') {
+      toast.error('index.js is the required entry point and cannot be deleted.');
+      return;
+    }
+
+    const newFileList = files.filter((f) => f.path !== pathToDelete);
+    const newTabs = openTabs.filter((t) => t !== pathToDelete);
+
+    setFiles(newFileList);
+    setOpenTabs(newTabs.length > 0 ? newTabs : ['index.js']);
+
+    if (activeFilePath === pathToDelete) {
+      setActiveFilePath(newTabs[0] || 'index.js');
+    }
+
+    if (slug) {
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
+    }
+    toast.success(`Deleted "${pathToDelete}"`);
+  };
+
+  // Close tab
+  const handleCloseTab = (tabToClose, e) => {
+    if (e) e.stopPropagation();
+    if (openTabs.length <= 1) return; // Keep at least one tab open
+
+    const newTabs = openTabs.filter((t) => t !== tabToClose);
+    setOpenTabs(newTabs);
+
+    if (activeFilePath === tabToClose) {
+      setActiveFilePath(newTabs[0]);
     }
   };
 
   // Reset to starter files
   const handleResetConfirm = () => {
-    const starter = problem?.starterFiles?.find((f) => f.path === 'index.js')?.content ||
-      problem?.starterFiles?.[0]?.content ||
-      '';
-    setCode(starter);
+    const starter = (problem?.starterFiles && problem.starterFiles.length > 0)
+      ? problem.starterFiles.map((f) => ({ path: f.path, content: f.content }))
+      : [{ path: 'index.js', content: '' }];
+
+    setFiles(starter);
+    setOpenTabs(starter.map((f) => f.path));
+    setActiveFilePath(starter[0]?.path || 'index.js');
+
     if (slug) {
-      localStorage.removeItem(`build_code_${slug}`);
+      localStorage.removeItem(`build_files_${slug}`);
     }
     setShowResetModal(false);
-    toast.success('Workspace reset to initial starter code');
+    toast.success('Workspace reset to initial starter files.');
   };
 
   // Cooldown countdown effect
@@ -149,10 +277,10 @@ export default function BuildWorkspace() {
     return () => clearInterval(t);
   }, [rateLimitWait]);
 
-  // 3. Submit solution
+  // 3. Submit solution with all files
   const handleSubmit = async () => {
-    if (!code.trim()) {
-      toast.error('Please write your solution before submitting.');
+    if (!files.some((f) => f.path === 'index.js' && f.content.trim())) {
+      toast.error('index.js is required and must contain your server code.');
       return;
     }
 
@@ -171,12 +299,7 @@ export default function BuildWorkspace() {
 
       const payload = {
         slug,
-        files: [
-          {
-            path: 'index.js',
-            content: code,
-          },
-        ],
+        files: files.map((f) => ({ path: f.path, content: f.content })),
       };
 
       const res = await API.post('/build/submit', payload);
@@ -263,14 +386,22 @@ export default function BuildWorkspace() {
   };
 
   // Toggle expanded test detail
-  const toggleTestExpand = (idx) => {
+  const toggleTestExpand = (key) => {
     setExpandedTests((prev) => ({
       ...prev,
-      [idx]: !prev[idx],
+      [key]: !prev[key],
     }));
   };
 
-  // Distinct endpoint list extracted from visible tests
+  // Toggle collapsed endpoint group
+  const toggleGroupCollapse = (groupKey) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  // Distinct endpoint list extracted from visible tests (for Brief / Endpoints tab)
   const endpointCards = useMemo(() => {
     if (!problem?.visibleTests) return [];
     const map = new Map();
@@ -293,35 +424,74 @@ export default function BuildWorkspace() {
     return Array.from(map.values());
   }, [problem]);
 
-  // Aggregate results list combining visible and hidden
-  const testResultsList = useMemo(() => {
-    if (!problem) return [];
-    const results = submissionResult?.testResults || [];
+  // ─── Grouped Checklist Logic (Stage 2) ───
+  const groupedChecklist = useMemo(() => {
+    if (!problem) return { endpointGroups: [], hiddenTests: [] };
 
-    // Map results by test name
+    const results = submissionResult?.testResults || [];
     const resultMap = new Map();
     results.forEach((r) => {
       resultMap.set(r.name, r);
     });
 
-    // Visible tests
-    const visibleItems = (problem.visibleTests || []).map((t, idx) => {
+    // 1. Group visible tests by endpoint key
+    const endpointMap = new Map();
+
+    (problem.visibleTests || []).forEach((t, idx) => {
+      const method = (t.request?.method || 'GET').toUpperCase();
+      const path = t.request?.path || '/';
+      const endpointKey = `${method} ${path}`;
+
       const runResult = resultMap.get(t.name);
-      return {
+      const testItem = {
         id: `vis-${idx}`,
         name: t.name,
-        method: t.request?.method || 'GET',
-        path: t.request?.path || '/',
+        method,
+        path,
         request: t.request,
         expect: t.expect,
         passed: runResult ? runResult.passed : null,
         got: runResult?.got || null,
         isHidden: false,
       };
+
+      if (!endpointMap.has(endpointKey)) {
+        endpointMap.set(endpointKey, {
+          key: endpointKey,
+          method,
+          path,
+          tests: [testItem],
+        });
+      } else {
+        endpointMap.get(endpointKey).tests.push(testItem);
+      }
     });
 
-    // If finished, include hidden tests from worker report
-    const hiddenItems = results
+    // Calculate group stats
+    const endpointGroups = Array.from(endpointMap.values()).map((grp) => {
+      const passedInGroup = grp.tests.filter((t) => t.passed === true).length;
+      const failedInGroup = grp.tests.filter((t) => t.passed === false).length;
+      const totalInGroup = grp.tests.length;
+
+      let groupStatus = 'idle';
+      if (submissionStatus === 'queued' || submissionStatus === 'running') {
+        groupStatus = 'running';
+      } else if (passedInGroup === totalInGroup && totalInGroup > 0) {
+        groupStatus = 'passed';
+      } else if (failedInGroup > 0) {
+        groupStatus = 'failed';
+      }
+
+      return {
+        ...grp,
+        passedCount: passedInGroup,
+        totalCount: totalInGroup,
+        status: groupStatus,
+      };
+    });
+
+    // 2. Hidden tests group
+    const hiddenTests = results
       .filter((r) => r.visible === false || !(problem.visibleTests || []).some((vt) => vt.name === r.name))
       .map((r, idx) => ({
         id: `hid-${idx}`,
@@ -330,8 +500,8 @@ export default function BuildWorkspace() {
         isHidden: true,
       }));
 
-    return [...visibleItems, ...hiddenItems];
-  }, [problem, submissionResult]);
+    return { endpointGroups, hiddenTests };
+  }, [problem, submissionResult, submissionStatus]);
 
   const passedCount = submissionResult?.passed ?? 0;
   const totalCount = submissionResult?.total ?? (problem?.visibleTests?.length || 0);
@@ -339,7 +509,7 @@ export default function BuildWorkspace() {
 
   if (loading) {
     return (
-      <div className="flex h-[80vh] flex-col items-center justify-center space-y-3">
+      <div className="flex h-[75vh] flex-col items-center justify-center space-y-3">
         <Loader2 className="w-8 h-8 text-accent-build animate-spin" />
         <span className="text-xs font-mono text-text-muted">Loading API Workbench...</span>
       </div>
@@ -358,9 +528,9 @@ export default function BuildWorkspace() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4.5rem)] -mx-3 sm:-mx-6 lg:-mx-8 -my-2 sm:-my-3.5 bg-bg text-text overflow-hidden select-none">
-      {/* ─── Top Workbench Navbar ─── */}
-      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-20">
+    <div className="flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden select-none shadow-md">
+      {/* ─── Top Workbench Header (Cleanly separated from Navbar) ─── */}
+      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-10">
         {/* Left: Back + Title + Badges */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
@@ -378,7 +548,7 @@ export default function BuildWorkspace() {
               <Boxes className="w-3 h-3" />
               API Workbench
             </span>
-            <h1 className="text-xs sm:text-sm font-bold text-text truncate max-w-[200px] sm:max-w-xs md:max-w-md">
+            <h1 className="text-xs sm:text-sm font-bold text-text truncate max-w-[180px] sm:max-w-xs md:max-w-md">
               {problem.title}
             </h1>
             <DifficultyBadge difficulty={problem.difficulty} />
@@ -455,7 +625,7 @@ export default function BuildWorkspace() {
               : 'text-text-muted hover:text-text'
           }`}
         >
-          Code Editor
+          Code Editor ({files.length} {files.length === 1 ? 'file' : 'files'})
         </button>
         <button
           type="button"
@@ -466,7 +636,7 @@ export default function BuildWorkspace() {
               : 'text-text-muted hover:text-text'
           }`}
         >
-          Results ({passedCount}/{totalCount})
+          Checklist ({passedCount}/{totalCount})
         </button>
       </div>
 
@@ -593,14 +763,21 @@ export default function BuildWorkspace() {
                   </div>
 
                   <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">3. Pre-installed Packages</span>
+                    <span className="text-text font-bold text-accent-build block">3. Multi-File Architecture</span>
+                    <p className="text-text-muted font-sans text-xs">
+                      You can organize your API across multiple files (e.g. <code>routes/todos.js</code>). Use standard <code>require('./path')</code>.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
+                    <span className="text-text font-bold text-accent-build block">4. Pre-installed Packages</span>
                     <p className="text-text-muted font-sans text-xs">
                       <code>express</code> and <code>cors</code> are pre-installed. Do not attempt to <code>npm install</code> extra packages.
                     </p>
                   </div>
 
                   <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">4. Entrypoint</span>
+                    <span className="text-text font-bold text-accent-build block">5. Entrypoint</span>
                     <p className="text-text-muted font-sans text-xs">
                       The primary server file must be named <code>index.js</code>.
                     </p>
@@ -661,51 +838,194 @@ export default function BuildWorkspace() {
           </div>
         </aside>
 
-        {/* ════════ COLUMN 2 (CENTER): Monaco Editor + Output Console ════════ */}
+        {/* ════════ COLUMN 2 (CENTER): Multi-File Tree + Monaco Editor + Console ════════ */}
         <main
           className={`lg:col-span-6 flex flex-col min-h-0 bg-surface-inset ${
             mobileTab === 'code' ? 'flex' : 'hidden lg:flex'
           }`}
         >
-          {/* File Tab Bar (Stage 1: single file index.js) */}
-          <div className="flex items-center justify-between border-b border-border/50 bg-surface px-3 py-1.5 select-none shrink-0">
-            <div className="flex items-center gap-1">
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-surface-raised border border-border/60 text-xs font-mono font-medium text-text shadow-sm">
-                <FileCode className="w-3.5 h-3.5 text-accent-build" />
-                <span>index.js</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-build ml-1" title="Active File" />
-              </div>
+          {/* File Tabs Bar & Explorer Controls (Stage 2) */}
+          <div className="flex items-center justify-between border-b border-border/50 bg-surface px-2 select-none shrink-0 overflow-x-auto">
+            {/* Tabs List */}
+            <div className="flex items-center gap-1 py-1">
+              {/* Explorer toggle button */}
+              <button
+                type="button"
+                onClick={() => setFileExplorerOpen(!fileExplorerOpen)}
+                className={`p-1.5 rounded transition-colors ${
+                  fileExplorerOpen ? 'bg-accent-build/15 text-accent-build' : 'text-text-muted hover:text-text'
+                }`}
+                title="Toggle File Explorer"
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="h-4 w-px bg-border/50 mx-1 shrink-0" />
+
+              {/* Open File Tabs */}
+              {openTabs.map((tabPath) => {
+                const isActive = activeFilePath === tabPath;
+                const isEntry = tabPath === 'index.js';
+                return (
+                  <div
+                    key={tabPath}
+                    onClick={() => setActiveFilePath(tabPath)}
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-surface-raised border border-border text-text shadow-xs'
+                        : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                    }`}
+                  >
+                    <FileCode className={`w-3.5 h-3.5 ${isActive ? 'text-accent-build' : 'text-text-muted'}`} />
+                    <span className="truncate max-w-[120px]">{tabPath}</span>
+                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-accent-build ml-0.5" />}
+
+                    {/* Close Tab Button */}
+                    {!isEntry && openTabs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCloseTab(tabPath, e)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                        title="Close tab"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add file inline trigger */}
+              <button
+                type="button"
+                onClick={() => setShowNewFileInput(!showNewFileInput)}
+                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors ml-1"
+                title="Create New File"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <span className="text-[10px] font-mono text-text-muted">
-              JavaScript (Node.js 20)
+            <span className="text-[10px] font-mono text-text-muted hidden sm:inline shrink-0 pl-2">
+              {files.length} {files.length === 1 ? 'file' : 'files'}
             </span>
           </div>
 
-          {/* Monaco Editor Container */}
-          <div className="flex-1 min-h-[300px] relative">
-            <Editor
-              height="100%"
-              defaultLanguage="javascript"
-              theme="vs-dark"
-              value={code}
-              onChange={handleCodeChange}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
-              options={{
-                fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                minimap: { enabled: false },
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: 'on',
-                formatOnPaste: true,
-                padding: { top: 12, bottom: 12 },
-              }}
-            />
+          {/* New File Inline Bar */}
+          {showNewFileInput && (
+            <div className="flex items-center gap-2 p-2 bg-surface-raised border-b border-border/50 animate-fadeIn text-xs">
+              <FilePlus className="w-4 h-4 text-accent-build shrink-0" />
+              <input
+                type="text"
+                placeholder="e.g. routes/todoRoutes.js or store.js"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFile();
+                  if (e.key === 'Escape') setShowNewFileInput(false);
+                }}
+                className="flex-1 bg-surface px-2.5 py-1 text-xs font-mono text-text rounded border border-border focus:border-accent-build focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleCreateFile}
+                className="px-2.5 py-1 bg-accent-build text-black font-semibold text-xs rounded hover:bg-accent-build-hover"
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewFileInput(false)}
+                className="p-1 text-text-muted hover:text-text"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Center Main Workspace: File Tree Sidebar + Monaco Editor */}
+          <div className="flex-1 min-h-[300px] flex relative overflow-hidden">
+            {/* Collapsible File Explorer Sidebar */}
+            {fileExplorerOpen && (
+              <div className="w-44 border-r border-border/50 bg-surface/70 flex flex-col shrink-0 text-xs font-mono select-none">
+                <div className="p-2 border-b border-border/40 flex items-center justify-between text-[11px] text-text-muted uppercase tracking-wider font-bold">
+                  <span>Workspace Files</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewFileInput(true)}
+                    className="hover:text-accent-build"
+                    title="Add file"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
+                  {files.map((file) => {
+                    const isActive = activeFilePath === file.path;
+                    const isEntry = file.path === 'index.js';
+                    return (
+                      <div
+                        key={file.path}
+                        onClick={() => {
+                          if (!openTabs.includes(file.path)) {
+                            setOpenTabs([...openTabs, file.path]);
+                          }
+                          setActiveFilePath(file.path);
+                        }}
+                        className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                          isActive
+                            ? 'bg-accent-build/15 text-accent-build font-bold'
+                            : 'text-text-muted hover:text-text hover:bg-surface-raised/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <FileCode className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-accent-build' : 'text-text-muted'}`} />
+                          <span className="truncate text-xs">{file.path}</span>
+                        </div>
+
+                        {!isEntry && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteFile(file.path, e)}
+                            className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Monaco Editor Container */}
+            <div className="flex-1 min-w-0 h-full relative">
+              <Editor
+                height="100%"
+                defaultLanguage="javascript"
+                theme="vs-dark"
+                value={activeFileContent}
+                onChange={handleCodeChange}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
+                options={{
+                  fontSize: 13,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  minimap: { enabled: false },
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordWrap: 'on',
+                  formatOnPaste: true,
+                  padding: { top: 12, bottom: 12 },
+                }}
+              />
+            </div>
           </div>
 
           {/* ─── Bottom Console Area ─── */}
@@ -783,7 +1103,7 @@ export default function BuildWorkspace() {
                 ) : (
                   <div className="text-text-muted text-[11px] py-2 flex items-center gap-2">
                     <Info className="w-3.5 h-3.5" />
-                    <span>Click "Submit API" to evaluate your Express server in Docker sandbox.</span>
+                    <span>Click "Submit API" to evaluate your multi-file Express project in Docker.</span>
                   </div>
                 )}
               </div>
@@ -791,7 +1111,7 @@ export default function BuildWorkspace() {
           </div>
         </main>
 
-        {/* ════════ COLUMN 3 (RIGHT): Requirements Checklist (Stage 1 Flat List) ════════ */}
+        {/* ════════ COLUMN 3 (RIGHT): Grouped Requirements Checklist (Stage 2) ════════ */}
         <aside
           className={`lg:col-span-3 flex flex-col min-h-0 bg-surface/50 ${
             mobileTab === 'results' ? 'flex' : 'hidden lg:flex'
@@ -828,8 +1148,8 @@ export default function BuildWorkspace() {
             </div>
           </div>
 
-          {/* Test List Container (Stage 1 Flat List) */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {/* Test Groups Container (Stage 2 Grouped by Endpoint) */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {submissionStatus === 'queued' || submissionStatus === 'running' ? (
               <div className="py-12 text-center space-y-3">
                 <div className="w-7 h-7 rounded-full border-2 border-accent-build border-t-transparent animate-spin mx-auto" />
@@ -843,126 +1163,178 @@ export default function BuildWorkspace() {
                 </div>
               </div>
             ) : (
-              testResultsList.map((test, index) => {
-                const isFailed = test.passed === false;
-                const isPassed = test.passed === true;
-                const isIdle = test.passed === null;
-                const isExpanded = expandedTests[index];
-
-                return (
-                  <div
-                    key={test.id || index}
-                    className={`rounded-lg border transition-all text-xs ${
-                      isPassed
-                        ? 'border-emerald-500/30 bg-emerald-500/5'
-                        : isFailed
-                        ? 'border-rose-500/40 bg-rose-500/5'
-                        : 'border-border/50 bg-surface-raised/30'
-                    }`}
-                  >
-                    {/* Test Header Row */}
+              <>
+                {/* 1. Visible Tests Grouped by Endpoint */}
+                {groupedChecklist.endpointGroups.map((grp) => {
+                  const isCollapsed = collapsedGroups[grp.key];
+                  return (
                     <div
-                      onClick={() => !test.isHidden && isFailed && toggleTestExpand(index)}
-                      className={`p-2.5 flex items-center justify-between gap-2 ${
-                        !test.isHidden && isFailed ? 'cursor-pointer hover:bg-surface-raised/40' : ''
-                      }`}
+                      key={grp.key}
+                      className="rounded-lg border border-border/50 bg-surface overflow-hidden shadow-xs"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {/* Status Light */}
-                        <div className="shrink-0">
-                          {isPassed ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          ) : isFailed ? (
-                            <XCircle className="w-4 h-4 text-rose-400" />
-                          ) : (
-                            <span className="w-2.5 h-2.5 rounded-full bg-border block mx-0.5" />
-                          )}
+                      {/* Group Header */}
+                      <div
+                        onClick={() => toggleGroupCollapse(grp.key)}
+                        className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 hover:bg-surface-raised cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MethodBadge method={grp.method} size="xs" />
+                          <span className="font-mono text-xs font-bold text-text truncate">
+                            {grp.path}
+                          </span>
                         </div>
 
-                        {/* Method badge (for visible tests) */}
-                        {!test.isHidden && test.method && (
-                          <MethodBadge method={test.method} size="xs" />
-                        )}
-
-                        {/* Test Name */}
-                        <span className="font-medium text-xs text-text truncate">
-                          {test.name}
-                        </span>
-                      </div>
-
-                      {/* Lock for Hidden Tests or Expand indicator */}
-                      <div className="shrink-0 flex items-center gap-1 text-text-muted">
-                        {test.isHidden ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border/40">
-                            <Lock className="w-2.5 h-2.5" />
-                            Hidden
-                          </span>
-                        ) : isFailed ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Group score indicator */}
+                          {submissionStatus === 'finished' && (
+                            <span
+                              className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                                grp.passedCount === grp.totalCount
+                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                              }`}
+                            >
+                              {grp.passedCount}/{grp.totalCount}
+                            </span>
+                          )}
                           <ChevronDown
                             className={`w-3.5 h-3.5 text-text-muted transition-transform ${
-                              isExpanded ? 'rotate-180' : ''
+                              isCollapsed ? '-rotate-90' : ''
                             }`}
                           />
-                        ) : null}
+                        </div>
                       </div>
+
+                      {/* Group Test Items */}
+                      {!isCollapsed && (
+                        <div className="p-2 space-y-1.5 divide-y divide-border/30">
+                          {grp.tests.map((test) => {
+                            const isFailed = test.passed === false;
+                            const isPassed = test.passed === true;
+                            const isExpanded = expandedTests[test.id];
+
+                            return (
+                              <div key={test.id} className="pt-1.5 first:pt-0">
+                                <div
+                                  onClick={() => isFailed && toggleTestExpand(test.id)}
+                                  className={`p-2 rounded flex items-center justify-between gap-2 text-xs transition-colors ${
+                                    isPassed
+                                      ? 'bg-emerald-500/5'
+                                      : isFailed
+                                      ? 'bg-rose-500/5 cursor-pointer hover:bg-rose-500/10'
+                                      : 'bg-surface-raised/20'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {/* Status Light */}
+                                    <div className="shrink-0">
+                                      {isPassed ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                      ) : isFailed ? (
+                                        <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                                      ) : (
+                                        <span className="w-2 h-2 rounded-full bg-border block mx-0.5" />
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-text truncate">
+                                      {test.name}
+                                    </span>
+                                  </div>
+
+                                  {isFailed && (
+                                    <ChevronDown
+                                      className={`w-3.5 h-3.5 text-text-muted transition-transform ${
+                                        isExpanded ? 'rotate-180' : ''
+                                      }`}
+                                    />
+                                  )}
+                                </div>
+
+                                {/* Expanded Failure Details */}
+                                {isFailed && isExpanded && (
+                                  <div className="mt-1.5 p-2.5 rounded bg-surface border border-rose-500/30 space-y-2 text-[10px] font-mono animate-fadeIn">
+                                    <div>
+                                      <span className="text-text-muted uppercase font-bold block mb-0.5">Request Sent</span>
+                                      <div className="text-text">
+                                        {test.method} {test.path}
+                                      </div>
+                                      {test.request?.body && (
+                                        <pre className="text-text-muted overflow-x-auto mt-0.5">
+                                          <code>{JSON.stringify(test.request.body, null, 2)}</code>
+                                        </pre>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <span className="text-emerald-400 uppercase font-bold block mb-0.5">Expected</span>
+                                      <div>Status: {test.expect?.status || 200}</div>
+                                      {test.expect?.bodyContains && (
+                                        <pre className="text-emerald-400/80 overflow-x-auto mt-0.5">
+                                          <code>{JSON.stringify(test.expect.bodyContains, null, 2)}</code>
+                                        </pre>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <span className="text-rose-400 uppercase font-bold block mb-0.5">Actual (Got)</span>
+                                      <div className="text-rose-300">Status: {test.got?.status ?? 'No response'}</div>
+                                      {test.got?.body !== undefined && (
+                                        <pre className="text-rose-300 overflow-x-auto mt-0.5">
+                                          <code>
+                                            {typeof test.got.body === 'object'
+                                              ? JSON.stringify(test.got.body, null, 2)
+                                              : String(test.got.body)}
+                                          </code>
+                                        </pre>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* 2. Hidden Verification Suite */}
+                {groupedChecklist.hiddenTests.length > 0 && (
+                  <div className="rounded-lg border border-border/50 bg-surface overflow-hidden shadow-xs">
+                    <div className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70">
+                      <div className="flex items-center gap-1.5 font-bold font-mono text-xs text-text-muted">
+                        <Lock className="w-3.5 h-3.5 text-accent-build" />
+                        <span>Hidden Edge Case Suite</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border/40">
+                        {groupedChecklist.hiddenTests.filter((t) => t.passed).length}/{groupedChecklist.hiddenTests.length} Passed
+                      </span>
                     </div>
 
-                    {/* Expanded Failure Inspection (Visible tests only) */}
-                    {!test.isHidden && isFailed && isExpanded && (
-                      <div className="px-3 pb-3 pt-1 border-t border-rose-500/20 space-y-2 text-[11px] font-mono animate-fadeIn">
-                        {/* Request Sent */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-text-muted uppercase font-bold block">
-                            Request Sent
-                          </span>
-                          <div className="p-2 rounded bg-surface border border-border/40 text-text">
-                            <div>{test.method} {test.path}</div>
-                            {test.request?.body && (
-                              <pre className="mt-1 text-[10px] text-text-muted overflow-x-auto">
-                                <code>{JSON.stringify(test.request.body, null, 2)}</code>
-                              </pre>
+                    <div className="p-2 space-y-1.5 divide-y divide-border/30">
+                      {groupedChecklist.hiddenTests.map((test) => (
+                        <div
+                          key={test.id}
+                          className="pt-1.5 first:pt-0 flex items-center justify-between p-2 rounded text-xs bg-surface-raised/20"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            {test.passed === true ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            ) : test.passed === false ? (
+                              <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                            ) : (
+                              <Lock className="w-3 h-3 text-text-muted shrink-0" />
                             )}
+                            <span className="text-xs text-text-muted truncate">{test.name}</span>
                           </div>
+                          <span className="text-[10px] font-mono text-text-muted shrink-0">Private</span>
                         </div>
-
-                        {/* Expected */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-text-muted uppercase font-bold block">
-                            Expected
-                          </span>
-                          <div className="p-2 rounded bg-surface border border-border/40 text-emerald-400">
-                            <div>Status: {test.expect?.status || 200}</div>
-                            {test.expect?.bodyContains && (
-                              <pre className="mt-1 text-[10px] overflow-x-auto">
-                                <code>{JSON.stringify(test.expect.bodyContains, null, 2)}</code>
-                              </pre>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Actual Got */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-rose-400 uppercase font-bold block">
-                            Actual (Got)
-                          </span>
-                          <div className="p-2 rounded bg-surface border border-rose-500/30 text-rose-300">
-                            <div>Status: {test.got?.status ?? 'No response'}</div>
-                            {test.got?.body !== undefined && (
-                              <pre className="mt-1 text-[10px] overflow-x-auto">
-                                <code>
-                                  {typeof test.got.body === 'object'
-                                    ? JSON.stringify(test.got.body, null, 2)
-                                    : String(test.got.body)}
-                                </code>
-                              </pre>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                );
-              })
+                )}
+              </>
             )}
           </div>
         </aside>
@@ -976,10 +1348,10 @@ export default function BuildWorkspace() {
               <div className="p-2 rounded-full bg-amber-500/10 border border-amber-500/25">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-text">Reset Starter Code?</h3>
+              <h3 className="text-base font-bold text-text">Reset All Files?</h3>
             </div>
             <p className="text-xs text-text-muted leading-relaxed">
-              This will overwrite your current edits in <code>index.js</code> with the original starter code. This action cannot be undone.
+              This will overwrite all your current files and restore the original starter files. This action cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -994,7 +1366,7 @@ export default function BuildWorkspace() {
                 onClick={handleResetConfirm}
                 className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded transition-colors"
               >
-                Reset Code
+                Reset Files
               </button>
             </div>
           </div>
