@@ -21,6 +21,12 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+
+  /* Build Mode (API Workbench) Tokens */
+  --accent-build: #14b8a6;
+  --accent-build-hover: #0d9488;
+  --accent-build-subtle: rgba(20, 184, 166, 0.12);
+  --accent-build-border: rgba(20, 184, 166, 0.28);
 }
 
 /* Light Mode Overrides (Plain White like LeetCode) */
@@ -41,6 +47,12 @@ html:not(.dark) {
   --info: #0284c7;
 
   --heatmap-empty: #e5e7eb;
+
+  /* Build Mode (Light) */
+  --accent-build: #0d9488;
+  --accent-build-hover: #0f766e;
+  --accent-build-subtle: rgba(13, 148, 136, 0.1);
+  --accent-build-border: rgba(13, 148, 136, 0.25);
 }
 
 /* ─── Tailwind v4 Theme Variables ───────────────────────────── */
@@ -58,6 +70,10 @@ html:not(.dark) {
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  --color-accent-build: var(--accent-build);
+  --color-accent-build-hover: var(--accent-build-hover);
+  --color-accent-build-subtle: var(--accent-build-subtle);
+  --color-accent-build-border: var(--accent-build-border);
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -109,10 +125,17 @@ html:not(.dark) {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 9999px;
-}
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* ─── Build Mode Indeterminate Progress Bar ─────────────────── */
+@keyframes build-indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(250%); }
+}
+
+.animate-build-indeterminate {
+  animation: build-indeterminate 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}

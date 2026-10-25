@@ -10,13 +10,23 @@ const { validateSubmissionFiles, validateTestCases } = require('../utils/buildVa
 const getBuildProblems = async (req, res) => {
   try {
     const problems = await BuildProblem.find({})
-      .select('slug title difficulty runtime limits createdAt')
+      .select('slug title difficulty runtime limits createdAt visibleTests')
       .sort({ createdAt: -1 });
+
+    const formatted = problems.map((p) => {
+      const obj = p.toObject();
+      const uniqueEndpoints = new Set(
+        (obj.visibleTests || []).map((t) => `${(t.request?.method || 'GET').toUpperCase()} ${t.request?.path || ''}`)
+      );
+      obj.endpointCount = Math.max(uniqueEndpoints.size, 1);
+      delete obj.visibleTests;
+      return obj;
+    });
 
     return res.status(200).json({
       status: 'success',
-      count: problems.length,
-      problems,
+      count: formatted.length,
+      problems: formatted,
     });
   } catch (err) {
     console.error('Error fetching build problems:', err.message);

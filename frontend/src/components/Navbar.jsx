@@ -21,7 +21,8 @@ import {
   X,
   Search,
   Loader2,
-  PlusCircle
+  PlusCircle,
+  Boxes
 } from 'lucide-react';
 import { getAvatarSrc } from '../utils/avatar';
 
@@ -99,6 +100,7 @@ export default function Navbar() {
   const navLinks = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/problems', label: 'Problems', icon: Code2 },
+    { to: '/build', label: 'Build Mode', icon: Boxes, isBuildMode: true },
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { to: '/my-submissions', label: 'Submissions', icon: History },
   ];
@@ -190,19 +192,28 @@ export default function Navbar() {
         <nav className="hidden lg:flex items-center gap-1 shrink-0">
           {navLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = location.pathname === link.to;
+            const isActive = location.pathname === link.to || (link.to === '/build' && location.pathname.startsWith('/build'));
             return (
               <Link
                 key={link.to}
                 to={link.to}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors select-none ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all select-none ${
                   isActive
-                    ? 'bg-surface-raised text-text border border-border font-medium'
+                    ? link.isBuildMode
+                      ? 'bg-accent-build/15 text-accent-build border border-accent-build/40 font-semibold shadow-xs'
+                      : 'bg-surface-raised text-text border border-border font-medium'
+                    : link.isBuildMode
+                    ? 'text-accent-build/80 hover:text-accent-build hover:bg-accent-build/10 border border-transparent'
                     : 'text-text-muted hover:text-text hover:bg-surface-raised/60'
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
+                <Icon className={`h-3.5 w-3.5 ${link.isBuildMode ? 'text-accent-build' : isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
                 <span>{link.label}</span>
+                {link.isBuildMode && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent-build/20 text-accent-build uppercase tracking-wider ml-0.5">
+                    API
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -448,19 +459,31 @@ export default function Navbar() {
           <div className="flex flex-col gap-0.5">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = location.pathname === link.to;
+              const isActive = location.pathname === link.to || (link.to === '/build' && location.pathname.startsWith('/build'));
               return (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md transition-all ${
                     isActive
-                      ? 'bg-surface-raised text-text border border-border'
+                      ? link.isBuildMode
+                        ? 'bg-accent-build/15 text-accent-build border border-accent-build/40'
+                        : 'bg-surface-raised text-text border border-border'
+                      : link.isBuildMode
+                      ? 'text-accent-build/80 hover:text-accent-build hover:bg-accent-build/10'
                       : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
-                  <span>{link.label}</span>
+                  <div className="flex items-center gap-2">
+                    <Icon className={`h-3.5 w-3.5 ${link.isBuildMode ? 'text-accent-build' : isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
+                    <span>{link.label}</span>
+                  </div>
+                  {link.isBuildMode && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent-build/20 text-accent-build uppercase">
+                      API
+                    </span>
+                  )}
                 </Link>
               );
             })}

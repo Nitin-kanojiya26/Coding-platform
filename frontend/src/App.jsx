@@ -28,6 +28,8 @@ import EditProblem from './pages/EditProblem';
 import Sheet from './pages/Sheet';
 import SheetsList from './pages/SheetsList';
 import SubmissionDetail from './pages/SubmissionDetail';
+import BuildProblems from './pages/BuildProblems';
+import BuildWorkspace from './pages/BuildWorkspace';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -52,6 +54,8 @@ function AppRoutes() {
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/problems" element={<ProtectedRoute><Problems /></ProtectedRoute>} />
         <Route path="/problems/:slug" element={<ProtectedRoute><ProblemDetail /></ProtectedRoute>} />
+        <Route path="/build" element={<ProtectedRoute><BuildProblems /></ProtectedRoute>} />
+        <Route path="/build/:slug" element={<ProtectedRoute><BuildWorkspace /></ProtectedRoute>} />
         <Route path="/problems/:slug/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
         <Route path="/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
         <Route path="/sheets/:sheetId" element={<ProtectedRoute><Sheet /></ProtectedRoute>} />
