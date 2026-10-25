@@ -52,6 +52,7 @@ export default function BuildWorkspace() {
   const [leftTab, setLeftTab] = useState('brief'); // 'brief' | 'endpoints' | 'contract' | 'history'
   const [mobileTab, setMobileTab] = useState('code'); // 'brief' | 'code' | 'results' (for < 1024px)
   const [showResetModal, setShowResetModal] = useState(false);
+  const [copiedStatement, setCopiedStatement] = useState(false);
 
   // ─── Multi-File State (Stage 2) ───
   const [files, setFiles] = useState([
@@ -528,7 +529,7 @@ export default function BuildWorkspace() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden select-none shadow-md">
+    <div className="flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden shadow-md">
       {/* ─── Top Workbench Header (Cleanly separated from Navbar) ─── */}
       <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-10">
         {/* Left: Back + Title + Badges */}
@@ -676,11 +677,38 @@ export default function BuildWorkspace() {
             })}
           </div>
 
-          {/* Left Panel Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Left Panel Body (Allow text selection & copy) */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 select-text">
             {/* TAB: Brief */}
             {leftTab === 'brief' && (
-              <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between pb-2 border-b border-border/40 select-none">
+                  <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider font-bold">
+                    Problem Description
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(problem.statement);
+                      setCopiedStatement(true);
+                      setTimeout(() => setCopiedStatement(false), 2000);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono text-text-muted hover:text-text hover:bg-surface-raised border border-border/50 transition-colors"
+                    title="Copy entire problem description"
+                  >
+                    {copiedStatement ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy All</span>
+                      </>
+                    )}
+                  </button>
+                </div>
                 <MarkdownRenderer content={problem.statement} />
               </div>
             )}

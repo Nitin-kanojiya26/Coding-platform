@@ -52,8 +52,8 @@ export default function MarkdownRenderer({ content = '', className = '' }) {
                   {codeLang}
                 </div>
               )}
-              <pre className="p-3 text-xs font-mono text-text overflow-x-auto whitespace-pre leading-relaxed">
-                <code>{codeBuffer.join('\n')}</code>
+              <pre className="p-3 text-xs font-mono text-text overflow-x-auto whitespace-pre leading-relaxed select-text">
+                <code className="select-text">{codeBuffer.join('\n')}</code>
               </pre>
             </div>
           );
