@@ -205,9 +205,9 @@ async function executeDockerFlow(submission, problem) {
       };
     }
 
-    // 3. docker run -d --name app-<id> --network judge-<id> --network-alias app
-    //    --memory 256m --cpus 0.5 --pids-limit 100 --read-only --tmpfs /tmp --user 1000:1000
-    //    -v <abs>/user:/app/user:ro BM_APP_IMAGE node /app/user/index.js
+    const hasServerJs = (submission.files || []).some((f) => f.path === 'server.js');
+    const entryPath = hasServerJs ? '/app/user/server.js' : '/app/user/index.js';
+
     const appArgs = [
       'run', '-d',
       '--name', appName,
@@ -221,7 +221,7 @@ async function executeDockerFlow(submission, problem) {
       '--user', '1000:1000',
       '-v', `${userDir}:/app/user:ro`,
       BM_APP_IMAGE,
-      'node', '/app/user/index.js',
+      'node', entryPath,
     ];
 
     const appRunRes = await spawnCommand('docker', appArgs);

@@ -92,7 +92,7 @@ function validateSubmissionFiles(files) {
 
   let totalBytes = 0;
   const seenPaths = new Set();
-  let hasIndexJs = false;
+  let hasEntry = false;
 
   for (const file of files) {
     if (!file || typeof file !== 'object') {
@@ -139,8 +139,8 @@ function validateSubmissionFiles(files) {
     }
     seenPaths.add(canonicalPath);
 
-    if (canonicalPath === 'index.js') {
-      hasIndexJs = true;
+    if (canonicalPath === 'server.js' || canonicalPath === 'index.js') {
+      hasEntry = true;
     }
 
     // Check content
@@ -156,9 +156,9 @@ function validateSubmissionFiles(files) {
     totalBytes += fileByteSize;
   }
 
-  // index.js must exist at the root level
-  if (!hasIndexJs) {
-    return 'Missing required entry file "index.js" at the root level of your submission.';
+  // server.js or index.js must exist at the root level
+  if (!hasEntry) {
+    return 'Missing required entry file ("server.js" or "index.js") at the root level of your submission.';
   }
 
   // Max 200 KB total

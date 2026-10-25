@@ -20,7 +20,7 @@ Build a RESTful API using Node.js and Express.
     runtime: 'node-express',
     starterFiles: [
       {
-        path: 'index.js',
+        path: 'server.js',
         content: `const express = require('express');
 const app = express();
 
@@ -120,7 +120,7 @@ Build an in-memory Todo REST API with Express listening on \`0.0.0.0:3000\`.
     runtime: 'node-express',
     starterFiles: [
       {
-        path: 'index.js',
+        path: 'server.js',
         content: `const express = require('express');
 const app = express();
 

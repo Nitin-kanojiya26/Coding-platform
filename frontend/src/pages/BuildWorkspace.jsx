@@ -33,18 +33,36 @@ import {
   AlertCircle,
   Info,
   FolderTree,
+  Folder,
+  FolderOpen,
   Plus,
   Trash2,
   X,
-  Layers,
   FilePlus,
-  SlidersHorizontal
+  FolderPlus,
+  ChevronsDownUp,
+  GripVertical,
+  GripHorizontal
 } from 'lucide-react';
+
+/**
+ * File icon helper based on extension
+ */
+function FileIcon({ path = '', className = 'w-3.5 h-3.5' }) {
+  if (path.endsWith('.json')) {
+    return <span className={`text-amber-400 font-mono font-bold text-[10px] leading-none shrink-0 ${className}`}>{'{}'}</span>;
+  }
+  if (path.endsWith('.md')) {
+    return <FileText className={`text-sky-400 shrink-0 ${className}`} />;
+  }
+  return <FileCode className={`text-accent-build shrink-0 ${className}`} />;
+}
 
 export default function BuildWorkspace() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const containerRef = useRef(null);
 
   // Problem & workspace state
   const [problem, setProblem] = useState(null);
@@ -54,15 +72,35 @@ export default function BuildWorkspace() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [copiedStatement, setCopiedStatement] = useState(false);
 
-  // ─── Multi-File State (Stage 2) ───
+  // ─── Multi-File State (server.js as primary entry) ───
   const [files, setFiles] = useState([
-    { path: 'index.js', content: '' }
+    { path: 'server.js', content: '' }
   ]);
-  const [activeFilePath, setActiveFilePath] = useState('index.js');
-  const [openTabs, setOpenTabs] = useState(['index.js']);
+  const [activeFilePath, setActiveFilePath] = useState('server.js');
+  const [openTabs, setOpenTabs] = useState(['server.js']);
   const [showNewFileInput, setShowNewFileInput] = useState(false);
+  const [newFileType, setNewFileType] = useState('file'); // 'file' | 'folder'
   const [newFileName, setNewFileName] = useState('');
   const [fileExplorerOpen, setFileExplorerOpen] = useState(true);
+  const [collapsedFolders, setCollapsedFolders] = useState({});
+
+  // ─── LeetCode-Style Resizable Panel Dimensions ───
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const saved = localStorage.getItem('build_split_left');
+    return saved ? Math.min(Math.max(Number(saved), 18), 40) : 26;
+  });
+  const [rightWidth, setRightWidth] = useState(() => {
+    const saved = localStorage.getItem('build_split_right');
+    return saved ? Math.min(Math.max(Number(saved), 20), 45) : 30;
+  });
+  const [consoleHeight, setConsoleHeight] = useState(() => {
+    const saved = localStorage.getItem('build_console_height');
+    return saved ? Math.min(Math.max(Number(saved), 60), 400) : 170;
+  });
+
+  const [isDraggingLeft, setIsDraggingLeft] = useState(false);
+  const [isDraggingRight, setIsDraggingRight] = useState(false);
+  const [isDraggingConsole, setIsDraggingConsole] = useState(false);
 
   // Submissions & evaluation state
   const [submissionId, setSubmissionId] = useState(null);
@@ -94,12 +132,15 @@ export default function BuildWorkspace() {
           const p = res.data.problem;
           setProblem(p);
 
-          // Prepare starter files
-          const initialStarterFiles = (p.starterFiles && p.starterFiles.length > 0)
-            ? p.starterFiles.map((f) => ({ path: f.path, content: f.content }))
+          // Convert starter files to server.js if needed
+          let initialStarterFiles = (p.starterFiles && p.starterFiles.length > 0)
+            ? p.starterFiles.map((f) => ({
+                path: f.path === 'index.js' ? 'server.js' : f.path,
+                content: f.content,
+              }))
             : [
                 {
-                  path: 'index.js',
+                  path: 'server.js',
                   content: `const express = require('express');\nconst app = express();\n\napp.use(express.json());\n\n// TODO: Implement your routes\n\nconst PORT = process.env.PORT || 3000;\napp.listen(PORT, '0.0.0.0', () => {\n  console.log(\`Server listening on 0.0.0.0:\${PORT}\`);\n});\n`,
                 },
               ];
@@ -109,18 +150,27 @@ export default function BuildWorkspace() {
           if (savedDraft) {
             try {
               const parsed = JSON.parse(savedDraft);
-              if (Array.isArray(parsed) && parsed.length > 0 && parsed.some((f) => f.path === 'index.js')) {
-                setFiles(parsed);
-                setOpenTabs(parsed.map((f) => f.path));
-                setActiveFilePath(parsed[0].path);
-                return;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                // Ensure server.js entry (convert old index.js draft to server.js)
+                const migrated = parsed.map((f) => ({
+                  ...f,
+                  path: f.path === 'index.js' ? 'server.js' : f.path,
+                }));
+                const hasEntry = migrated.some((f) => f.path === 'server.js');
+                if (hasEntry) {
+                  localStorage.setItem(`build_files_${slug}`, JSON.stringify(migrated));
+                  setFiles(migrated);
+                  setOpenTabs(migrated.map((f) => f.path));
+                  setActiveFilePath(migrated[0].path);
+                  return;
+                }
               }
             } catch (_) {}
           }
 
           setFiles(initialStarterFiles);
           setOpenTabs(initialStarterFiles.map((f) => f.path));
-          setActiveFilePath(initialStarterFiles[0]?.path || 'index.js');
+          setActiveFilePath(initialStarterFiles[0]?.path || 'server.js');
         }
       } catch (err) {
         console.error('Failed to load problem:', err);
@@ -156,6 +206,56 @@ export default function BuildWorkspace() {
     }
   };
 
+  // ─── Mouse Resizing Listeners (LeetCode-Style) ───
+  useEffect(() => {
+    if (!isDraggingLeft && !isDraggingRight && !isDraggingConsole) return;
+
+    const handleMouseMove = (e) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      // Left panel horizontal resize
+      if (isDraggingLeft) {
+        const newLeftPercent = ((e.clientX - rect.left) / rect.width) * 100;
+        if (newLeftPercent >= 16 && newLeftPercent <= 42) {
+          setLeftWidth(newLeftPercent);
+          localStorage.setItem('build_split_left', String(newLeftPercent));
+        }
+      }
+
+      // Right panel horizontal resize
+      if (isDraggingRight) {
+        const newRightPercent = ((rect.right - e.clientX) / rect.width) * 100;
+        if (newRightPercent >= 18 && newRightPercent <= 45) {
+          setRightWidth(newRightPercent);
+          localStorage.setItem('build_split_right', String(newRightPercent));
+        }
+      }
+
+      // Console drawer vertical resize
+      if (isDraggingConsole) {
+        const newHeight = rect.bottom - e.clientY;
+        if (newHeight >= 50 && newHeight <= 420) {
+          setConsoleHeight(newHeight);
+          localStorage.setItem('build_console_height', String(newHeight));
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingLeft(false);
+      setIsDraggingRight(false);
+      setIsDraggingConsole(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingLeft, isDraggingRight, isDraggingConsole]);
+
   // Active file content lookup
   const activeFileContent = useMemo(() => {
     const f = files.find((file) => file.path === activeFilePath);
@@ -173,19 +273,53 @@ export default function BuildWorkspace() {
     }
   };
 
-  // Add new file
+  // Add new file or folder (VS Code style)
   const handleCreateFile = () => {
     let raw = newFileName.trim().replace(/\\/g, '/');
     if (raw.startsWith('/')) raw = raw.slice(1);
+    if (raw.endsWith('/')) raw = raw.slice(0, -1);
 
     if (!raw) {
-      toast.error('Please enter a valid filename.');
+      toast.error(newFileType === 'folder' ? 'Please enter a folder name.' : 'Please enter a filename.');
       return;
     }
 
     if (raw.includes('..')) {
       toast.error('Directory traversal (..) is not allowed.');
       return;
+    }
+
+    if (newFileType === 'folder') {
+      const folderFilePath = `${raw}/index.js`;
+      if (files.some((f) => f.path.toLowerCase() === folderFilePath.toLowerCase())) {
+        toast.error(`Folder "${raw}" already exists.`);
+        return;
+      }
+      if (files.length >= 20) {
+        toast.error('Maximum limit of 20 files reached.');
+        return;
+      }
+      const newFileList = [
+        ...files,
+        { path: folderFilePath, content: `// ${raw}/index.js\n\nmodule.exports = {};\n` },
+      ];
+      setFiles(newFileList);
+      if (!openTabs.includes(folderFilePath)) {
+        setOpenTabs([...openTabs, folderFilePath]);
+      }
+      setActiveFilePath(folderFilePath);
+      setNewFileName('');
+      setShowNewFileInput(false);
+      if (slug) {
+        localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
+      }
+      toast.success(`Created folder "${raw}/"`);
+      return;
+    }
+
+    // Default to .js if no extension provided
+    if (!raw.includes('.')) {
+      raw += '.js';
     }
 
     if (files.some((f) => f.path.toLowerCase() === raw.toLowerCase())) {
@@ -198,7 +332,12 @@ export default function BuildWorkspace() {
       return;
     }
 
-    const defaultContent = `// ${raw}\n\n`;
+    const defaultContent = raw.endsWith('.json')
+      ? '{\n  \n}\n'
+      : raw.endsWith('.md')
+      ? `# ${raw}\n`
+      : `// ${raw}\n\n`;
+
     const newFileList = [...files, { path: raw, content: defaultContent }];
     setFiles(newFileList);
 
@@ -212,14 +351,14 @@ export default function BuildWorkspace() {
     if (slug) {
       localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
     }
-    toast.success(`Created file "${raw}"`);
+    toast.success(`Created "${raw}"`);
   };
 
   // Delete file
   const handleDeleteFile = (pathToDelete, e) => {
     if (e) e.stopPropagation();
-    if (pathToDelete === 'index.js') {
-      toast.error('index.js is the required entry point and cannot be deleted.');
+    if (pathToDelete === 'server.js' || pathToDelete === 'index.js') {
+      toast.error(`"${pathToDelete}" is the required server entry point and cannot be deleted.`);
       return;
     }
 
@@ -227,10 +366,10 @@ export default function BuildWorkspace() {
     const newTabs = openTabs.filter((t) => t !== pathToDelete);
 
     setFiles(newFileList);
-    setOpenTabs(newTabs.length > 0 ? newTabs : ['index.js']);
+    setOpenTabs(newTabs.length > 0 ? newTabs : ['server.js']);
 
     if (activeFilePath === pathToDelete) {
-      setActiveFilePath(newTabs[0] || 'index.js');
+      setActiveFilePath(newTabs[0] || 'server.js');
     }
 
     if (slug) {
@@ -254,13 +393,16 @@ export default function BuildWorkspace() {
 
   // Reset to starter files
   const handleResetConfirm = () => {
-    const starter = (problem?.starterFiles && problem.starterFiles.length > 0)
-      ? problem.starterFiles.map((f) => ({ path: f.path, content: f.content }))
-      : [{ path: 'index.js', content: '' }];
+    let starter = (problem?.starterFiles && problem.starterFiles.length > 0)
+      ? problem.starterFiles.map((f) => ({
+          path: f.path === 'index.js' ? 'server.js' : f.path,
+          content: f.content,
+        }))
+      : [{ path: 'server.js', content: '' }];
 
     setFiles(starter);
     setOpenTabs(starter.map((f) => f.path));
-    setActiveFilePath(starter[0]?.path || 'index.js');
+    setActiveFilePath(starter[0]?.path || 'server.js');
 
     if (slug) {
       localStorage.removeItem(`build_files_${slug}`);
@@ -280,8 +422,12 @@ export default function BuildWorkspace() {
 
   // 3. Submit solution with all files
   const handleSubmit = async () => {
-    if (!files.some((f) => f.path === 'index.js' && f.content.trim())) {
-      toast.error('index.js is required and must contain your server code.');
+    const hasEntry = files.some(
+      (f) => (f.path === 'server.js' || f.path === 'index.js') && f.content.trim()
+    );
+
+    if (!hasEntry) {
+      toast.error('An entry file ("server.js" or "index.js") is required and must contain your code.');
       return;
     }
 
@@ -315,12 +461,14 @@ export default function BuildWorkspace() {
         setRateLimitWait(60);
         setSubmissionStatus('error');
         setSubmissionResult({
+          status: 'Rate Limited',
           verdict: 'Rate Limited',
           message: 'You have reached the submission rate limit (5 per minute). Please wait 60s.',
         });
       } else {
         setSubmissionStatus('error');
         setSubmissionResult({
+          status: 'Submission Error',
           verdict: 'Submission Error',
           message: err.response?.data?.message || 'Could not queue your submission. Check your network.',
         });
@@ -348,6 +496,7 @@ export default function BuildWorkspace() {
         clearInterval(pollTimerRef.current);
         setSubmissionStatus('finished');
         setSubmissionResult({
+          status: 'Internal Error',
           verdict: 'Internal Error',
           message: 'Evaluation timed out waiting for worker. Please try again.',
           score: 0,
@@ -401,6 +550,34 @@ export default function BuildWorkspace() {
       [groupKey]: !prev[groupKey],
     }));
   };
+
+  // Toggle folder collapse in tree
+  const toggleFolderCollapse = (folderName) => {
+    setCollapsedFolders((prev) => ({
+      ...prev,
+      [folderName]: !prev[folderName],
+    }));
+  };
+
+  // ─── VS Code Style File Tree Structure ───
+  const fileTree = useMemo(() => {
+    const folders = {};
+    const rootFiles = [];
+
+    files.forEach((file) => {
+      const parts = file.path.split('/');
+      if (parts.length > 1) {
+        const folderName = parts[0];
+        const subPath = parts.slice(1).join('/');
+        if (!folders[folderName]) folders[folderName] = [];
+        folders[folderName].push({ ...file, subPath });
+      } else {
+        rootFiles.push(file);
+      }
+    });
+
+    return { folders, rootFiles };
+  }, [files]);
 
   // Distinct endpoint list extracted from visible tests (for Brief / Endpoints tab)
   const endpointCards = useMemo(() => {
@@ -530,10 +707,17 @@ export default function BuildWorkspace() {
     );
   }
 
+  const isDraggingAny = isDraggingLeft || isDraggingRight || isDraggingConsole;
+
   return (
-    <div className="flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden shadow-md">
+    <div
+      ref={containerRef}
+      className={`flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden shadow-md ${
+        isDraggingAny ? 'select-none' : ''
+      }`}
+    >
       {/* ─── Top Workbench Header (Cleanly separated from Navbar) ─── */}
-      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-10">
+      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-10 select-none">
         {/* Left: Back + Title + Badges */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
@@ -607,7 +791,7 @@ export default function BuildWorkspace() {
       </header>
 
       {/* ─── Mobile / Tablet Navigation Pills (< 1024px) ─── */}
-      <div className="lg:hidden flex items-center border-b border-border/50 bg-surface px-2 py-1 gap-1 text-xs shrink-0">
+      <div className="lg:hidden flex items-center border-b border-border/50 bg-surface px-2 py-1 gap-1 text-xs shrink-0 select-none">
         <button
           type="button"
           onClick={() => setMobileTab('brief')}
@@ -628,7 +812,7 @@ export default function BuildWorkspace() {
               : 'text-text-muted hover:text-text'
           }`}
         >
-          Code Editor ({files.length} {files.length === 1 ? 'file' : 'files'})
+          Code Editor ({files.length})
         </button>
         <button
           type="button"
@@ -643,13 +827,14 @@ export default function BuildWorkspace() {
         </button>
       </div>
 
-      {/* ─── 3-Column Main Workspace ─── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 divide-y lg:divide-y-0 lg:divide-x divide-border/50">
+      {/* ─── 3-Column Main Workspace with LeetCode-Style Resizers ─── */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         
         {/* ════════ COLUMN 1 (LEFT): Brief, Endpoints, Contract, History ════════ */}
         <aside
-          className={`lg:col-span-3 flex flex-col min-h-0 bg-surface/50 ${
-            mobileTab === 'brief' ? 'flex' : 'hidden lg:flex'
+          style={{ width: window.innerWidth >= 1024 ? `${leftWidth}%` : '100%' }}
+          className={`flex-col min-h-0 bg-surface/50 shrink-0 ${
+            mobileTab === 'brief' ? 'flex w-full' : 'hidden lg:flex'
           }`}
         >
           {/* Sub-tabs header */}
@@ -718,7 +903,7 @@ export default function BuildWorkspace() {
             {/* TAB: Endpoints */}
             {leftTab === 'endpoints' && (
               <div className="space-y-3 animate-fadeIn">
-                <div className="text-[11px] text-text-muted leading-relaxed">
+                <div className="text-[11px] text-text-muted leading-relaxed select-none">
                   Required REST endpoints derived from integration test specifications:
                 </div>
                 {endpointCards.map((ep, idx) => (
@@ -736,7 +921,7 @@ export default function BuildWorkspace() {
                     {/* Sample Request Payload */}
                     {ep.sampleRequest?.body && (
                       <div className="space-y-1">
-                        <span className="text-[10px] font-mono text-text-muted uppercase">Sample Request Body</span>
+                        <span className="text-[10px] font-mono text-text-muted uppercase select-none">Sample Request Body</span>
                         <pre className="p-2 rounded bg-surface border border-border/40 text-[10px] font-mono text-text overflow-x-auto">
                           <code>{JSON.stringify(ep.sampleRequest.body, null, 2)}</code>
                         </pre>
@@ -746,7 +931,7 @@ export default function BuildWorkspace() {
                     {/* Expected Status & Body */}
                     {ep.sampleExpect && (
                       <div className="space-y-1">
-                        <span className="text-[10px] font-mono text-text-muted uppercase">
+                        <span className="text-[10px] font-mono text-text-muted uppercase select-none">
                           Expected Response ({ep.sampleExpect.status || 200})
                         </span>
                         {ep.sampleExpect.bodyContains && (
@@ -770,13 +955,20 @@ export default function BuildWorkspace() {
                     <span>Evaluation Contract</span>
                   </div>
                   <p className="text-[11px] text-text-muted leading-relaxed">
-                    Your code executes in an isolated Docker container with zero access to the internet. Comply with the following constraints to pass evaluation:
+                    Your code executes in an isolated Docker container with zero access to the internet. Comply with the following constraints:
                   </p>
                 </div>
 
                 <div className="space-y-2 font-mono text-[11px]">
                   <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">1. Port & Host Binding</span>
+                    <span className="text-text font-bold text-accent-build block">1. Entrypoint</span>
+                    <p className="text-text-muted font-sans text-xs">
+                      The primary server file must be named <code>server.js</code> (or <code>index.js</code>).
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
+                    <span className="text-text font-bold text-accent-build block">2. Port & Host Binding</span>
                     <p className="text-text-muted font-sans text-xs">
                       Server must listen on port <strong>3000</strong> and bind to <code>0.0.0.0</code>:
                     </p>
@@ -786,30 +978,23 @@ export default function BuildWorkspace() {
                   </div>
 
                   <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">2. In-Memory Data Storage</span>
-                    <p className="text-text-muted font-sans text-xs">
-                      Persist data in in-memory JavaScript variables, arrays, or objects. Do not write to local disk (filesystem is read-only).
-                    </p>
-                  </div>
-
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
                     <span className="text-text font-bold text-accent-build block">3. Multi-File Architecture</span>
                     <p className="text-text-muted font-sans text-xs">
-                      You can organize your API across multiple files (e.g. <code>routes/todos.js</code>). Use standard <code>require('./path')</code>.
+                      Modular files like <code>routes/todos.js</code> are fully supported. Use standard <code>require('./path')</code>.
                     </p>
                   </div>
 
                   <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">4. Pre-installed Packages</span>
+                    <span className="text-text font-bold text-accent-build block">4. In-Memory Data Storage</span>
+                    <p className="text-text-muted font-sans text-xs">
+                      Persist data in in-memory JavaScript variables, arrays, or objects. (Filesystem is read-only).
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
+                    <span className="text-text font-bold text-accent-build block">5. Pre-installed Packages</span>
                     <p className="text-text-muted font-sans text-xs">
                       <code>express</code> and <code>cors</code> are pre-installed. Do not attempt to <code>npm install</code> extra packages.
-                    </p>
-                  </div>
-
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">5. Entrypoint</span>
-                    <p className="text-text-muted font-sans text-xs">
-                      The primary server file must be named <code>index.js</code>.
                     </p>
                   </div>
                 </div>
@@ -825,7 +1010,7 @@ export default function BuildWorkspace() {
                     <span className="text-xs font-mono text-text-muted">Loading history...</span>
                   </div>
                 ) : historyList.length === 0 ? (
-                  <div className="py-8 text-center space-y-2 border border-dashed border-border/50 rounded-lg">
+                  <div className="py-8 text-center space-y-2 border border-dashed border-border/50 rounded-lg select-none">
                     <History className="w-6 h-6 text-text-muted mx-auto" />
                     <p className="text-xs text-text-muted">No submissions recorded yet for this challenge.</p>
                   </div>
@@ -868,13 +1053,25 @@ export default function BuildWorkspace() {
           </div>
         </aside>
 
-        {/* ════════ COLUMN 2 (CENTER): Multi-File Tree + Monaco Editor + Console ════════ */}
+        {/* ─── RESIZE HANDLE 1 (Left <-> Center) ─── */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsDraggingLeft(true);
+          }}
+          className="hidden lg:flex w-1.5 hover:w-2 bg-border/40 hover:bg-accent-build cursor-col-resize items-center justify-center transition-all select-none shrink-0 group relative z-20"
+          title="Drag to resize Brief panel"
+        >
+          <div className="w-0.5 h-6 rounded-full bg-text-muted/40 group-hover:bg-black transition-colors" />
+        </div>
+
+        {/* ════════ COLUMN 2 (CENTER): VS Code-Style Explorer + Editor + Resizable Console ════════ */}
         <main
-          className={`lg:col-span-6 flex flex-col min-h-0 bg-surface-inset ${
-            mobileTab === 'code' ? 'flex' : 'hidden lg:flex'
+          className={`flex-1 flex flex-col min-h-0 bg-surface-inset ${
+            mobileTab === 'code' ? 'flex w-full' : 'hidden lg:flex'
           }`}
         >
-          {/* File Tabs Bar & Explorer Controls (Stage 2) */}
+          {/* File Tab Bar & Explorer Controls */}
           <div className="flex items-center justify-between border-b border-border/50 bg-surface px-2 select-none shrink-0 overflow-x-auto">
             {/* Tabs List */}
             <div className="flex items-center gap-1 py-1">
@@ -885,7 +1082,7 @@ export default function BuildWorkspace() {
                 className={`p-1.5 rounded transition-colors ${
                   fileExplorerOpen ? 'bg-accent-build/15 text-accent-build' : 'text-text-muted hover:text-text'
                 }`}
-                title="Toggle File Explorer"
+                title="Toggle File Explorer (VS Code Style)"
               >
                 <FolderTree className="w-3.5 h-3.5" />
               </button>
@@ -895,7 +1092,7 @@ export default function BuildWorkspace() {
               {/* Open File Tabs */}
               {openTabs.map((tabPath) => {
                 const isActive = activeFilePath === tabPath;
-                const isEntry = tabPath === 'index.js';
+                const isEntry = tabPath === 'server.js' || tabPath === 'index.js';
                 return (
                   <div
                     key={tabPath}
@@ -906,7 +1103,7 @@ export default function BuildWorkspace() {
                         : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                     }`}
                   >
-                    <FileCode className={`w-3.5 h-3.5 ${isActive ? 'text-accent-build' : 'text-text-muted'}`} />
+                    <FileIcon path={tabPath} className="w-3.5 h-3.5" />
                     <span className="truncate max-w-[120px]">{tabPath}</span>
                     {isActive && <span className="w-1.5 h-1.5 rounded-full bg-accent-build ml-0.5" />}
 
@@ -928,11 +1125,26 @@ export default function BuildWorkspace() {
               {/* Add file inline trigger */}
               <button
                 type="button"
-                onClick={() => setShowNewFileInput(!showNewFileInput)}
+                onClick={() => {
+                  setShowNewFileInput(true);
+                  setNewFileType('file');
+                }}
                 className="p-1 text-text-muted hover:text-accent-build rounded transition-colors ml-1"
-                title="Create New File"
+                title="New File"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <FilePlus className="w-3.5 h-3.5" />
+              </button>
+              {/* Add folder inline trigger */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewFileInput(true);
+                  setNewFileType('folder');
+                }}
+                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors"
+                title="New Folder"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -941,13 +1153,21 @@ export default function BuildWorkspace() {
             </span>
           </div>
 
-          {/* New File Inline Bar */}
+          {/* New File / Folder Inline Bar (VS Code style) */}
           {showNewFileInput && (
             <div className="flex items-center gap-2 p-2 bg-surface-raised border-b border-border/50 animate-fadeIn text-xs">
-              <FilePlus className="w-4 h-4 text-accent-build shrink-0" />
+              {newFileType === 'folder' ? (
+                <FolderPlus className="w-4 h-4 text-accent-build shrink-0" />
+              ) : (
+                <FilePlus className="w-4 h-4 text-accent-build shrink-0" />
+              )}
               <input
                 type="text"
-                placeholder="e.g. routes/todoRoutes.js or store.js"
+                placeholder={
+                  newFileType === 'folder'
+                    ? 'Folder name (e.g. routes, models, controllers)'
+                    : 'File name (e.g. routes/todos.js, models/item.js, data.json)'
+                }
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
                 onKeyDown={(e) => {
@@ -974,26 +1194,106 @@ export default function BuildWorkspace() {
             </div>
           )}
 
-          {/* Center Main Workspace: File Tree Sidebar + Monaco Editor */}
-          <div className="flex-1 min-h-[300px] flex relative overflow-hidden">
-            {/* Collapsible File Explorer Sidebar */}
+          {/* Center Main Workspace: VS Code Explorer Sidebar + Monaco Editor */}
+          <div className="flex-1 min-h-[220px] flex relative overflow-hidden">
+            {/* VS Code Style File Explorer Sidebar */}
             {fileExplorerOpen && (
-              <div className="w-44 border-r border-border/50 bg-surface/70 flex flex-col shrink-0 text-xs font-mono select-none">
-                <div className="p-2 border-b border-border/40 flex items-center justify-between text-[11px] text-text-muted uppercase tracking-wider font-bold">
-                  <span>Workspace Files</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewFileInput(true)}
-                    className="hover:text-accent-build"
-                    title="Add file"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+              <div className="w-48 border-r border-border/50 bg-surface/80 flex flex-col shrink-0 text-xs font-mono select-none">
+                {/* Explorer Header */}
+                <div className="p-2 border-b border-border/40 flex items-center justify-between text-[10px] text-text-muted uppercase tracking-wider font-bold">
+                  <span>Explorer</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewFileInput(true);
+                        setNewFileType('file');
+                      }}
+                      className="p-1 hover:text-accent-build rounded"
+                      title="New File"
+                    >
+                      <FilePlus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewFileInput(true);
+                        setNewFileType('folder');
+                      }}
+                      className="p-1 hover:text-accent-build rounded"
+                      title="New Folder"
+                    >
+                      <FolderPlus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
-                  {files.map((file) => {
+
+                {/* Tree View */}
+                <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
+                  {/* Folders */}
+                  {Object.entries(fileTree.folders).map(([folderName, folderFiles]) => {
+                    const isCollapsed = collapsedFolders[folderName];
+                    return (
+                      <div key={folderName} className="space-y-0.5">
+                        <div
+                          onClick={() => toggleFolderCollapse(folderName)}
+                          className="flex items-center gap-1.5 px-1.5 py-1 rounded text-text-muted hover:text-text hover:bg-surface-raised/40 cursor-pointer text-xs"
+                        >
+                          <ChevronRight className={`w-3 h-3 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} />
+                          {isCollapsed ? (
+                            <Folder className="w-3.5 h-3.5 text-accent-build/80" />
+                          ) : (
+                            <FolderOpen className="w-3.5 h-3.5 text-accent-build" />
+                          )}
+                          <span className="font-semibold text-xs truncate">{folderName}</span>
+                        </div>
+
+                        {/* Indented folder files */}
+                        {!isCollapsed && (
+                          <div className="pl-4 space-y-0.5 border-l border-border/30 ml-2">
+                            {folderFiles.map((file) => {
+                              const isActive = activeFilePath === file.path;
+                              return (
+                                <div
+                                  key={file.path}
+                                  onClick={() => {
+                                    if (!openTabs.includes(file.path)) {
+                                      setOpenTabs([...openTabs, file.path]);
+                                    }
+                                    setActiveFilePath(file.path);
+                                  }}
+                                  className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors ${
+                                    isActive
+                                      ? 'bg-accent-build/15 text-accent-build font-bold'
+                                      : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <FileIcon path={file.subPath} className="w-3.5 h-3.5" />
+                                    <span className="truncate text-xs">{file.subPath}</span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleDeleteFile(file.path, e)}
+                                    className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
+                                    title="Delete file"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Root files */}
+                  {fileTree.rootFiles.map((file) => {
                     const isActive = activeFilePath === file.path;
-                    const isEntry = file.path === 'index.js';
+                    const isEntry = file.path === 'server.js' || file.path === 'index.js';
                     return (
                       <div
                         key={file.path}
@@ -1003,15 +1303,20 @@ export default function BuildWorkspace() {
                           }
                           setActiveFilePath(file.path);
                         }}
-                        className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                        className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer transition-colors ${
                           isActive
                             ? 'bg-accent-build/15 text-accent-build font-bold'
-                            : 'text-text-muted hover:text-text hover:bg-surface-raised/50'
+                            : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                         }`}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <FileCode className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-accent-build' : 'text-text-muted'}`} />
+                          <FileIcon path={file.path} className="w-3.5 h-3.5" />
                           <span className="truncate text-xs">{file.path}</span>
+                          {isEntry && (
+                            <span className="text-[9px] font-mono px-1 rounded bg-accent-build/20 text-accent-build uppercase">
+                              entry
+                            </span>
+                          )}
                         </div>
 
                         {!isEntry && (
@@ -1058,12 +1363,27 @@ export default function BuildWorkspace() {
             </div>
           </div>
 
-          {/* ─── Bottom Console Area ─── */}
-          <div className="border-t border-border/50 bg-surface flex flex-col shrink-0">
+          {/* ─── RESIZE HANDLE 3 (Editor <-> Console Vertical Resizer) ─── */}
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingConsole(true);
+            }}
+            className="h-1.5 hover:h-2 bg-border/40 hover:bg-accent-build cursor-row-resize flex items-center justify-center transition-all select-none shrink-0 group relative z-20"
+            title="Drag to resize Console"
+          >
+            <div className="h-0.5 w-8 rounded-full bg-text-muted/40 group-hover:bg-black transition-colors" />
+          </div>
+
+          {/* ─── Bottom Console Area (Resizable) ─── */}
+          <div
+            style={{ height: consoleOpen ? `${consoleHeight}px` : 'auto' }}
+            className="border-t border-border/50 bg-surface flex flex-col shrink-0 overflow-hidden transition-[height] duration-75"
+          >
             {/* Console Toolbar */}
             <div
               onClick={() => setConsoleOpen(!consoleOpen)}
-              className="flex items-center justify-between px-3 py-1.5 bg-surface-raised/60 hover:bg-surface-raised cursor-pointer border-b border-border/40 select-none text-xs"
+              className="flex items-center justify-between px-3 py-1.5 bg-surface-raised/60 hover:bg-surface-raised cursor-pointer border-b border-border/40 select-none text-xs shrink-0"
             >
               <div className="flex items-center gap-2">
                 <Terminal className="w-3.5 h-3.5 text-accent-build" />
@@ -1085,9 +1405,9 @@ export default function BuildWorkspace() {
 
             {/* Console Content */}
             {consoleOpen && (
-              <div className="p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-2 bg-surface">
+              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-2 bg-surface select-text">
                 {submissionStatus === 'queued' || submissionStatus === 'running' ? (
-                  <div className="flex items-center gap-2 text-accent-build text-xs py-2">
+                  <div className="flex items-center gap-2 text-accent-build text-xs py-2 select-none">
                     <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                     <span>Starting your server in Docker container, then running tests...</span>
                   </div>
@@ -1126,14 +1446,14 @@ export default function BuildWorkspace() {
 
                     {/* Execution Time */}
                     {submissionResult.timeTakenMs != null && (
-                      <div className="text-[11px] text-text-muted flex items-center gap-1.5 pt-1">
+                      <div className="text-[11px] text-text-muted flex items-center gap-1.5 pt-1 select-none">
                         <Clock className="w-3 h-3 text-accent-build" />
                         <span>Execution time: {submissionResult.timeTakenMs} ms</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-text-muted text-[11px] py-2 flex items-center gap-2">
+                  <div className="text-text-muted text-[11px] py-2 flex items-center gap-2 select-none">
                     <Info className="w-3.5 h-3.5" />
                     <span>Click "Submit API" to evaluate your multi-file Express project in Docker.</span>
                   </div>
@@ -1143,10 +1463,23 @@ export default function BuildWorkspace() {
           </div>
         </main>
 
-        {/* ════════ COLUMN 3 (RIGHT): Grouped Requirements Checklist (Stage 2) ════════ */}
+        {/* ─── RESIZE HANDLE 2 (Center <-> Right) ─── */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsDraggingRight(true);
+          }}
+          className="hidden lg:flex w-1.5 hover:w-2 bg-border/40 hover:bg-accent-build cursor-col-resize items-center justify-center transition-all select-none shrink-0 group relative z-20"
+          title="Drag to resize Checklist panel"
+        >
+          <div className="w-0.5 h-6 rounded-full bg-text-muted/40 group-hover:bg-black transition-colors" />
+        </div>
+
+        {/* ════════ COLUMN 3 (RIGHT): Grouped Requirements Checklist ════════ */}
         <aside
-          className={`lg:col-span-3 flex flex-col min-h-0 bg-surface/50 ${
-            mobileTab === 'results' ? 'flex' : 'hidden lg:flex'
+          style={{ width: window.innerWidth >= 1024 ? `${rightWidth}%` : '100%' }}
+          className={`flex-col min-h-0 bg-surface/50 shrink-0 ${
+            mobileTab === 'results' ? 'flex w-full' : 'hidden lg:flex'
           }`}
         >
           {/* Header & Progress Bar */}
@@ -1181,9 +1514,9 @@ export default function BuildWorkspace() {
           </div>
 
           {/* Test Groups Container (Stage 2 Grouped by Endpoint) */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 select-text">
             {submissionStatus === 'queued' || submissionStatus === 'running' ? (
-              <div className="py-12 text-center space-y-3">
+              <div className="py-12 text-center space-y-3 select-none">
                 <div className="w-7 h-7 rounded-full border-2 border-accent-build border-t-transparent animate-spin mx-auto" />
                 <div className="space-y-1">
                   <span className="text-xs font-mono font-semibold text-text block">
@@ -1207,7 +1540,7 @@ export default function BuildWorkspace() {
                       {/* Group Header */}
                       <div
                         onClick={() => toggleGroupCollapse(grp.key)}
-                        className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 hover:bg-surface-raised cursor-pointer transition-colors"
+                        className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 hover:bg-surface-raised cursor-pointer transition-colors select-none"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <MethodBadge method={grp.method} size="xs" />
@@ -1284,7 +1617,7 @@ export default function BuildWorkspace() {
 
                                 {/* Expanded Failure Details */}
                                 {isFailed && isExpanded && (
-                                  <div className="mt-1.5 p-2.5 rounded bg-surface border border-rose-500/30 space-y-2 text-[10px] font-mono animate-fadeIn">
+                                  <div className="mt-1.5 p-2.5 rounded bg-surface border border-rose-500/30 space-y-2 text-[10px] font-mono animate-fadeIn select-text">
                                     <div>
                                       <span className="text-text-muted uppercase font-bold block mb-0.5">Request Sent</span>
                                       <div className="text-text">
@@ -1334,7 +1667,7 @@ export default function BuildWorkspace() {
                 {/* 2. Hidden Verification Suite */}
                 {groupedChecklist.hiddenTests.length > 0 && (
                   <div className="rounded-lg border border-border/50 bg-surface overflow-hidden shadow-xs">
-                    <div className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70">
+                    <div className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 select-none">
                       <div className="flex items-center gap-1.5 font-bold font-mono text-xs text-text-muted">
                         <Lock className="w-3.5 h-3.5 text-accent-build" />
                         <span>Hidden Edge Case Suite</span>
@@ -1374,7 +1707,7 @@ export default function BuildWorkspace() {
 
       {/* ─── Reset Confirmation Modal ─── */}
       {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn select-none">
           <div className="bg-surface border border-border/80 rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-amber-400">
               <div className="p-2 rounded-full bg-amber-500/10 border border-amber-500/25">
