@@ -3,8 +3,8 @@ const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('../config/redis');
 
 // Helper function to create limiters backed by Redis with isolated keys
-const createLimiter = (prefix, windowMs, max, message) => {
-  const limiter = rateLimit({
+const createLimiter = (prefix, windowMs, max, message, keyGenerator) => {
+  const limiterOptions = {
     windowMs,
     max,
     message: { message: message || 'Too many requests, please try again later.' },
@@ -14,14 +14,27 @@ const createLimiter = (prefix, windowMs, max, message) => {
       sendCommand: (...args) => redisClient.call(...args),
       prefix: `rl:${prefix}:`,
     }),
-  });
+  };
+
+  if (keyGenerator) {
+    limiterOptions.keyGenerator = keyGenerator;
+    limiterOptions.validate = { keyGeneratorIpFallback: false };
+  }
+
+  const limiter = rateLimit(limiterOptions);
 
   // If DISABLE_RATE_LIMIT=true (for capacity / benchmark tests), bypass rate limiter completely
   return (req, res, next) => {
     if (process.env.DISABLE_RATE_LIMIT === 'true') {
       return next();
     }
-    return limiter(req, res, next);
+    return limiter(req, res, (err) => {
+      if (err) {
+        // Fallback: don't block user requests if rate-limiter store is temporarily unavailable
+        return next();
+      }
+      next();
+    });
   };
 };
 
@@ -46,6 +59,15 @@ const bookmarksLimiter = createLimiter('bookmarks', 60 * 1000, 1000);
 const historyLimiter = createLimiter('history', 60 * 1000, 1000);
 const profileUpdateLimiter = createLimiter('profile_update', 60 * 1000, 200, 'Too many profile updates. Please try again after a minute.');
 
+// Build Mode Rate Limiter: 5 submissions per minute per user (prefix: rl:build_submit:)
+const buildSubmitLimiter = createLimiter(
+  'build_submit',
+  60 * 1000,
+  5,
+  'Too many build submissions. Please wait before submitting again (limit: 5/min).',
+  (req) => req.user?._id?.toString() || req.ip
+);
+
 module.exports = {
   loginLimiter,
   registerLimiter,
@@ -60,4 +82,6 @@ module.exports = {
   bookmarksLimiter,
   historyLimiter,
   profileUpdateLimiter,
+  buildSubmitLimiter,
 };
+

@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "adds positive numbers",
+      "request": {
+        "method": "POST",
+        "path": "/add",
+        "body": { "a": 2, "b": 3 }
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": { "sum": 5 },
+        "bodyHasKeys": ["sum"]
+      }
+    },
+    {
+      "name": "adds negative numbers",
+      "request": {
+        "method": "POST",
+        "path": "/add",
+        "body": { "a": -5, "b": 2 }
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": { "sum": -3 }
+      }
+    },
+    {
+      "name": "adds zeros",
+      "request": {
+        "method": "POST",
+        "path": "/add",
+        "body": { "a": 0, "b": 0 }
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": { "sum": 0 }
+      }
+    }
+  ]
+}

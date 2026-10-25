@@ -17,4 +17,8 @@ yarn-error.log*
 
 # Agent customizations / skills
 .agents/
+
+# Build Mode temporary execution directory
+.tmp/
+
 

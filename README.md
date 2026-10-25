@@ -117,7 +117,93 @@ cd backend
 npm run dev
 ```
 
+## 🚀 Feature: Build Mode (API-Building Problems)
+
+Build Mode allows learners to solve backend API-building problems using a Node.js + Express runtime. Unlike traditional DSA code execution, Build Mode launches the student's Express server in a restricted Docker container, creates an isolated bridge network, and runs an automated test harness that executes HTTP requests against the live API.
+
+### 🏗️ Architecture & Evaluation Flow
+
+```
+User Submits Files ──▶ Saved as Queued ──▶ BullMQ Job ('api-judge')
+                                                   │
+                                                   ▼
+                                         Docker Sandbox Flow
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. Mount student files to read-only container (bm-node-express)       │
+│ 2. Create isolated internal network: judge-<id> (no internet access)  │
+│ 3. Start app at http://app:3000 (--memory 256m --cpus 0.5)            │
+│ 4. Run test harness (bm-harness) against http://app:3000               │
+│ 5. Parse JSON verdict & score, guaranteed cleanup in finally block     │
+└────────────────────────────────────────────────────────────────────────┘
+                                                   │
+                                                   ▼
+                          MongoDB: Save final verdict & test results
+```
+
+### 🔒 Docker Sandbox Security
+- **Strict Resource Limits**: `--memory 256m`, `--cpus 0.5`, `--pids-limit 100`.
+- **Read-Only Filesystem**: Container root is `--read-only`, with a temporary writable `--tmpfs /tmp`.
+- **Network Isolation**: `--network judge-<id>` is created with `--internal`, completely blocking external WAN/LAN access.
+- **Unprivileged User**: Runs as non-root `--user 1000:1000`.
+- **Strict Path Validation**: Rejects `..`, drive letters, leading `/` or `\`, and NUL bytes; max 20 files and 200 KB total.
+
+### 🧪 Test Case Format
+Test cases support sequential execution, assertions, and variable chaining:
+```json
+{
+  "name": "create todo item",
+  "request": {
+    "method": "POST",
+    "path": "/todos",
+    "body": { "title": "Buy milk" }
+  },
+  "expect": {
+    "status": 201,
+    "bodyContains": { "title": "Buy milk", "completed": false },
+    "bodyHasKeys": ["id", "title", "completed"]
+  },
+  "save": { "todoId": "id" }
+}
+```
+Subsequent tests can interpolate saved variables using `{{todoId}}` in `request.path` or `request.body`.
+
+### 📡 API Endpoints
+
+All protected endpoints use standard JWT Bearer authentication (`Authorization: Bearer <token>`).
+
+| Method | Endpoint | Description | Auth |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/build/problems` | List problems (no tests exposed) | Public |
+| `GET` | `/api/build/problems/:slug` | Problem statement, starter files, & visible tests | Public |
+| `POST` | `/api/build/submit` | Submit files `{ slug, files }` (5/min rate limit) | JWT |
+| `GET` | `/api/build/submissions/:id` | Status & results (owner only; hidden test privacy protected) | JWT |
+| `GET` | `/api/build/submissions?slug=` | User's submission history | JWT |
+| `POST` | `/api/build/problems` | Create new problem | Admin |
+| `PUT` | `/api/build/problems/:slug` | Update problem | Admin |
+
+### 🛠️ Verification & Test Commands
+
+```bash
+# Build the Docker images
+docker build -t bm-node-express ./docker/bm-node-express
+docker build -t bm-harness ./docker/bm-harness
+# (or use .\scripts\build-docker-images.bat on Windows)
+
+# Seed sample problems into MongoDB (add-api & todo-api)
+npm run seed-build-problems --prefix backend
+
+# Verify reference solutions against Docker harness (Must give Accepted)
+npm run verify-build-problems --prefix backend
+
+# Run Milestone 1 sample suite (Accepted, WA, Start Timeout, TLE, Runtime Error)
+node scripts/test-all-samples.js
+
+# Run Milestone 3 safety checks (Path traversal, output truncation, privacy, cleanup)
+npm run verify-safety --prefix backend
+```
+
 ## Development
+
 
 ### File Structure Guidelines
 

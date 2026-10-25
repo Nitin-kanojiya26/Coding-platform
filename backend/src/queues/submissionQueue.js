@@ -1,5 +1,5 @@
 const { Queue, Worker } = require('bullmq');
-const { bullmqConnection } = require('../config/bullmqredis');
+const { bullmqConnection } = require('../config/bullmqRedis');
 const judge0Service = require('../services/judge0Service');
 const Submission = require('../models/Submission');
 const User = require('../models/Users');

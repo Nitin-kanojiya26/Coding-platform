@@ -1,0 +1,92 @@
+{
+  "tests": [
+    {
+      "name": "create todo item",
+      "request": {
+        "method": "POST",
+        "path": "/todos",
+        "body": { "title": "Buy groceries" }
+      },
+      "expect": {
+        "status": 201,
+        "bodyContains": { "title": "Buy groceries", "completed": false },
+        "bodyHasKeys": ["id", "title", "completed"]
+      },
+      "save": { "todoId": "id" }
+    },
+    {
+      "name": "list todos",
+      "request": {
+        "method": "GET",
+        "path": "/todos"
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "get todo by id",
+      "request": {
+        "method": "GET",
+        "path": "/todos/{{todoId}}"
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": { "title": "Buy groceries" }
+      }
+    },
+    {
+      "name": "update todo",
+      "request": {
+        "method": "PUT",
+        "path": "/todos/{{todoId}}",
+        "body": { "completed": true }
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": { "completed": true }
+      }
+    },
+    {
+      "name": "delete todo",
+      "request": {
+        "method": "DELETE",
+        "path": "/todos/{{todoId}}"
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "400 missing title",
+      "request": {
+        "method": "POST",
+        "path": "/todos",
+        "body": {}
+      },
+      "expect": {
+        "status": 400
+      }
+    },
+    {
+      "name": "404 unknown id on get",
+      "request": {
+        "method": "GET",
+        "path": "/todos/99999"
+      },
+      "expect": {
+        "status": 404
+      }
+    },
+    {
+      "name": "404 on deleted todo",
+      "request": {
+        "method": "GET",
+        "path": "/todos/{{todoId}}"
+      },
+      "expect": {
+        "status": 404
+      }
+    }
+  ]
+}

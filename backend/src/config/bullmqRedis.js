@@ -1,4 +1,6 @@
+require('dotenv').config();
 const Redis = require('ioredis');
+
 
 // BullMQ STRICTLY requires maxRetriesPerRequest: null
 const connectionOptions = {

@@ -17,7 +17,12 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/leaderboard', require('./routes/leaderboardRoutes'));
 app.use('/api/sheets', require('./routes/sheetRoutes'));
+app.use('/api/build', require('./routes/buildRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Initialize Build Mode Worker
+require('./workers/buildWorker');
+
 // 5. Start Server Listener
 const PORT = process.env.PORT || 5000;
 connectDB().then(() => {

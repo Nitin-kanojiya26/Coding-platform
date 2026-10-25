@@ -17,7 +17,7 @@ const getPagination = (page, limit) => {
 // Map fallback names in case languageMap uses different key formatting or IDs
 const getLanguageId = (lang) => {
   if (!lang) return null;
-  
+
   // If already a valid numeric ID passed from frontend
   if (typeof lang === 'number' || !isNaN(Number(lang))) {
     return Number(lang);
@@ -63,8 +63,8 @@ exports.createSubmission = async (req, res) => {
     // 1. Convert language string or ID to valid Judge0 language ID
     const languageId = getLanguageId(language);
     if (!languageId) {
-      return res.status(400).json({ 
-        message: `Unsupported language: "${language}". Please provide a valid language string or ID.` 
+      return res.status(400).json({
+        message: `Unsupported language: "${language}". Please provide a valid language string or ID.`
       });
     }
 
@@ -331,8 +331,8 @@ exports.getProblemStats = async (req, res) => {
 
     const other = Math.max(0, total - (accepted + wrongAnswer + timeLimit + runtimeError + compileError));
     const acceptanceRate = total > 0 ? parseFloat(((accepted / total) * 100).toFixed(1)) : 0;
-    const userAcceptanceRate = uniqueUsers.size > 0 
-      ? parseFloat(((uniqueAcceptedUsers.size / uniqueUsers.size) * 100).toFixed(1)) 
+    const userAcceptanceRate = uniqueUsers.size > 0
+      ? parseFloat(((uniqueAcceptedUsers.size / uniqueUsers.size) * 100).toFixed(1))
       : 0;
 
     // Build 5 runtime histogram buckets
