@@ -24,7 +24,8 @@ import {
   ArrowLeft,
   RotateCcw,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
 
@@ -101,6 +102,15 @@ export default function ProblemDetail() {
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
 
+  // Vertical testcases / console height state (LeetCode style)
+  const [consoleHeight, setConsoleHeight] = useState(() => {
+    const saved = localStorage.getItem('codexium_console_height');
+    const parsed = saved ? parseFloat(saved) : 230;
+    return isNaN(parsed) ? 230 : Math.min(Math.max(parsed, 100), 600);
+  });
+  const [consoleOpen, setConsoleOpen] = useState(true);
+  const [isDraggingConsole, setIsDraggingConsole] = useState(false);
+
   useEffect(() => {
     const handleWindowResize = () => {
       setIsDesktop(window.innerWidth >= 1024);
@@ -117,27 +127,47 @@ export default function ProblemDetail() {
     localStorage.setItem('codexium_ide_split', String(splitPercent));
   }, [splitPercent]);
 
-  // Horizontal resizer mouse drag handlers
+  useEffect(() => {
+    localStorage.setItem('codexium_console_height', String(consoleHeight));
+  }, [consoleHeight]);
+
+  // Horizontal resizer mouse drag handler
   const handleMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
+  // Dragging event listeners for both horizontal and vertical resizers
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging && !isDraggingConsole) return;
 
     const handleMouseMove = (e) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const clientX = e.clientX;
-      const newPercent = ((clientX - rect.left) / rect.width) * 100;
-      if (newPercent >= 20 && newPercent <= 80) {
-        setSplitPercent(newPercent);
+
+      // Horizontal splitter: Problem Panel <-> Code Editor
+      if (isDragging) {
+        const clientX = e.clientX;
+        const newPercent = ((clientX - rect.left) / rect.width) * 100;
+        if (newPercent >= 20 && newPercent <= 80) {
+          setSplitPercent(newPercent);
+        }
+      }
+
+      // Vertical splitter: Code Editor <-> Test Cases & Console Drawer
+      if (isDraggingConsole) {
+        const newHeight = rect.bottom - e.clientY;
+        const maxHeight = Math.max(rect.height - 140, 200);
+        if (newHeight >= 90 && newHeight <= maxHeight) {
+          setConsoleHeight(newHeight);
+          setConsoleOpen(true);
+        }
       }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      setIsDraggingConsole(false);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -146,7 +176,7 @@ export default function ProblemDetail() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, isDraggingConsole]);
 
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -255,6 +285,7 @@ export default function ProblemDetail() {
     setTerminalLogs(null);
     setActiveTestTab(0);
     setConsoleTab('result');
+    setConsoleOpen(true);
     try {
       const res = await API.post(`/problems/${problem._id}/run`, {
         language,
@@ -275,6 +306,7 @@ export default function ProblemDetail() {
     setSubmitting(true);
     setTerminalLogs(null);
     setConsoleTab('result');
+    setConsoleOpen(true);
     try {
       const res = await API.post('/submissions', {
         problemId: problem._id,
@@ -372,7 +404,7 @@ export default function ProblemDetail() {
     <div
       ref={containerRef}
       className={`h-[calc(100vh-5.5rem)] overflow-hidden flex flex-col lg:flex-row gap-0 border border-border/40 rounded-md bg-bg text-text ${
-        isDragging ? 'select-none cursor-col-resize' : ''
+        isDragging ? 'select-none cursor-col-resize' : isDraggingConsole ? 'select-none cursor-row-resize' : ''
       }`}
     >
       {/* ─── LEFT PANEL: Problem Workspace & Submissions ─── */}
@@ -924,7 +956,7 @@ export default function ProblemDetail() {
       <div
         style={{ width: isDesktop ? `calc(100% - ${splitPercent}% - 0.625rem)` : '100%' }}
         className={`w-full flex flex-col h-full bg-bg relative flex-1 min-w-0 ${
-          isDragging ? 'pointer-events-none' : ''
+          isDragging || isDraggingConsole ? 'pointer-events-none select-none' : ''
         }`}
       >
         {/* Editor Top Toolbar */}
@@ -956,7 +988,7 @@ export default function ProblemDetail() {
         </div>
 
         {/* Monaco Code Editor */}
-        <div className="flex-1 min-h-[200px] bg-[#1e1e1e]">
+        <div className="flex-1 min-h-[140px] bg-[#1e1e1e]">
           <Editor
             height="100%"
             theme="vs-dark"
@@ -975,71 +1007,111 @@ export default function ProblemDetail() {
           />
         </div>
 
-        {/* Bottom Console Toolbar: LeetCode-style Testcase & Result tabs + Run/Submit */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/40 bg-surface/40 shrink-0">
-          {/* LeetCode Seamless Console Tabs */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setConsoleTab('testcase')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                consoleTab === 'testcase'
-                  ? 'bg-surface-raised text-text font-medium border border-border/50'
-                  : 'text-text-muted hover:text-text'
-              }`}
-            >
-              Testcase
-            </button>
-            <button
-              type="button"
-              onClick={() => setConsoleTab('result')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                consoleTab === 'result'
-                  ? 'bg-surface-raised text-text font-medium border border-border/50'
-                  : 'text-text-muted hover:text-text'
-              }`}
-            >
-              <span>Test Result</span>
-              {terminalLogs?.mode === 'sandbox' && (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    terminalLogs.data?.overallStatus?.toLowerCase() === 'accepted'
-                      ? 'bg-success'
-                      : 'bg-danger'
-                  }`}
-                />
-              )}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={triggerSandboxRun}
-              disabled={running || submitting}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-border/50 bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors disabled:opacity-50"
-            >
-              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 text-text-muted" />}
-              <span>Run</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={triggerProductionTransmit}
-              disabled={running || submitting}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded text-xs font-medium bg-success text-black hover:opacity-90 transition-opacity disabled:opacity-50 font-semibold"
-            >
-              {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-              <span>Submit</span>
-            </button>
-          </div>
+        {/* ─── RESIZE HANDLE: Vertical Splitter between Editor and Test Cases / Console ─── */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsDraggingConsole(true);
+          }}
+          className={`h-2 hover:h-2.5 relative z-20 cursor-row-resize flex items-center justify-center transition-all group shrink-0 select-none ${
+            isDraggingConsole ? 'bg-accent/40' : 'bg-border/30 hover:bg-accent/30 border-y border-border/40'
+          }`}
+          title="Drag to resize Test Cases & Console"
+        >
+          <div
+            className={`h-0.5 w-10 rounded-full transition-colors ${
+              isDraggingConsole ? 'bg-accent' : 'bg-text-muted/40 group-hover:bg-accent/80'
+            }`}
+          />
         </div>
 
-        {/* Terminal / Testcase Console Body */}
+        {/* ─── Bottom Console Container (Toolbar + Testcase/Result body with adjustable height) ─── */}
         <div
-          ref={terminalRef}
-          className="bg-bg border-t border-border/40 p-3.5 shrink-0 min-h-[170px] max-h-[250px] overflow-y-auto"
+          style={{ height: consoleOpen ? `${consoleHeight}px` : '38px' }}
+          className="flex flex-col shrink-0 overflow-hidden bg-bg transition-[height] duration-75"
         >
+          {/* Bottom Console Toolbar: LeetCode-style Testcase & Result tabs + Run/Submit */}
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-surface/40 shrink-0">
+            {/* LeetCode Seamless Console Tabs */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setConsoleTab('testcase');
+                  setConsoleOpen(true);
+                }}
+                className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                  consoleTab === 'testcase'
+                    ? 'bg-surface-raised text-text font-medium border border-border/50'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                Testcase
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConsoleTab('result');
+                  setConsoleOpen(true);
+                }}
+                className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
+                  consoleTab === 'result'
+                    ? 'bg-surface-raised text-text font-medium border border-border/50'
+                    : 'text-text-muted hover:text-text'
+                }`}
+              >
+                <span>Test Result</span>
+                {terminalLogs?.mode === 'sandbox' && (
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      terminalLogs.data?.overallStatus?.toLowerCase() === 'accepted'
+                        ? 'bg-success'
+                        : 'bg-danger'
+                    }`}
+                  />
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={triggerSandboxRun}
+                disabled={running || submitting}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-border/50 bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors disabled:opacity-50"
+              >
+                {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 text-text-muted" />}
+                <span>Run</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={triggerProductionTransmit}
+                disabled={running || submitting}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded text-xs font-medium bg-success text-black hover:opacity-90 transition-opacity disabled:opacity-50 font-semibold"
+              >
+                {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                <span>Submit</span>
+              </button>
+
+              <div className="h-3.5 w-px bg-border/40 mx-0.5" />
+
+              <button
+                type="button"
+                onClick={() => setConsoleOpen(!consoleOpen)}
+                className="p-1 rounded text-text-muted hover:text-text transition-colors"
+                title={consoleOpen ? 'Collapse console' : 'Expand console'}
+              >
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${consoleOpen ? '' : 'rotate-180'}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Terminal / Testcase Console Body */}
+          <div
+            ref={terminalRef}
+            className="bg-bg p-3.5 flex-1 min-h-0 overflow-y-auto"
+          >
           {/* TAB 1: Testcase (Seamless LeetCode Case Tabs & Input Parameters) */}
           {consoleTab === 'testcase' && (
             <div className="space-y-3 font-mono text-xs">
@@ -1294,6 +1366,7 @@ export default function ProblemDetail() {
               )}
             </>
           )}
+          </div>
         </div>
       </div>
     </div>
