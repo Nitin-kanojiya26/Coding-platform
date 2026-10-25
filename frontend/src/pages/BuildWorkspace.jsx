@@ -507,6 +507,8 @@ export default function BuildWorkspace() {
   const passedCount = submissionResult?.passed ?? 0;
   const totalCount = submissionResult?.total ?? (problem?.visibleTests?.length || 0);
   const scorePercent = submissionResult?.score ?? (totalCount > 0 && passedCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0);
+  const verdict = submissionResult?.verdict || submissionResult?.status || '';
+  const isAccepted = verdict === 'Accepted';
 
   if (loading) {
     return (
@@ -1066,15 +1068,15 @@ export default function BuildWorkspace() {
               <div className="flex items-center gap-2">
                 <Terminal className="w-3.5 h-3.5 text-accent-build" />
                 <span className="font-mono font-semibold text-text">Output Console</span>
-                {submissionResult?.verdict && (
+                {verdict && (
                   <span
                     className={`font-mono text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                      submissionResult.verdict === 'Accepted'
+                      isAccepted
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                         : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                     }`}
                   >
-                    {submissionResult.verdict}
+                    {verdict}
                   </span>
                 )}
               </div>
@@ -1094,28 +1096,30 @@ export default function BuildWorkspace() {
                     {/* Verdict Banner */}
                     <div
                       className={`p-2.5 rounded border flex items-start gap-2.5 ${
-                        submissionResult.verdict === 'Accepted'
+                        isAccepted
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          : submissionResult.verdict === 'Start Timeout'
+                          : verdict === 'Start Timeout'
                           ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                           : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                       }`}
                     >
-                      {submissionResult.verdict === 'Accepted' ? (
+                      {isAccepted ? (
                         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
                       ) : (
                         <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
                       )}
                       <div className="space-y-1">
                         <span className="font-bold text-xs uppercase tracking-wide block">
-                          {submissionResult.verdict} ({passedCount}/{totalCount} Passed)
+                          {verdict} ({passedCount}/{totalCount} Passed)
                         </span>
                         <p className="text-[11px] font-sans leading-relaxed">
-                          {submissionResult.verdict === 'Start Timeout'
+                          {verdict === 'Start Timeout'
                             ? 'Your server did not respond on port 3000. Check it listens on 3000 and binds to 0.0.0.0.'
-                            : submissionResult.verdict === 'Internal Error'
+                            : verdict === 'Internal Error'
                             ? 'Something went wrong on our side. Try again.'
-                            : submissionResult.message || (submissionResult.verdict === 'Accepted' ? 'All integration tests passed successfully.' : 'Some test cases failed. Inspect requirements checklist on the right.')}
+                            : isAccepted
+                            ? 'All integration tests passed successfully.'
+                            : submissionResult.message || 'Some test cases failed. Inspect requirements checklist on the right.'}
                         </p>
                       </div>
                     </div>

@@ -151,6 +151,7 @@ const getBuildSubmissionById = async (req, res) => {
         id: submission._id,
         problem: submission.problemId,
         status: submission.status,
+        verdict: submission.status,
         score: submission.score,
         passed: submission.passed,
         total: submission.total,
