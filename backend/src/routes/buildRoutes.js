@@ -30,6 +30,7 @@ router.put('/problems/:slug', protect, isAdmin, updateBuildProblem);
 // --- Submission Routes ---
 // Submit code files (5/min per user rate limit)
 router.post('/submit', protect, buildSubmitLimiter, submitBuildSolution);
+router.post('/problems/:slug/submit', protect, buildSubmitLimiter, submitBuildSolution);
 
 // Get user's submission history (?slug=)
 router.get('/submissions', protect, getUserBuildSubmissions);

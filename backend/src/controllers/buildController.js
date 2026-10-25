@@ -54,11 +54,12 @@ const getBuildProblemBySlug = async (req, res) => {
  */
 const submitBuildSolution = async (req, res) => {
   try {
-    const { slug, files } = req.body;
+    const slug = req.params.slug || req.body?.slug;
 
     if (!slug || typeof slug !== 'string') {
       return res.status(400).json({ message: 'Problem slug is required.' });
     }
+    const files = req.body?.files;
 
     // 1. Submit validation (Max 20 files, 200KB total, relative paths only, index.js required, plain text only)
     const validationError = validateSubmissionFiles(files);
