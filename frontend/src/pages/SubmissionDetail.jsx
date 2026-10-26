@@ -262,7 +262,7 @@ export default function SubmissionDetail() {
           <p className="text-[11px] text-text-muted font-sans">
             {beatsRuntime != null
               ? `Faster than ${beatsRuntime}% of ${submission.language} online submissions.`
-              : 'Execution evaluation runtime.'}
+              : 'Total time taken to run your solution.'}
           </p>
         </div>
 
@@ -284,7 +284,7 @@ export default function SubmissionDetail() {
           <p className="text-[11px] text-text-muted font-sans">
             {beatsMemory != null
               ? `Less memory than ${beatsMemory}% of ${submission.language} online submissions.`
-              : 'Peak memory usage during evaluation.'}
+              : 'Peak memory used by your solution.'}
           </p>
         </div>
 
@@ -302,7 +302,7 @@ export default function SubmissionDetail() {
             {submission.passedTestCases ?? 0} / {submission.totalTestCases ?? 0}
           </div>
           <p className="text-[11px] text-text-muted font-sans">
-            {isAccepted ? 'All test cases evaluated and passed.' : 'Failed on hidden validation test suite.'}
+            {isAccepted ? 'All test cases passed successfully.' : 'Did not pass all private test cases.'}
           </p>
         </div>
       </div>

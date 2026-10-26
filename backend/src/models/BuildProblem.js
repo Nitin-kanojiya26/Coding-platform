@@ -59,6 +59,11 @@ const buildProblemSchema = new mongoose.Schema({
     startTimeoutMs: { type: Number, default: 3000 },
     totalTimeoutMs: { type: Number, default: 20000 },
   },
+  verified: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('BuildProblem', buildProblemSchema);

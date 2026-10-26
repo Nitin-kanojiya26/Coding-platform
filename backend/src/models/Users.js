@@ -38,7 +38,8 @@ const userSchema = new mongoose.Schema({
     isBanned: { type: Boolean, default: false },
     banReason: { type: String, default: '' },
     bannedAt: { type: Date, default: null },
-
+    emailNotifications: { type: Boolean, default: true },
+    unsubscribeToken: { type: String, default: null, index: true },
 }, {
     timestamps: true 
 });

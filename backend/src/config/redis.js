@@ -33,11 +33,11 @@ function delMemory(key) {
 let isRedisConnected = false;
 let hasLoggedFailure = false;
 
-// Connect to Redis using REDIS_URL or default to 127.0.0.1:6380
-const redisClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6380', {
+// Connect to Redis using REDIS_CACHE_URL, REDIS_URL or default to 127.0.0.1:6380
+const redisClient = new Redis(process.env.REDIS_CACHE_URL || process.env.REDIS_URL || 'redis://127.0.0.1:6380', {
   maxRetriesPerRequest: 1,
   enableReadyCheck: false,
-  enableOfflineQueue: true,
+  enableOfflineQueue: false,
 
   retryStrategy(times) {
     if (times > 2) {
@@ -45,7 +45,7 @@ const redisClient = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6380',
         console.warn('⚠️ [Redis] Redis server not reachable on port 6380. Backend running in in-memory fallback mode.');
         hasLoggedFailure = true;
       }
-      return 5000; // Retry quietly every 5 seconds
+      return 10000; // Retry quietly every 10 seconds
     }
     return Math.min(times * 300, 2000);
   },
@@ -128,6 +128,22 @@ const proxyClient = new Proxy(redisClient, {
         return 1;
       };
     }
+
+    if (prop === 'call') {
+      return async (...args) => {
+        if (isRedisConnected) {
+          try {
+            return await target.call(...args);
+          } catch (_) {}
+        }
+        return null;
+      };
+    }
+
+    if (prop === 'status') {
+      return isRedisConnected ? 'ready' : 'offline';
+    }
+
     const val = target[prop];
     if (typeof val === 'function') {
       return val.bind(target);

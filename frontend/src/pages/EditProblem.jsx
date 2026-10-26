@@ -265,7 +265,7 @@ export default function EditProblem() {
             {/* Hidden Cases */}
             <div className="space-y-3 pt-3 border-t border-border/30">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-text">Hidden Evaluation Cases</span>
+                <span className="text-[11px] font-medium text-text">Hidden Test Cases (Private)</span>
                 <button
                   type="button"
                   onClick={() => addTestCase('hidden')}

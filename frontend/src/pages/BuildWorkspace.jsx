@@ -21,6 +21,7 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Server,
   Zap,
   ArrowLeft,
@@ -42,7 +43,8 @@ import {
   FolderPlus,
   ChevronsDownUp,
   GripVertical,
-  GripHorizontal
+  GripHorizontal,
+  Play
 } from 'lucide-react';
 
 /**
@@ -70,7 +72,41 @@ export default function BuildWorkspace() {
   const [leftTab, setLeftTab] = useState('brief'); // 'brief' | 'endpoints' | 'contract' | 'history'
   const [mobileTab, setMobileTab] = useState('code'); // 'brief' | 'code' | 'results' (for < 1024px)
   const [showResetModal, setShowResetModal] = useState(false);
-  const [copiedStatement, setCopiedStatement] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(() => {
+    const saved = localStorage.getItem('build_checklist_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('build_checklist_open', String(checklistOpen));
+  }, [checklistOpen]);
+
+  const handleToggleChecklist = () => {
+    const next = !checklistOpen;
+    setChecklistOpen(next);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobileTab(next ? 'results' : 'code');
+    }
+  };
+
+  const handleHideChecklist = () => {
+    setChecklistOpen(false);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobileTab('code');
+    }
+  };
 
   // ─── Multi-File State (server.js as primary entry) ───
   const [files, setFiles] = useState([
@@ -89,23 +125,19 @@ export default function BuildWorkspace() {
     const saved = localStorage.getItem('build_split_left');
     return saved ? Math.min(Math.max(Number(saved), 18), 40) : 26;
   });
-  const [rightWidth, setRightWidth] = useState(() => {
-    const saved = localStorage.getItem('build_split_right');
-    return saved ? Math.min(Math.max(Number(saved), 20), 45) : 30;
-  });
   const [consoleHeight, setConsoleHeight] = useState(() => {
     const saved = localStorage.getItem('build_console_height');
     return saved ? Math.min(Math.max(Number(saved), 60), 400) : 170;
   });
 
   const [isDraggingLeft, setIsDraggingLeft] = useState(false);
-  const [isDraggingRight, setIsDraggingRight] = useState(false);
   const [isDraggingConsole, setIsDraggingConsole] = useState(false);
 
   // Submissions & evaluation state
   const [submissionId, setSubmissionId] = useState(null);
   const [submissionStatus, setSubmissionStatus] = useState('idle'); // 'idle' | 'queued' | 'running' | 'finished' | 'error'
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [runLoading, setRunLoading] = useState(false);
   const [historyList, setHistoryList] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rateLimitWait, setRateLimitWait] = useState(0); // cooldown in seconds
@@ -120,6 +152,22 @@ export default function BuildWorkspace() {
   // Monaco editor reference
   const editorRef = useRef(null);
   const pollTimerRef = useRef(null);
+
+  // Re-layout Monaco editor smoothly when checklist toggles
+  useEffect(() => {
+    if (editorRef.current) {
+      const raf = requestAnimationFrame(() => {
+        editorRef.current?.layout();
+      });
+      const t1 = setTimeout(() => editorRef.current?.layout(), 40);
+      const t2 = setTimeout(() => editorRef.current?.layout(), 180);
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [checklistOpen, leftWidth, fileExplorerOpen]);
 
   // 1. Fetch problem details and load multi-file starter
   useEffect(() => {
@@ -206,9 +254,9 @@ export default function BuildWorkspace() {
     }
   };
 
-  // ─── Mouse Resizing Listeners (LeetCode-Style) ───
+  // ─── Mouse Resizing Listeners (Left Panel & Console) ───
   useEffect(() => {
-    if (!isDraggingLeft && !isDraggingRight && !isDraggingConsole) return;
+    if (!isDraggingLeft && !isDraggingConsole) return;
 
     const handleMouseMove = (e) => {
       if (!containerRef.current) return;
@@ -220,15 +268,6 @@ export default function BuildWorkspace() {
         if (newLeftPercent >= 16 && newLeftPercent <= 42) {
           setLeftWidth(newLeftPercent);
           localStorage.setItem('build_split_left', String(newLeftPercent));
-        }
-      }
-
-      // Right panel horizontal resize
-      if (isDraggingRight) {
-        const newRightPercent = ((rect.right - e.clientX) / rect.width) * 100;
-        if (newRightPercent >= 18 && newRightPercent <= 45) {
-          setRightWidth(newRightPercent);
-          localStorage.setItem('build_split_right', String(newRightPercent));
         }
       }
 
@@ -244,7 +283,6 @@ export default function BuildWorkspace() {
 
     const handleMouseUp = () => {
       setIsDraggingLeft(false);
-      setIsDraggingRight(false);
       setIsDraggingConsole(false);
     };
 
@@ -254,7 +292,7 @@ export default function BuildWorkspace() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingLeft, isDraggingRight, isDraggingConsole]);
+  }, [isDraggingLeft, isDraggingConsole]);
 
   // Active file content lookup
   const activeFileContent = useMemo(() => {
@@ -358,7 +396,7 @@ export default function BuildWorkspace() {
   const handleDeleteFile = (pathToDelete, e) => {
     if (e) e.stopPropagation();
     if (pathToDelete === 'server.js' || pathToDelete === 'index.js') {
-      toast.error(`"${pathToDelete}" is the required server entry point and cannot be deleted.`);
+      toast.error(`"${pathToDelete}" is your main project file and cannot be deleted.`);
       return;
     }
 
@@ -420,6 +458,70 @@ export default function BuildWorkspace() {
     return () => clearInterval(t);
   }, [rateLimitWait]);
 
+  // 2.5 Run code against visible checklist requirements (Sandbox Mode)
+  const handleRunCode = async () => {
+    const hasEntry = files.some(
+      (f) => (f.path === 'server.js' || f.path === 'index.js') && f.content.trim()
+    );
+
+    if (!hasEntry) {
+      toast.error('Your main file ("server.js") is required to run and test your project.');
+      return;
+    }
+
+    if (runLoading || submissionStatus === 'queued' || submissionStatus === 'running') {
+      return;
+    }
+
+    try {
+      setRunLoading(true);
+      setSubmissionResult(null);
+      setConsoleOpen(true);
+      setChecklistOpen(true);
+      if (window.innerWidth < 1024) {
+        setMobileTab('results');
+      }
+
+      const payload = {
+        slug,
+        files: files.map((f) => ({ path: f.path, content: f.content })),
+      };
+
+      const res = await API.post('/build/run', payload);
+      const data = res.data;
+
+      setSubmissionResult({
+        status: data.verdict,
+        verdict: data.verdict,
+        score: data.score,
+        passed: data.passed,
+        total: data.total,
+        message: data.message,
+        testResults: data.testResults,
+        timeTakenMs: data.timeTakenMs,
+        isRun: true,
+      });
+      setSubmissionStatus('finished');
+
+      if (data.verdict === 'Accepted') {
+        toast.success(`Run Passed (${data.passed}/${data.total} tests)`);
+      } else {
+        toast.error(`Run: ${data.verdict} (${data.passed}/${data.total} passed)`);
+      }
+    } catch (err) {
+      console.error('Run failed:', err);
+      setSubmissionStatus('error');
+      setSubmissionResult({
+        status: 'Run Error',
+        verdict: 'Run Error',
+        message: err.response?.data?.message || 'Could not execute test run. Check your server code.',
+        isRun: true,
+      });
+    } finally {
+      setRunLoading(false);
+    }
+  };
+
   // 3. Submit solution with all files
   const handleSubmit = async () => {
     const hasEntry = files.some(
@@ -427,7 +529,11 @@ export default function BuildWorkspace() {
     );
 
     if (!hasEntry) {
-      toast.error('An entry file ("server.js" or "index.js") is required and must contain your code.');
+      toast.error('Your main file ("server.js") is required to run and test your project.');
+      return;
+    }
+
+    if (runLoading || submissionStatus === 'queued' || submissionStatus === 'running') {
       return;
     }
 
@@ -440,6 +546,7 @@ export default function BuildWorkspace() {
       setSubmissionStatus('queued');
       setSubmissionResult(null);
       setConsoleOpen(true);
+      setChecklistOpen(true);
       if (window.innerWidth < 1024) {
         setMobileTab('results');
       }
@@ -498,7 +605,7 @@ export default function BuildWorkspace() {
         setSubmissionResult({
           status: 'Internal Error',
           verdict: 'Internal Error',
-          message: 'Evaluation timed out waiting for worker. Please try again.',
+          message: 'Testing timed out. Please try submitting again.',
           score: 0,
           passed: 0,
           total: problem?.visibleTests?.length || 0,
@@ -521,9 +628,9 @@ export default function BuildWorkspace() {
           setSubmissionResult(sub);
 
           if (sub.status === 'Accepted') {
-            toast.success('🎉 Accepted! All test cases passed!');
+            toast.success('🎉 Great job! All tests passed!');
           } else {
-            toast.error(`Evaluation finished: ${sub.status}`);
+            toast.error(`Tests finished: ${sub.status}`);
           }
 
           // Refresh history if history tab open
@@ -652,7 +759,7 @@ export default function BuildWorkspace() {
       const totalInGroup = grp.tests.length;
 
       let groupStatus = 'idle';
-      if (submissionStatus === 'queued' || submissionStatus === 'running') {
+      if (runLoading || submissionStatus === 'queued' || submissionStatus === 'running') {
         groupStatus = 'running';
       } else if (passedInGroup === totalInGroup && totalInGroup > 0) {
         groupStatus = 'passed';
@@ -679,7 +786,7 @@ export default function BuildWorkspace() {
       }));
 
     return { endpointGroups, hiddenTests };
-  }, [problem, submissionResult, submissionStatus]);
+  }, [problem, submissionResult, submissionStatus, runLoading]);
 
   const passedCount = submissionResult?.passed ?? 0;
   const totalCount = submissionResult?.total ?? (problem?.visibleTests?.length || 0);
@@ -707,62 +814,110 @@ export default function BuildWorkspace() {
     );
   }
 
-  const isDraggingAny = isDraggingLeft || isDraggingRight || isDraggingConsole;
+  const isDraggingAny = isDraggingLeft || isDraggingConsole;
 
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col h-[calc(100vh-5.4rem)] rounded-xl border border-border/60 bg-bg text-text overflow-hidden shadow-md ${
+      className={`flex flex-col h-[calc(100vh-5.5rem)] bg-bg text-text overflow-hidden border border-border/30 rounded-md ${
         isDraggingAny ? 'select-none' : ''
       }`}
     >
-      {/* ─── Top Workbench Header (Cleanly separated from Navbar) ─── */}
-      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-surface border-b border-border/50 shrink-0 z-10 select-none">
+      {/* ─── Top Workbench Header (Flat, Seamless LeetCode Style) ─── */}
+      <header className="flex items-center justify-between px-3 sm:px-4 py-2 bg-bg border-b border-border/30 shrink-0 z-10 select-none">
         {/* Left: Back + Title + Badges */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
             to="/build"
-            className="p-1 rounded text-text-muted hover:text-text hover:bg-surface-raised transition-colors shrink-0"
+            className="p-1 rounded text-text-muted hover:text-text hover:bg-surface-raised/40 transition-colors shrink-0"
             title="Back to Build Mode list"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
 
-          <div className="h-4 w-px bg-border/60 shrink-0 hidden sm:block" />
+          <div className="h-4 w-px bg-border/40 shrink-0 hidden sm:block" />
 
           <div className="flex items-center gap-2 min-w-0">
-            <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider text-accent-build bg-accent-build/10 border border-accent-build/30 shrink-0">
-              <Boxes className="w-3 h-3" />
-              API Workbench
-            </span>
-            <h1 className="text-xs sm:text-sm font-bold text-text truncate max-w-[180px] sm:max-w-xs md:max-w-md">
+            <h1 className="text-xs sm:text-sm font-semibold text-text truncate max-w-[200px] sm:max-w-xs md:max-w-md">
               {problem.title}
             </h1>
             <DifficultyBadge difficulty={problem.difficulty} />
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
               <Server className="w-2.5 h-2.5" />
-              Node + Express
+              Node.js
             </span>
           </div>
         </div>
 
-        {/* Right: Actions (Reset + Submit) */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right: Actions (Checklist Toggle + Reset + Run + Submit) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            id="toggle-checklist-btn"
+            type="button"
+            onClick={handleToggleChecklist}
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded transition-colors shrink-0 select-none ${
+              checklistOpen
+                ? 'bg-accent-build/15 text-accent-build font-semibold border border-accent-build/30'
+                : 'text-text-muted hover:text-text hover:bg-surface-raised/40 border border-border/40'
+            }`}
+            title={checklistOpen ? 'Hide Checklist (more space for editor)' : 'Show Requirements Checklist'}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{checklistOpen ? 'Hide' : 'Checklist'}</span>
+            {submissionStatus === 'finished' ? (
+              <span className="text-[10px] font-bold">
+                ({passedCount}/{totalCount})
+              </span>
+            ) : (
+              <span className="text-[10px] opacity-75">
+                ({totalCount})
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => setShowResetModal(true)}
-            className="px-2.5 py-1 text-xs text-text-muted hover:text-text hover:bg-surface-raised border border-border/50 rounded flex items-center gap-1 transition-colors"
+            className="px-2 py-1.5 text-xs text-text-muted hover:text-text hover:bg-surface-raised/40 border border-border/40 rounded flex items-center gap-1 transition-colors"
             title="Reset code to starter template"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Reset</span>
           </button>
 
+          {/* RUN CODE BUTTON (Visible Tests Fast Runner) */}
           <button
+            id="run-code-btn"
+            type="button"
+            onClick={handleRunCode}
+            disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running'}
+            className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all border ${
+              runLoading
+                ? 'bg-surface-raised text-text-muted border-border cursor-not-allowed'
+                : 'bg-surface-raised/60 hover:bg-surface-raised text-text hover:text-white border-border/60 hover:border-text-muted active:scale-95'
+            }`}
+            title="Run code against visible checklist requirements (Fast Sandbox Test)"
+          >
+            {runLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-build" />
+                <span>Running...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5 fill-current text-accent-build" />
+                <span>Run</span>
+              </>
+            )}
+          </button>
+
+          {/* SUBMIT SOLUTION BUTTON */}
+          <button
+            id="submit-solution-btn"
             type="button"
             onClick={handleSubmit}
-            disabled={submissionStatus === 'queued' || submissionStatus === 'running' || rateLimitWait > 0}
-            className={`px-3.5 py-1 text-xs font-semibold rounded flex items-center gap-1.5 transition-all shadow-sm ${
+            disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running' || rateLimitWait > 0}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all shadow-sm ${
               submissionStatus === 'queued' || submissionStatus === 'running'
                 ? 'bg-accent-build/50 text-black cursor-not-allowed'
                 : rateLimitWait > 0
@@ -773,7 +928,7 @@ export default function BuildWorkspace() {
             {submissionStatus === 'queued' || submissionStatus === 'running' ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Running Tests...</span>
+                <span>Submitting...</span>
               </>
             ) : rateLimitWait > 0 ? (
               <>
@@ -783,7 +938,7 @@ export default function BuildWorkspace() {
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
-                <span>Submit API</span>
+                <span>Submit</span>
               </>
             )}
           </button>
@@ -791,35 +946,44 @@ export default function BuildWorkspace() {
       </header>
 
       {/* ─── Mobile / Tablet Navigation Pills (< 1024px) ─── */}
-      <div className="lg:hidden flex items-center border-b border-border/50 bg-surface px-2 py-1 gap-1 text-xs shrink-0 select-none">
+      <div className="lg:hidden flex items-center border-b border-border/30 bg-bg px-2 py-1 gap-1 text-xs shrink-0 select-none">
         <button
           type="button"
-          onClick={() => setMobileTab('brief')}
+          onClick={() => {
+            setMobileTab('brief');
+            setChecklistOpen(false);
+          }}
           className={`flex-1 py-1.5 text-center font-medium rounded transition-colors ${
             mobileTab === 'brief'
-              ? 'bg-surface-raised text-accent-build border border-accent-build/30'
+              ? 'bg-accent-build/15 text-accent-build font-semibold'
               : 'text-text-muted hover:text-text'
           }`}
         >
-          Brief & Specs
+          Brief
         </button>
         <button
           type="button"
-          onClick={() => setMobileTab('code')}
+          onClick={() => {
+            setMobileTab('code');
+            setChecklistOpen(false);
+          }}
           className={`flex-1 py-1.5 text-center font-medium rounded transition-colors ${
             mobileTab === 'code'
-              ? 'bg-surface-raised text-accent-build border border-accent-build/30'
+              ? 'bg-accent-build/15 text-accent-build font-semibold'
               : 'text-text-muted hover:text-text'
           }`}
         >
-          Code Editor ({files.length})
+          Code ({files.length})
         </button>
         <button
           type="button"
-          onClick={() => setMobileTab('results')}
+          onClick={() => {
+            setMobileTab('results');
+            setChecklistOpen(true);
+          }}
           className={`flex-1 py-1.5 text-center font-medium rounded transition-colors ${
             mobileTab === 'results'
-              ? 'bg-surface-raised text-accent-build border border-accent-build/30'
+              ? 'bg-accent-build/15 text-accent-build font-semibold'
               : 'text-text-muted hover:text-text'
           }`}
         >
@@ -828,21 +992,21 @@ export default function BuildWorkspace() {
       </div>
 
       {/* ─── 3-Column Main Workspace with LeetCode-Style Resizers ─── */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col lg:flex-row min-h-0 overflow-hidden bg-bg">
         
         {/* ════════ COLUMN 1 (LEFT): Brief, Endpoints, Contract, History ════════ */}
         <aside
-          style={{ width: window.innerWidth >= 1024 ? `${leftWidth}%` : '100%' }}
-          className={`flex-col min-h-0 bg-surface/50 shrink-0 ${
-            mobileTab === 'brief' ? 'flex w-full' : 'hidden lg:flex'
+          style={{ width: isDesktop ? `${leftWidth}%` : '100%' }}
+          className={`flex-col min-h-0 bg-bg shrink-0 ${
+            mobileTab === 'brief' ? 'flex w-full h-full' : 'hidden lg:flex'
           }`}
         >
           {/* Sub-tabs header */}
-          <div className="flex items-center border-b border-border/40 bg-surface px-2 gap-1 overflow-x-auto shrink-0 select-none">
+          <div className="flex items-center border-b border-border/30 bg-bg px-2 gap-1 overflow-x-auto shrink-0 select-none">
             {[
               { id: 'brief', label: 'Brief', icon: BookOpen },
               { id: 'endpoints', label: 'Endpoints', icon: Zap },
-              { id: 'contract', label: 'Contract', icon: ShieldCheck },
+              { id: 'contract', label: 'Rules', icon: ShieldCheck },
               { id: 'history', label: 'History', icon: History },
             ].map((tab) => {
               const TabIcon = tab.icon;
@@ -853,7 +1017,7 @@ export default function BuildWorkspace() {
                   onClick={() => setLeftTab(tab.id)}
                   className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
                     leftTab === tab.id
-                      ? 'border-accent-build text-accent-build bg-surface-raised/40 font-semibold'
+                      ? 'border-accent-build text-accent-build font-semibold'
                       : 'border-transparent text-text-muted hover:text-text hover:bg-surface-raised/20'
                   }`}
                 >
@@ -864,38 +1028,11 @@ export default function BuildWorkspace() {
             })}
           </div>
 
-          {/* Left Panel Body (Allow text selection & copy) */}
+          {/* Left Panel Body (Allow text selection) */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 select-text">
             {/* TAB: Brief */}
             {leftTab === 'brief' && (
               <div className="space-y-3 animate-fadeIn">
-                <div className="flex items-center justify-between pb-2 border-b border-border/40 select-none">
-                  <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider font-bold">
-                    Problem Description
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(problem.statement);
-                      setCopiedStatement(true);
-                      setTimeout(() => setCopiedStatement(false), 2000);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono text-text-muted hover:text-text hover:bg-surface-raised border border-border/50 transition-colors"
-                    title="Copy entire problem description"
-                  >
-                    {copiedStatement ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy All</span>
-                      </>
-                    )}
-                  </button>
-                </div>
                 <MarkdownRenderer content={problem.statement} />
               </div>
             )}
@@ -903,150 +1040,138 @@ export default function BuildWorkspace() {
             {/* TAB: Endpoints */}
             {leftTab === 'endpoints' && (
               <div className="space-y-3 animate-fadeIn">
-                <div className="text-[11px] text-text-muted leading-relaxed select-none">
-                  Required REST endpoints derived from integration test specifications:
-                </div>
-                {endpointCards.map((ep, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-lg border border-border/50 bg-surface-raised/50 space-y-2 hover:border-accent-build/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MethodBadge method={ep.method} size="sm" />
-                      <span className="font-mono text-xs font-semibold text-text tracking-tight">
-                        {ep.path}
-                      </span>
-                    </div>
-
-                    {/* Sample Request Payload */}
-                    {ep.sampleRequest?.body && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-mono text-text-muted uppercase select-none">Sample Request Body</span>
-                        <pre className="p-2 rounded bg-surface border border-border/40 text-[10px] font-mono text-text overflow-x-auto">
-                          <code>{JSON.stringify(ep.sampleRequest.body, null, 2)}</code>
-                        </pre>
-                      </div>
-                    )}
-
-                    {/* Expected Status & Body */}
-                    {ep.sampleExpect && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-mono text-text-muted uppercase select-none">
-                          Expected Response ({ep.sampleExpect.status || 200})
+                <div className="divide-y divide-border/20">
+                  {endpointCards.map((ep, idx) => (
+                    <div key={idx} className="py-3 first:pt-0 last:pb-0 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <MethodBadge method={ep.method} size="sm" />
+                        <span className="font-mono text-xs font-semibold text-text tracking-tight">
+                          {ep.path}
                         </span>
-                        {ep.sampleExpect.bodyContains && (
-                          <pre className="p-2 rounded bg-surface border border-border/40 text-[10px] font-mono text-emerald-400 overflow-x-auto">
-                            <code>{JSON.stringify(ep.sampleExpect.bodyContains, null, 2)}</code>
-                          </pre>
-                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* Sample Request Payload */}
+                      {ep.sampleRequest?.body && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider select-none">Request Body</span>
+                          <pre className="p-2.5 rounded bg-surface-raised/40 text-[11px] font-mono text-text overflow-x-auto border-0">
+                            <code>{JSON.stringify(ep.sampleRequest.body, null, 2)}</code>
+                          </pre>
+                        </div>
+                      )}
+
+                      {/* Expected Status & Body */}
+                      {ep.sampleExpect && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider select-none">
+                            Expected ({ep.sampleExpect.status || 200})
+                          </span>
+                          {ep.sampleExpect.bodyContains && (
+                            <pre className="p-2.5 rounded bg-surface-raised/40 text-[11px] font-mono text-emerald-400 overflow-x-auto border-0">
+                              <code>{JSON.stringify(ep.sampleExpect.bodyContains, null, 2)}</code>
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* TAB: Contract (Rules & Environment) */}
+            {/* TAB: Contract / Rules */}
             {leftTab === 'contract' && (
-              <div className="space-y-3.5 animate-fadeIn text-xs">
-                <div className="p-3 rounded-lg border border-accent-build/30 bg-accent-build/5 space-y-1.5">
-                  <div className="flex items-center gap-1.5 font-bold text-accent-build">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Evaluation Contract</span>
-                  </div>
-                  <p className="text-[11px] text-text-muted leading-relaxed">
-                    Your code executes in an isolated Docker container with zero access to the internet. Comply with the following constraints:
-                  </p>
-                </div>
-
-                <div className="space-y-2 font-mono text-[11px]">
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">1. Entrypoint</span>
+              <div className="space-y-3 animate-fadeIn text-xs">
+                <div className="divide-y divide-border/20 font-mono text-[11px]">
+                  <div className="py-2.5 first:pt-0 space-y-1">
+                    <span className="text-accent-build font-bold block">1. Main File</span>
                     <p className="text-text-muted font-sans text-xs">
-                      The primary server file must be named <code>server.js</code> (or <code>index.js</code>).
+                      Write your main server in <code className="text-text font-mono">server.js</code>.
                     </p>
                   </div>
 
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">2. Port & Host Binding</span>
+                  <div className="py-2.5 space-y-1">
+                    <span className="text-accent-build font-bold block">2. Port 3000</span>
                     <p className="text-text-muted font-sans text-xs">
-                      Server must listen on port <strong>3000</strong> and bind to <code>0.0.0.0</code>:
+                      Server must listen on port 3000:
                     </p>
-                    <code className="block p-1.5 rounded bg-surface border border-border/30 text-text">
+                    <code className="block p-2 rounded bg-surface-raised/40 text-text border-0">
                       app.listen(3000, '0.0.0.0');
                     </code>
                   </div>
 
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">3. Multi-File Architecture</span>
+                  <div className="py-2.5 space-y-1">
+                    <span className="text-accent-build font-bold block">3. Multi-File</span>
                     <p className="text-text-muted font-sans text-xs">
-                      Modular files like <code>routes/todos.js</code> are fully supported. Use standard <code>require('./path')</code>.
+                      Create extra files and link them with <code className="text-text font-mono">require('./path')</code>.
                     </p>
                   </div>
 
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">4. In-Memory Data Storage</span>
+                  <div className="py-2.5 space-y-1">
+                    <span className="text-accent-build font-bold block">4. In-Memory State</span>
                     <p className="text-text-muted font-sans text-xs">
-                      Persist data in in-memory JavaScript variables, arrays, or objects. (Filesystem is read-only).
+                      Store items in JavaScript arrays/objects in memory.
                     </p>
                   </div>
 
-                  <div className="p-2.5 rounded border border-border/50 bg-surface-raised/60 space-y-1">
-                    <span className="text-text font-bold text-accent-build block">5. Pre-installed Packages</span>
+                  <div className="py-2.5 space-y-1">
+                    <span className="text-accent-build font-bold block">5. Pre-Installed</span>
                     <p className="text-text-muted font-sans text-xs">
-                      <code>express</code> and <code>cors</code> are pre-installed. Do not attempt to <code>npm install</code> extra packages.
+                      <code className="text-text font-mono">express</code> and <code className="text-text font-mono">cors</code> are pre-installed.
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: History */}
+            {/* TAB: History / Past Submissions */}
             {leftTab === 'history' && (
-              <div className="space-y-2.5 animate-fadeIn">
+              <div className="space-y-1 animate-fadeIn">
                 {historyLoading ? (
                   <div className="py-8 text-center space-y-2">
                     <Loader2 className="w-5 h-5 text-accent-build animate-spin mx-auto" />
-                    <span className="text-xs font-mono text-text-muted">Loading history...</span>
+                    <span className="text-xs font-mono text-text-muted">Loading submissions...</span>
                   </div>
                 ) : historyList.length === 0 ? (
-                  <div className="py-8 text-center space-y-2 border border-dashed border-border/50 rounded-lg select-none">
+                  <div className="py-8 text-center space-y-2 select-none">
                     <History className="w-6 h-6 text-text-muted mx-auto" />
-                    <p className="text-xs text-text-muted">No submissions recorded yet for this challenge.</p>
+                    <p className="text-xs text-text-muted">No submissions yet. Click "Submit" to test your project.</p>
                   </div>
                 ) : (
-                  historyList.map((sub) => {
-                    const isAc = sub.status === 'Accepted';
-                    return (
-                      <div
-                        key={sub._id}
-                        className="p-2.5 rounded-lg border border-border/50 bg-surface-raised/40 space-y-1.5 text-xs hover:border-accent-build/40 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`font-semibold font-mono text-[11px] px-2 py-0.5 rounded ${
-                              isAc
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                            }`}
-                          >
-                            {sub.status}
-                          </span>
-                          <span className="font-mono text-xs font-bold text-text">
-                            {sub.score ?? 0}%
-                          </span>
+                  <div className="divide-y divide-border/20">
+                    {historyList.map((sub) => {
+                      const isAc = sub.status === 'Accepted';
+                      return (
+                        <div
+                          key={sub._id}
+                          className="py-2.5 first:pt-0 last:pb-0 space-y-1 text-xs hover:bg-surface-raised/20 transition-colors px-1"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`font-semibold font-mono text-[11px] px-2 py-0.5 rounded ${
+                                isAc
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'bg-rose-500/10 text-rose-400'
+                              }`}
+                            >
+                              {sub.status}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-text">
+                              {sub.score ?? 0}%
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
+                            <span>
+                              {sub.passed ?? 0}/{sub.total ?? 0} tests passed
+                            </span>
+                            <span>
+                              {sub.createdAt ? new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
-                          <span>
-                            {sub.passed ?? 0}/{sub.total ?? 0} tests passed
-                          </span>
-                          <span>
-                            {sub.createdAt ? new Date(sub.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
@@ -1067,27 +1192,27 @@ export default function BuildWorkspace() {
 
         {/* ════════ COLUMN 2 (CENTER): VS Code-Style Explorer + Editor + Resizable Console ════════ */}
         <main
-          className={`flex-1 flex flex-col min-h-0 bg-surface-inset ${
-            mobileTab === 'code' ? 'flex w-full' : 'hidden lg:flex'
+          className={`flex-1 min-w-0 flex flex-col min-h-0 bg-bg overflow-hidden ${
+            mobileTab === 'code' ? 'flex w-full h-full' : 'hidden lg:flex'
           }`}
         >
-          {/* File Tab Bar & Explorer Controls */}
-          <div className="flex items-center justify-between border-b border-border/50 bg-surface px-2 select-none shrink-0 overflow-x-auto">
-            {/* Tabs List */}
-            <div className="flex items-center gap-1 py-1">
+          {/* File Tab Bar & Explorer Controls (Flat, Never-Cropped Toolbar) */}
+          <div className="flex items-center justify-between border-b border-border/30 bg-bg px-2 select-none shrink-0 h-9">
+            {/* Scrollable Tabs List */}
+            <div className="flex items-center gap-1 py-1 overflow-x-auto flex-1 min-w-0 scrollbar-none">
               {/* Explorer toggle button */}
               <button
                 type="button"
                 onClick={() => setFileExplorerOpen(!fileExplorerOpen)}
-                className={`p-1.5 rounded transition-colors ${
-                  fileExplorerOpen ? 'bg-accent-build/15 text-accent-build' : 'text-text-muted hover:text-text'
+                className={`p-1.5 rounded transition-colors shrink-0 ${
+                  fileExplorerOpen ? 'bg-accent-build/15 text-accent-build font-semibold' : 'text-text-muted hover:text-text'
                 }`}
-                title="Toggle File Explorer (VS Code Style)"
+                title="Show/Hide Files"
               >
                 <FolderTree className="w-3.5 h-3.5" />
               </button>
 
-              <div className="h-4 w-px bg-border/50 mx-1 shrink-0" />
+              <div className="h-3.5 w-px bg-border/30 mx-1 shrink-0" />
 
               {/* Open File Tabs */}
               {openTabs.map((tabPath) => {
@@ -1097,10 +1222,10 @@ export default function BuildWorkspace() {
                   <div
                     key={tabPath}
                     onClick={() => setActiveFilePath(tabPath)}
-                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium transition-all cursor-pointer ${
+                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer shrink-0 ${
                       isActive
-                        ? 'bg-surface-raised border border-border text-text shadow-xs'
-                        : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                        ? 'bg-surface-raised/70 text-text font-semibold'
+                        : 'text-text-muted hover:text-text hover:bg-surface-raised/20'
                     }`}
                   >
                     <FileIcon path={tabPath} className="w-3.5 h-3.5" />
@@ -1129,7 +1254,7 @@ export default function BuildWorkspace() {
                   setShowNewFileInput(true);
                   setNewFileType('file');
                 }}
-                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors ml-1"
+                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors ml-1 shrink-0"
                 title="New File"
               >
                 <FilePlus className="w-3.5 h-3.5" />
@@ -1141,16 +1266,19 @@ export default function BuildWorkspace() {
                   setShowNewFileInput(true);
                   setNewFileType('folder');
                 }}
-                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors"
+                className="p-1 text-text-muted hover:text-accent-build rounded transition-colors shrink-0"
                 title="New Folder"
               >
                 <FolderPlus className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <span className="text-[10px] font-mono text-text-muted hidden sm:inline shrink-0 pl-2">
-              {files.length} {files.length === 1 ? 'file' : 'files'}
-            </span>
+            {/* Pinned Right Controls */}
+            <div className="flex items-center gap-2 shrink-0 pl-2">
+              <span className="text-[10px] font-mono text-text-muted">
+                {files.length} {files.length === 1 ? 'file' : 'files'}
+              </span>
+            </div>
           </div>
 
           {/* New File / Folder Inline Bar (VS Code style) */}
@@ -1195,12 +1323,12 @@ export default function BuildWorkspace() {
           )}
 
           {/* Center Main Workspace: VS Code Explorer Sidebar + Monaco Editor */}
-          <div className="flex-1 min-h-[220px] flex relative overflow-hidden">
+          <div className="flex-1 min-w-0 min-h-[220px] flex relative overflow-hidden">
             {/* VS Code Style File Explorer Sidebar */}
             {fileExplorerOpen && (
-              <div className="w-48 border-r border-border/50 bg-surface/80 flex flex-col shrink-0 text-xs font-mono select-none">
+              <div className="w-48 border-r border-border/30 bg-bg flex flex-col shrink-0 text-xs font-mono select-none">
                 {/* Explorer Header */}
-                <div className="p-2 border-b border-border/40 flex items-center justify-between text-[10px] text-text-muted uppercase tracking-wider font-bold">
+                <div className="p-2 border-b border-border/30 bg-bg flex items-center justify-between text-[10px] text-text-muted uppercase tracking-wider font-bold">
                   <span>Explorer</span>
                   <div className="flex items-center gap-1">
                     <button
@@ -1313,8 +1441,8 @@ export default function BuildWorkspace() {
                           <FileIcon path={file.path} className="w-3.5 h-3.5" />
                           <span className="truncate text-xs">{file.path}</span>
                           {isEntry && (
-                            <span className="text-[9px] font-mono px-1 rounded bg-accent-build/20 text-accent-build uppercase">
-                              entry
+                            <span className="text-[9px] font-mono px-1 rounded bg-accent-build/20 text-accent-build uppercase font-semibold">
+                              main
                             </span>
                           )}
                         </div>
@@ -1337,7 +1465,7 @@ export default function BuildWorkspace() {
             )}
 
             {/* Monaco Editor Container */}
-            <div className="flex-1 min-w-0 h-full relative">
+            <div className="flex-1 min-w-0 h-full relative overflow-hidden">
               <Editor
                 height="100%"
                 defaultLanguage="javascript"
@@ -1375,19 +1503,24 @@ export default function BuildWorkspace() {
             <div className="h-0.5 w-8 rounded-full bg-text-muted/40 group-hover:bg-black transition-colors" />
           </div>
 
-          {/* ─── Bottom Console Area (Resizable) ─── */}
+          {/* ─── Bottom Console Area (Resizable & Flat) ─── */}
           <div
             style={{ height: consoleOpen ? `${consoleHeight}px` : 'auto' }}
-            className="border-t border-border/50 bg-surface flex flex-col shrink-0 overflow-hidden transition-[height] duration-75"
+            className="border-t border-border/30 bg-bg flex flex-col shrink-0 overflow-hidden transition-[height] duration-75"
           >
             {/* Console Toolbar */}
             <div
               onClick={() => setConsoleOpen(!consoleOpen)}
-              className="flex items-center justify-between px-3 py-1.5 bg-surface-raised/60 hover:bg-surface-raised cursor-pointer border-b border-border/40 select-none text-xs shrink-0"
+              className="flex items-center justify-between px-3 py-1.5 bg-bg hover:bg-surface-raised/30 cursor-pointer border-b border-border/30 select-none text-xs shrink-0"
             >
               <div className="flex items-center gap-2">
                 <Terminal className="w-3.5 h-3.5 text-accent-build" />
-                <span className="font-mono font-semibold text-text">Output Console</span>
+                <span className="font-mono font-semibold text-text">Console</span>
+                {submissionResult?.isRun && (
+                  <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-accent-build/15 text-accent-build font-bold uppercase border border-accent-build/30">
+                    Run
+                  </span>
+                )}
                 {verdict && (
                   <span
                     className={`font-mono text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
@@ -1405,11 +1538,16 @@ export default function BuildWorkspace() {
 
             {/* Console Content */}
             {consoleOpen && (
-              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-2 bg-surface select-text">
-                {submissionStatus === 'queued' || submissionStatus === 'running' ? (
+              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-2 bg-bg select-text">
+                {runLoading ? (
                   <div className="flex items-center gap-2 text-accent-build text-xs py-2 select-none">
                     <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    <span>Starting your server in Docker container, then running tests...</span>
+                    <span>Running visible test cases against your server...</span>
+                  </div>
+                ) : submissionStatus === 'queued' || submissionStatus === 'running' ? (
+                  <div className="flex items-center gap-2 text-accent-build text-xs py-2 select-none">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>Evaluating submission against all test cases...</span>
                   </div>
                 ) : submissionResult ? (
                   <div className="space-y-2">
@@ -1430,32 +1568,32 @@ export default function BuildWorkspace() {
                       )}
                       <div className="space-y-1">
                         <span className="font-bold text-xs uppercase tracking-wide block">
-                          {verdict} ({passedCount}/{totalCount} Passed)
+                          {submissionResult.isRun ? 'Run: ' : ''}{isAccepted ? 'All Tests Passed' : verdict} ({passedCount}/{totalCount} Passed)
                         </span>
                         <p className="text-[11px] font-sans leading-relaxed">
                           {verdict === 'Start Timeout'
-                            ? 'Your server did not respond on port 3000. Check it listens on 3000 and binds to 0.0.0.0.'
+                            ? "Server did not respond on port 3000 in time. Verify app.listen(3000, '0.0.0.0') is in server.js."
                             : verdict === 'Internal Error'
-                            ? 'Something went wrong on our side. Try again.'
+                            ? 'Evaluation error. Please retry.'
                             : isAccepted
-                            ? 'All integration tests passed successfully.'
-                            : submissionResult.message || 'Some test cases failed. Inspect requirements checklist on the right.'}
+                            ? (submissionResult.isRun ? 'All visible requirements passed! Ready to submit solution.' : 'All requirements met!')
+                            : submissionResult.message || 'Some test cases did not pass. Check the checklist for details.'}
                         </p>
                       </div>
                     </div>
 
                     {/* Execution Time */}
                     {submissionResult.timeTakenMs != null && (
-                      <div className="text-[11px] text-text-muted flex items-center gap-1.5 pt-1 select-none">
+                      <div className="text-[11px] text-text-muted flex items-center gap-1.5 pt-0.5 select-none">
                         <Clock className="w-3 h-3 text-accent-build" />
-                        <span>Execution time: {submissionResult.timeTakenMs} ms</span>
+                        <span>Completed in {submissionResult.timeTakenMs} ms</span>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="text-text-muted text-[11px] py-2 flex items-center gap-2 select-none">
                     <Info className="w-3.5 h-3.5" />
-                    <span>Click "Submit API" to evaluate your multi-file Express project in Docker.</span>
+                    <span>Click "Run" to test visible endpoints, or "Submit" for full evaluation.</span>
                   </div>
                 )}
               </div>
@@ -1463,40 +1601,39 @@ export default function BuildWorkspace() {
           </div>
         </main>
 
-        {/* ─── RESIZE HANDLE 2 (Center <-> Right) ─── */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setIsDraggingRight(true);
-          }}
-          className="hidden lg:flex w-1.5 hover:w-2 bg-border/40 hover:bg-accent-build cursor-col-resize items-center justify-center transition-all select-none shrink-0 group relative z-20"
-          title="Drag to resize Checklist panel"
-        >
-          <div className="w-0.5 h-6 rounded-full bg-text-muted/40 group-hover:bg-black transition-colors" />
-        </div>
-
-        {/* ════════ COLUMN 3 (RIGHT): Grouped Requirements Checklist ════════ */}
-        <aside
-          style={{ width: window.innerWidth >= 1024 ? `${rightWidth}%` : '100%' }}
-          className={`flex-col min-h-0 bg-surface/50 shrink-0 ${
-            mobileTab === 'results' ? 'flex w-full' : 'hidden lg:flex'
-          }`}
-        >
+        {/* ════════ COLUMN 3 (RIGHT): Requirements Checklist (Clean, Fixed-Width, Toggleable) ════════ */}
+        {checklistOpen && (
+          <aside
+            className={`w-full lg:w-80 xl:w-[320px] flex-col min-h-0 bg-bg shrink-0 border-l border-border/30 z-10 ${
+              mobileTab === 'results' ? 'flex w-full h-full flex-1' : 'hidden lg:flex'
+            }`}
+          >
           {/* Header & Progress Bar */}
-          <div className="p-3 border-b border-border/50 bg-surface space-y-2.5 shrink-0 select-none">
+          <div className="px-3.5 py-2 border-b border-border/30 bg-bg space-y-1.5 shrink-0 select-none">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-text uppercase tracking-wider font-mono flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent-build" />
-                Requirements Checklist
+                Checklist
               </span>
-              <span className="text-xs font-mono font-bold text-accent-build">
-                {submissionStatus === 'finished' ? `${passedCount}/${totalCount} Passed` : `${totalCount} Tests`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-accent-build">
+                  {submissionStatus === 'finished' ? `${passedCount}/${totalCount} Passed` : `${totalCount} Tests`}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleHideChecklist}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-text-muted hover:text-text hover:bg-surface-raised transition-colors text-[11px]"
+                  title="Hide checklist"
+                >
+                  <span>Hide</span>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Progress Bar (Determinate or Indeterminate) */}
-            <div className="h-1.5 w-full rounded-full bg-border/60 overflow-hidden relative">
-              {submissionStatus === 'queued' || submissionStatus === 'running' ? (
+            <div className="h-1 w-full rounded-full bg-border/40 overflow-hidden relative">
+              {runLoading || submissionStatus === 'queued' || submissionStatus === 'running' ? (
                 <div className="h-full w-1/3 bg-accent-build rounded-full animate-build-indeterminate" />
               ) : (
                 <div
@@ -1513,19 +1650,14 @@ export default function BuildWorkspace() {
             </div>
           </div>
 
-          {/* Test Groups Container (Stage 2 Grouped by Endpoint) */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 select-text">
-            {submissionStatus === 'queued' || submissionStatus === 'running' ? (
-              <div className="py-12 text-center space-y-3 select-none">
-                <div className="w-7 h-7 rounded-full border-2 border-accent-build border-t-transparent animate-spin mx-auto" />
-                <div className="space-y-1">
-                  <span className="text-xs font-mono font-semibold text-text block">
-                    Starting your server, then running tests...
-                  </span>
-                  <p className="text-[11px] text-text-muted">
-                    Zero fake progress. Test results appear all at once.
-                  </p>
-                </div>
+          {/* Test Groups Container - Seamless Flat List (No nested cards) */}
+          <div className="flex-1 overflow-y-auto divide-y divide-border/20 select-text">
+            {runLoading || submissionStatus === 'queued' || submissionStatus === 'running' ? (
+              <div className="py-8 text-center space-y-2 select-none px-4">
+                <Loader2 className="w-5 h-5 text-accent-build animate-spin mx-auto" />
+                <span className="text-xs font-mono text-text-muted block">
+                  {runLoading ? 'Running visible tests...' : 'Evaluating submission...'}
+                </span>
               </div>
             ) : (
               <>
@@ -1533,18 +1665,20 @@ export default function BuildWorkspace() {
                 {groupedChecklist.endpointGroups.map((grp) => {
                   const isCollapsed = collapsedGroups[grp.key];
                   return (
-                    <div
-                      key={grp.key}
-                      className="rounded-lg border border-border/50 bg-surface overflow-hidden shadow-xs"
-                    >
-                      {/* Group Header */}
+                    <div key={grp.key} className="py-1">
+                      {/* Group Header (Flat row, no boxed container) */}
                       <div
                         onClick={() => toggleGroupCollapse(grp.key)}
-                        className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 hover:bg-surface-raised cursor-pointer transition-colors select-none"
+                        className="px-3.5 py-2 flex items-center justify-between gap-2 hover:bg-surface-raised/40 cursor-pointer transition-colors select-none"
                       >
                         <div className="flex items-center gap-2 min-w-0">
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 text-text-muted transition-transform shrink-0 ${
+                              isCollapsed ? '-rotate-90' : ''
+                            }`}
+                          />
                           <MethodBadge method={grp.method} size="xs" />
-                          <span className="font-mono text-xs font-bold text-text truncate">
+                          <span className="font-mono text-xs font-semibold text-text truncate">
                             {grp.path}
                           </span>
                         </div>
@@ -1555,39 +1689,34 @@ export default function BuildWorkspace() {
                             <span
                               className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
                                 grp.passedCount === grp.totalCount
-                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                  ? 'bg-emerald-500/15 text-emerald-400'
+                                  : 'bg-rose-500/15 text-rose-400'
                               }`}
                             >
                               {grp.passedCount}/{grp.totalCount}
                             </span>
                           )}
-                          <ChevronDown
-                            className={`w-3.5 h-3.5 text-text-muted transition-transform ${
-                              isCollapsed ? '-rotate-90' : ''
-                            }`}
-                          />
                         </div>
                       </div>
 
-                      {/* Group Test Items */}
+                      {/* Group Test Items - Flat, Direct on Surface */}
                       {!isCollapsed && (
-                        <div className="p-2 space-y-1.5 divide-y divide-border/30">
+                        <div className="pl-6 pr-3.5 space-y-0.5 pb-1">
                           {grp.tests.map((test) => {
                             const isFailed = test.passed === false;
                             const isPassed = test.passed === true;
                             const isExpanded = expandedTests[test.id];
 
                             return (
-                              <div key={test.id} className="pt-1.5 first:pt-0">
+                              <div key={test.id} className="py-0.5">
                                 <div
                                   onClick={() => isFailed && toggleTestExpand(test.id)}
-                                  className={`p-2 rounded flex items-center justify-between gap-2 text-xs transition-colors ${
+                                  className={`py-1.5 px-2 rounded flex items-center justify-between gap-2 text-xs transition-colors ${
                                     isPassed
-                                      ? 'bg-emerald-500/5'
+                                      ? 'hover:bg-surface-raised/30'
                                       : isFailed
-                                      ? 'bg-rose-500/5 cursor-pointer hover:bg-rose-500/10'
-                                      : 'bg-surface-raised/20'
+                                      ? 'cursor-pointer hover:bg-rose-500/10'
+                                      : 'hover:bg-surface-raised/20'
                                   }`}
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
@@ -1601,25 +1730,25 @@ export default function BuildWorkspace() {
                                         <span className="w-2 h-2 rounded-full bg-border block mx-0.5" />
                                       )}
                                     </div>
-                                    <span className="text-xs text-text truncate">
+                                    <span className={`text-xs truncate ${isPassed ? 'text-text' : isFailed ? 'text-rose-300 font-medium' : 'text-text-muted'}`}>
                                       {test.name}
                                     </span>
                                   </div>
 
                                   {isFailed && (
                                     <ChevronDown
-                                      className={`w-3.5 h-3.5 text-text-muted transition-transform ${
+                                      className={`w-3.5 h-3.5 text-rose-400 transition-transform shrink-0 ${
                                         isExpanded ? 'rotate-180' : ''
                                       }`}
                                     />
                                   )}
                                 </div>
 
-                                {/* Expanded Failure Details */}
+                                {/* Expanded Failure Details - Seamless Flat Accent */}
                                 {isFailed && isExpanded && (
-                                  <div className="mt-1.5 p-2.5 rounded bg-surface border border-rose-500/30 space-y-2 text-[10px] font-mono animate-fadeIn select-text">
+                                  <div className="my-1 ml-4 pl-3 py-2 border-l-2 border-rose-500/40 bg-surface-raised/20 space-y-2 text-[10px] font-mono animate-fadeIn select-text rounded-r">
                                     <div>
-                                      <span className="text-text-muted uppercase font-bold block mb-0.5">Request Sent</span>
+                                      <span className="text-[9px] text-text-muted uppercase font-bold tracking-wider block mb-0.5">REQUEST</span>
                                       <div className="text-text">
                                         {test.method} {test.path}
                                       </div>
@@ -1631,7 +1760,7 @@ export default function BuildWorkspace() {
                                     </div>
 
                                     <div>
-                                      <span className="text-emerald-400 uppercase font-bold block mb-0.5">Expected</span>
+                                      <span className="text-[9px] text-emerald-400 uppercase font-bold tracking-wider block mb-0.5">EXPECTED</span>
                                       <div>Status: {test.expect?.status || 200}</div>
                                       {test.expect?.bodyContains && (
                                         <pre className="text-emerald-400/80 overflow-x-auto mt-0.5">
@@ -1641,8 +1770,8 @@ export default function BuildWorkspace() {
                                     </div>
 
                                     <div>
-                                      <span className="text-rose-400 uppercase font-bold block mb-0.5">Actual (Got)</span>
-                                      <div className="text-rose-300">Status: {test.got?.status ?? 'No response'}</div>
+                                      <span className="text-[9px] text-rose-400 uppercase font-bold tracking-wider block mb-0.5">RETURNED</span>
+                                      <div className="text-rose-300">Status: {test.got?.status ?? 'No response received'}</div>
                                       {test.got?.body !== undefined && (
                                         <pre className="text-rose-300 overflow-x-auto mt-0.5">
                                           <code>
@@ -1664,24 +1793,24 @@ export default function BuildWorkspace() {
                   );
                 })}
 
-                {/* 2. Hidden Verification Suite */}
+                {/* 2. Hidden Verification Suite - Flat */}
                 {groupedChecklist.hiddenTests.length > 0 && (
-                  <div className="rounded-lg border border-border/50 bg-surface overflow-hidden shadow-xs">
-                    <div className="p-2.5 flex items-center justify-between gap-2 bg-surface-raised/70 select-none">
+                  <div className="py-1">
+                    <div className="px-3.5 py-2 flex items-center justify-between gap-2 select-none">
                       <div className="flex items-center gap-1.5 font-bold font-mono text-xs text-text-muted">
                         <Lock className="w-3.5 h-3.5 text-accent-build" />
-                        <span>Hidden Edge Case Suite</span>
+                        <span>Hidden Edge Cases</span>
                       </div>
-                      <span className="text-[10px] font-mono text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border/40">
+                      <span className="text-[10px] font-mono text-text-muted">
                         {groupedChecklist.hiddenTests.filter((t) => t.passed).length}/{groupedChecklist.hiddenTests.length} Passed
                       </span>
                     </div>
 
-                    <div className="p-2 space-y-1.5 divide-y divide-border/30">
+                    <div className="pl-6 pr-3.5 space-y-0.5 pb-1">
                       {groupedChecklist.hiddenTests.map((test) => (
                         <div
                           key={test.id}
-                          className="pt-1.5 first:pt-0 flex items-center justify-between p-2 rounded text-xs bg-surface-raised/20"
+                          className="py-1.5 px-2 rounded flex items-center justify-between gap-2 text-xs hover:bg-surface-raised/20"
                         >
                           <div className="flex items-center gap-2 truncate">
                             {test.passed === true ? (
@@ -1693,7 +1822,6 @@ export default function BuildWorkspace() {
                             )}
                             <span className="text-xs text-text-muted truncate">{test.name}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-text-muted shrink-0">Private</span>
                         </div>
                       ))}
                     </div>
@@ -1703,6 +1831,7 @@ export default function BuildWorkspace() {
             )}
           </div>
         </aside>
+        )}
       </div>
 
       {/* ─── Reset Confirmation Modal ─── */}
@@ -1713,10 +1842,10 @@ export default function BuildWorkspace() {
               <div className="p-2 rounded-full bg-amber-500/10 border border-amber-500/25">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-text">Reset All Files?</h3>
+              <h3 className="text-base font-bold text-text">Reset Code to Starter Template?</h3>
             </div>
             <p className="text-xs text-text-muted leading-relaxed">
-              This will overwrite all your current files and restore the original starter files. This action cannot be undone.
+              This will restore the original starter template files and discard your current code changes.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -1731,7 +1860,7 @@ export default function BuildWorkspace() {
                 onClick={handleResetConfirm}
                 className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded transition-colors"
               >
-                Reset Files
+                Reset Code
               </button>
             </div>
           </div>

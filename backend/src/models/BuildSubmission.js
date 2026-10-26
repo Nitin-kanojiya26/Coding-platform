@@ -55,10 +55,17 @@ const buildSubmissionSchema = new mongoose.Schema({
     default: 0,
   },
   testResults: [testResultSchema],
+  contestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Contest',
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+buildSubmissionSchema.index({ contestId: 1, userId: 1, problemId: 1, createdAt: 1 });
 
 module.exports = mongoose.model('BuildSubmission', buildSubmissionSchema);

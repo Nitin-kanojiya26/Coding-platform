@@ -89,7 +89,7 @@ export default function CreateProblem() {
           Create Problem
         </h1>
         <p className="text-xs text-text-muted mt-0.5">
-          Add a new coding challenge with test cases and evaluation limits.
+          Add a new coding challenge with test cases and runtime limits.
         </p>
       </div>
 
@@ -200,7 +200,7 @@ export default function CreateProblem() {
             {/* Hidden Testcases */}
             <div className="space-y-3 pt-3 border-t border-border/30">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-text">Hidden Evaluation Cases</span>
+                <span className="text-xs font-medium text-text">Hidden Test Cases (Private)</span>
                 <button
                   type="button"
                   onClick={() => addTestCase('hidden')}

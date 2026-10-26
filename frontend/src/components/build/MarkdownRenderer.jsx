@@ -46,9 +46,9 @@ export default function MarkdownRenderer({ content = '', className = '' }) {
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
           elements.push(
-            <div key={`code-${index}`} className="my-2.5 rounded-md border border-border/60 bg-surface-raised overflow-hidden">
+            <div key={`code-${index}`} className="my-2.5 rounded bg-surface-raised/20 border border-border/20 overflow-hidden">
               {codeLang && (
-                <div className="px-3 py-1 bg-surface-raised border-b border-border/40 text-[10px] font-mono text-text-muted select-none uppercase tracking-wider">
+                <div className="px-3 py-1 bg-surface-raised/30 border-b border-border/20 text-[10px] font-mono text-text-muted select-none uppercase tracking-wider">
                   {codeLang}
                 </div>
               )}
@@ -149,7 +149,7 @@ export default function MarkdownRenderer({ content = '', className = '' }) {
     return parts.map((part, i) => {
       if (part.startsWith('`') && part.endsWith('`')) {
         return (
-          <code key={i} className="px-1.5 py-0.5 rounded bg-surface-raised border border-border/60 text-accent-build font-mono text-[11px] font-medium mx-0.5 select-all">
+          <code key={i} className="px-1.5 py-0.5 rounded bg-surface-raised/30 text-accent-build font-mono text-[11px] font-medium mx-0.5 select-all">
             {part.slice(1, -1)}
           </code>
         );

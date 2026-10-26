@@ -156,9 +156,9 @@ export default function ProblemDetail() {
 
       // Vertical splitter: Code Editor <-> Test Cases & Console Drawer
       if (isDraggingConsole) {
-        const newHeight = rect.bottom - e.clientY;
-        const maxHeight = Math.max(rect.height - 140, 200);
-        if (newHeight >= 90 && newHeight <= maxHeight) {
+        const newHeight = rect.bottom - e.clientY - 40;
+        const maxHeight = Math.max(rect.height - 180, 200);
+        if (newHeight >= 60 && newHeight <= maxHeight) {
           setConsoleHeight(newHeight);
           setConsoleOpen(true);
         }
@@ -410,10 +410,10 @@ export default function ProblemDetail() {
       {/* ─── LEFT PANEL: Problem Workspace & Submissions ─── */}
       <div
         style={{ width: isDesktop ? `${splitPercent}%` : '100%' }}
-        className="w-full flex flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/40 bg-bg shrink-0"
+        className="w-full flex flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/30 bg-bg shrink-0"
       >
         {/* Left Panel Tabs Toolbar (LeetCode Style: Description, Submissions, Discussion) */}
-        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/40 bg-surface/50 shrink-0 text-xs select-none">
+        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30 bg-bg shrink-0 text-xs select-none">
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -423,7 +423,7 @@ export default function ProblemDetail() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
                 leftTab === 'description'
-                  ? 'bg-surface-raised text-text font-medium border border-border/50'
+                  ? 'bg-accent/15 text-accent font-semibold'
                   : 'text-text-muted hover:text-text'
               }`}
             >
@@ -436,14 +436,14 @@ export default function ProblemDetail() {
               onClick={() => setLeftTab('submissions')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
                 leftTab === 'submissions'
-                  ? 'bg-surface-raised text-text font-medium border border-border/50'
+                  ? 'bg-accent/15 text-accent font-semibold'
                   : 'text-text-muted hover:text-text'
               }`}
             >
               <Clock className="h-3.5 w-3.5" />
               <span>Submissions</span>
               {submissionsList.length > 0 && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-surface-raised border border-border/40 rounded-full text-text-muted">
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-surface-raised rounded-full text-text-muted">
                   {submissionsList.length}
                 </span>
               )}
@@ -960,12 +960,12 @@ export default function ProblemDetail() {
         }`}
       >
         {/* Editor Top Toolbar */}
-        <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/40 bg-surface/50 shrink-0">
+        <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30 bg-bg shrink-0">
           <div className="flex items-center gap-2">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="bg-surface-raised border border-border/40 rounded px-2.5 py-1 text-xs font-mono text-text outline-none hover:border-border cursor-pointer transition-colors"
+              className="bg-transparent border border-border/30 rounded px-2.5 py-1 text-xs font-mono text-text outline-none hover:border-border/60 cursor-pointer transition-colors"
             >
               {LANGUAGES.map((lang) => (
                 <option key={lang.id} value={lang.id} className="bg-[#121212] text-white">
@@ -1007,365 +1007,355 @@ export default function ProblemDetail() {
           />
         </div>
 
-        {/* ─── RESIZE HANDLE: Vertical Splitter between Editor and Test Cases / Console ─── */}
-        <div
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setIsDraggingConsole(true);
-          }}
-          className={`h-2 hover:h-2.5 relative z-20 cursor-row-resize flex items-center justify-center transition-all group shrink-0 select-none ${
-            isDraggingConsole ? 'bg-accent/40' : 'bg-border/30 hover:bg-accent/30 border-y border-border/40'
-          }`}
-          title="Drag to resize Test Cases & Console"
-        >
+        {/* ─── RESIZE HANDLE: Vertical Splitter between Editor and Test Cases / Console (only when console is open) ─── */}
+        {consoleOpen && (
           <div
-            className={`h-0.5 w-10 rounded-full transition-colors ${
-              isDraggingConsole ? 'bg-accent' : 'bg-text-muted/40 group-hover:bg-accent/80'
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingConsole(true);
+            }}
+            className={`h-1.5 hover:h-2 relative z-20 cursor-row-resize flex items-center justify-center transition-all group shrink-0 select-none ${
+              isDraggingConsole ? 'bg-accent/40' : 'bg-border/30 hover:bg-accent/30'
             }`}
-          />
-        </div>
-
-        {/* ─── Bottom Console Container (Toolbar + Testcase/Result body with adjustable height) ─── */}
-        <div
-          style={{ height: consoleOpen ? `${consoleHeight}px` : '38px' }}
-          className="flex flex-col shrink-0 overflow-hidden bg-bg transition-[height] duration-75"
-        >
-          {/* Bottom Console Toolbar: LeetCode-style Testcase & Result tabs + Run/Submit */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-surface/40 shrink-0">
-            {/* LeetCode Seamless Console Tabs */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setConsoleTab('testcase');
-                  setConsoleOpen(true);
-                }}
-                className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                  consoleTab === 'testcase'
-                    ? 'bg-surface-raised text-text font-medium border border-border/50'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                Testcase
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConsoleTab('result');
-                  setConsoleOpen(true);
-                }}
-                className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  consoleTab === 'result'
-                    ? 'bg-surface-raised text-text font-medium border border-border/50'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                <span>Test Result</span>
-                {terminalLogs?.mode === 'sandbox' && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      terminalLogs.data?.overallStatus?.toLowerCase() === 'accepted'
-                        ? 'bg-success'
-                        : 'bg-danger'
-                    }`}
-                  />
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={triggerSandboxRun}
-                disabled={running || submitting}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-border/50 bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors disabled:opacity-50"
-              >
-                {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3 text-text-muted" />}
-                <span>Run</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={triggerProductionTransmit}
-                disabled={running || submitting}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded text-xs font-medium bg-success text-black hover:opacity-90 transition-opacity disabled:opacity-50 font-semibold"
-              >
-                {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                <span>Submit</span>
-              </button>
-
-              <div className="h-3.5 w-px bg-border/40 mx-0.5" />
-
-              <button
-                type="button"
-                onClick={() => setConsoleOpen(!consoleOpen)}
-                className="p-1 rounded text-text-muted hover:text-text transition-colors"
-                title={consoleOpen ? 'Collapse console' : 'Expand console'}
-              >
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${consoleOpen ? '' : 'rotate-180'}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* Terminal / Testcase Console Body */}
-          <div
-            ref={terminalRef}
-            className="bg-bg p-3.5 flex-1 min-h-0 overflow-y-auto"
+            title="Drag to resize Console"
           >
-          {/* TAB 1: Testcase (Seamless LeetCode Case Tabs & Input Parameters) */}
-          {consoleTab === 'testcase' && (
-            <div className="space-y-3 font-mono text-xs">
-              {problem?.sampleTestCases?.length > 0 ? (
-                <>
-                  <div className="flex items-center gap-1.5 pb-2 border-b border-border/30 overflow-x-auto">
-                    {problem.sampleTestCases.map((_, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setActiveSampleIndex(idx)}
-                        className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
-                          activeSampleIndex === idx
-                            ? 'bg-surface-raised text-text border border-border/50 font-medium'
-                            : 'text-text-muted hover:text-text'
-                        }`}
-                      >
-                        Case {idx + 1}
-                      </button>
-                    ))}
-                  </div>
+            <div
+              className={`h-0.5 w-10 rounded-full transition-colors ${
+                isDraggingConsole ? 'bg-accent' : 'bg-text-muted/30 group-hover:bg-accent/80'
+              }`}
+            />
+          </div>
+        )}
 
-                  {problem.sampleTestCases[activeSampleIndex] && (
-                    <div className="space-y-2.5 text-[11px]">
-                      <div>
-                        <span className="text-[10px] text-text-muted uppercase tracking-wider block mb-1 font-sans">
-                          Input:
-                        </span>
-                        <div className="bg-surface-raised/30 border border-border/30 p-2.5 rounded text-text font-mono whitespace-pre-wrap">
-                          {problem.sampleTestCases[activeSampleIndex].displayInput ||
-                            problem.sampleTestCases[activeSampleIndex].input}
-                        </div>
+        {/* ─── Drawer Content (Completely hidden when consoleOpen is false) ─── */}
+        {consoleOpen && (
+          <div
+            style={{ height: `${consoleHeight}px` }}
+            className="flex flex-col shrink-0 bg-bg overflow-hidden select-text"
+          >
+            <div
+              ref={terminalRef}
+              className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3"
+            >
+              {/* TAB 1: Testcase (Clean, unboxed & seamless) */}
+              {consoleTab === 'testcase' && (
+                <div className="space-y-3 font-mono text-xs">
+                  {problem?.sampleTestCases?.length > 0 ? (
+                    <>
+                      {/* Case selector pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none">
+                        {problem.sampleTestCases.map((_, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setActiveSampleIndex(idx)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                              activeSampleIndex === idx
+                                ? 'bg-surface-raised text-text font-semibold shadow-xs'
+                                : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                            }`}
+                          >
+                            Case {idx + 1}
+                          </button>
+                        ))}
                       </div>
-                      <div>
-                        <span className="text-[10px] text-text-muted uppercase tracking-wider block mb-1 font-sans">
-                          Expected Output:
-                        </span>
-                        <div className="bg-surface-raised/30 border border-border/30 p-2.5 rounded text-success font-mono whitespace-pre-wrap">
-                          {problem.sampleTestCases[activeSampleIndex].output}
+
+                      {/* Clean Unboxed Case Details */}
+                      {problem.sampleTestCases[activeSampleIndex] && (
+                        <div className="space-y-3 pt-1 text-xs">
+                          <div className="space-y-1">
+                            <span className="text-[11px] text-text-muted font-sans font-medium">Input =</span>
+                            <div className="bg-surface-raised/40 px-3.5 py-2.5 rounded-lg font-mono text-xs text-text whitespace-pre-wrap select-text leading-relaxed">
+                              {problem.sampleTestCases[activeSampleIndex].displayInput ||
+                                problem.sampleTestCases[activeSampleIndex].input}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[11px] text-text-muted font-sans font-medium">Expected =</span>
+                            <div className="bg-surface-raised/40 px-3.5 py-2.5 rounded-lg font-mono text-xs text-emerald-400 whitespace-pre-wrap select-text leading-relaxed">
+                              {problem.sampleTestCases[activeSampleIndex].output}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-text-muted text-xs font-mono py-6 text-center select-none">
+                      No sample test cases configured for this challenge.
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-text-muted text-xs font-mono py-4 text-center">
-                  No sample test cases configured for this challenge.
                 </div>
               )}
-            </div>
-          )}
 
-          {/* TAB 2: Test Result */}
-          {consoleTab === 'result' && (
-            <>
-              {terminalLogs ? (
-                <div className="font-mono text-xs space-y-3">
-                  {/* Error Output */}
-                  {terminalLogs.mode === 'error' && (
-                    <div className="p-2.5 rounded bg-danger/10 border border-danger/30 text-danger space-y-1">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <ShieldAlert className="h-4 w-4" />
-                        <span>Execution Error</span>
-                      </div>
-                      <pre className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed">
-                        {terminalLogs.out}
-                      </pre>
-                    </div>
-                  )}
-
-                  {/* Sandbox Run Mode */}
-                  {terminalLogs.mode === 'sandbox' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-border/30">
-                        <div className="flex items-center gap-1.5">
-                          {terminalLogs.data.overallStatus?.toLowerCase() === 'accepted' ? (
-                            <span className="font-medium text-success flex items-center gap-1">
-                              <CheckCircle className="h-4 w-4" /> Accepted
-                            </span>
-                          ) : (
-                            <span className="font-medium text-danger flex items-center gap-1">
-                              <XCircle className="h-4 w-4" />{' '}
-                              {terminalLogs.data.overallStatus || 'Wrong Answer'}
-                            </span>
-                          )}
+              {/* TAB 2: Test Result (Clean, unboxed & seamless) */}
+              {consoleTab === 'result' && (
+                <>
+                  {terminalLogs ? (
+                    <div className="font-mono text-xs space-y-3">
+                      {/* Execution Error */}
+                      {terminalLogs.mode === 'error' && (
+                        <div className="p-3 rounded-lg bg-rose-500/10 text-rose-400 space-y-1">
+                          <div className="flex items-center gap-1.5 font-semibold text-xs">
+                            <ShieldAlert className="h-4 w-4" />
+                            <span>Execution Error</span>
+                          </div>
+                          <pre className="whitespace-pre-wrap text-xs font-mono leading-relaxed select-text">
+                            {terminalLogs.out}
+                          </pre>
                         </div>
-                        <span className="text-[11px] text-text-muted font-mono">
-                          {terminalLogs.data.passed} / {terminalLogs.data.total} passed
-                        </span>
-                      </div>
+                      )}
 
-                      {/* Testcase Tabs */}
-                      {terminalLogs.data.results?.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-1 overflow-x-auto">
-                            {terminalLogs.data.results.map((r, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setActiveTestTab(idx)}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
-                                  activeTestTab === idx
-                                    ? 'bg-surface-raised text-text border border-border/50 font-medium'
-                                    : 'text-text-muted hover:text-text'
-                                }`}
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full ${
-                                    r.passed ? 'bg-success' : 'bg-danger'
-                                  }`}
-                                />
-                                <span>Case {idx + 1}</span>
-                              </button>
-                            ))}
+                      {/* Sandbox Run Mode */}
+                      {terminalLogs.mode === 'sandbox' && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between pb-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              {terminalLogs.data.overallStatus?.toLowerCase() === 'accepted' ? (
+                                <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-sm">
+                                  <CheckCircle className="h-4 w-4" /> Accepted
+                                </span>
+                              ) : (
+                                <span className="font-semibold text-rose-400 flex items-center gap-1.5 text-sm">
+                                  <XCircle className="h-4 w-4" />{' '}
+                                  {terminalLogs.data.overallStatus || 'Wrong Answer'}
+                                </span>
+                              )}
+                              <span className="text-text-muted font-mono text-xs">
+                                ({terminalLogs.data.passed} / {terminalLogs.data.total} passed)
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Active Case Details */}
-                          {terminalLogs.data.results[activeTestTab] && (
-                            <div className="space-y-2 text-[11px]">
-                              <div>
-                                <span className="text-text-muted block text-[10px] mb-0.5">Input:</span>
-                                <div className="bg-surface-raised/40 p-2 rounded text-text whitespace-pre-wrap">
-                                  {terminalLogs.data.results[activeTestTab].displayInput ||
-                                    terminalLogs.data.results[activeTestTab].input ||
-                                    'N/A'}
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <span className="text-text-muted block text-[10px] mb-0.5">Output:</span>
-                                  <div
-                                    className={`p-2 rounded whitespace-pre-wrap ${
-                                      terminalLogs.data.results[activeTestTab].passed
-                                        ? 'bg-surface-raised/40 text-success'
-                                        : 'bg-danger/10 text-danger border border-danger/20'
+                          {/* Result Case Tabs */}
+                          {terminalLogs.data.results?.length > 0 && (
+                            <div className="space-y-2.5">
+                              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none">
+                                {terminalLogs.data.results.map((r, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setActiveTestTab(idx)}
+                                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                      activeTestTab === idx
+                                        ? 'bg-surface-raised text-text font-semibold shadow-xs'
+                                        : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                                     }`}
                                   >
-                                    {terminalLogs.data.results[activeTestTab].actualOutput || '(empty)'}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-text-muted block text-[10px] mb-0.5">Expected:</span>
-                                  <div className="bg-surface-raised/40 p-2 rounded text-success whitespace-pre-wrap">
-                                    {terminalLogs.data.results[activeTestTab].expectedOutput || 'N/A'}
-                                  </div>
-                                </div>
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${
+                                        r.passed ? 'bg-emerald-400' : 'bg-rose-500'
+                                      }`}
+                                    />
+                                    <span>Case {idx + 1}</span>
+                                  </button>
+                                ))}
                               </div>
+
+                              {/* Active Case Details */}
+                              {terminalLogs.data.results[activeTestTab] && (
+                                <div className="space-y-2.5 text-xs">
+                                  <div className="space-y-1">
+                                    <span className="text-[11px] text-text-muted font-sans font-medium">Input =</span>
+                                    <div className="bg-surface-raised/40 px-3.5 py-2.5 rounded-lg text-text whitespace-pre-wrap font-mono select-text leading-relaxed">
+                                      {terminalLogs.data.results[activeTestTab].displayInput ||
+                                        terminalLogs.data.results[activeTestTab].input ||
+                                        'N/A'}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    <div className="space-y-1">
+                                      <span className="text-[11px] text-text-muted font-sans font-medium">Output =</span>
+                                      <div
+                                        className={`px-3.5 py-2.5 rounded-lg whitespace-pre-wrap font-mono select-text leading-relaxed ${
+                                          terminalLogs.data.results[activeTestTab].passed
+                                            ? 'bg-surface-raised/40 text-emerald-400'
+                                            : 'bg-rose-500/10 text-rose-400'
+                                        }`}
+                                      >
+                                        {terminalLogs.data.results[activeTestTab].actualOutput || '(empty)'}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="text-[11px] text-text-muted font-sans font-medium">Expected =</span>
+                                      <div className="bg-surface-raised/40 px-3.5 py-2.5 rounded-lg text-emerald-400 whitespace-pre-wrap font-mono select-text leading-relaxed">
+                                        {terminalLogs.data.results[activeTestTab].expectedOutput || 'N/A'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       )}
+
+                      {/* Production Submission Mode */}
+                      {terminalLogs.mode === 'production' && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between pb-1">
+                            <div>
+                              {terminalLogs.data.status?.toLowerCase() === 'accepted' ? (
+                                <span className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
+                                  <CheckCircle className="h-5 w-5" /> Accepted
+                                </span>
+                              ) : (
+                                <span className="text-base font-bold text-rose-400 flex items-center gap-1.5">
+                                  <XCircle className="h-5 w-5" /> {terminalLogs.data.status || 'Wrong Answer'}
+                                </span>
+                              )}
+                              <div className="text-xs text-text-muted font-sans mt-0.5">
+                                {terminalLogs.data.passedTestCases ?? 0} /{' '}
+                                {terminalLogs.data.totalTestCases ?? 0} test cases passed.
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (terminalLogs.data) {
+                                  handleSelectSubmission(terminalLogs.data);
+                                  setLeftTab('submissions');
+                                } else {
+                                  setLeftTab('submissions');
+                                }
+                              }}
+                              className="text-xs text-accent hover:underline flex items-center gap-1 font-sans font-medium cursor-pointer"
+                            >
+                              View Details & Code →
+                            </button>
+                          </div>
+
+                          {/* Seamless Metric Chips without boxy cards */}
+                          <div className="flex flex-wrap items-center gap-2.5 text-xs pt-1">
+                            <div className="bg-surface-raised/40 px-3 py-2 rounded-lg flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-emerald-400" />
+                              <span className="text-text-muted">Runtime:</span>
+                              <span className="font-mono text-text font-bold">
+                                {terminalLogs.data.runtime ?? 0} ms
+                              </span>
+                              {problemStats?.acceptedRuntimes?.length > 0 && terminalLogs.data.runtime != null && (
+                                <span className="text-[11px] text-accent font-mono ml-1">
+                                  (Beats{' '}
+                                  {Math.round(
+                                    (problemStats.acceptedRuntimes.filter((r) => r > terminalLogs.data.runtime).length /
+                                      problemStats.acceptedRuntimes.length) *
+                                      100
+                                  )}
+                                  %)
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="bg-surface-raised/40 px-3 py-2 rounded-lg flex items-center gap-2">
+                              <HardDrive className="h-3.5 w-3.5 text-accent" />
+                              <span className="text-text-muted">Memory:</span>
+                              <span className="font-mono text-text font-bold">
+                                {terminalLogs.data.memory ?? 0} MB
+                              </span>
+                              {problemStats?.acceptedMemories?.length > 0 && terminalLogs.data.memory != null && (
+                                <span className="text-[11px] text-accent font-mono ml-1">
+                                  (Beats{' '}
+                                  {Math.round(
+                                    (problemStats.acceptedMemories.filter((m) => m > terminalLogs.data.memory).length /
+                                      problemStats.acceptedMemories.length) *
+                                      100
+                                  )}
+                                  %)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full min-h-[100px] items-center justify-center text-text-muted text-xs font-mono space-y-1.5 py-6 select-none">
+                      <Terminal className="h-4 w-4 text-text-muted" />
+                      <span>Run your code to test against example test cases.</span>
                     </div>
                   )}
-
-                  {/* Production Submission Mode */}
-                  {terminalLogs.mode === 'production' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-border/30">
-                        <div>
-                          {terminalLogs.data.status?.toLowerCase() === 'accepted' ? (
-                            <span className="text-sm font-semibold text-success flex items-center gap-1.5">
-                              <CheckCircle className="h-4 w-4" /> Accepted
-                            </span>
-                          ) : (
-                            <span className="text-sm font-semibold text-danger flex items-center gap-1.5">
-                              <XCircle className="h-4 w-4" /> {terminalLogs.data.status || 'Wrong Answer'}
-                            </span>
-                          )}
-                          <div className="text-[11px] text-text-muted font-sans mt-0.5">
-                            {terminalLogs.data.passedTestCases ?? 0} /{' '}
-                            {terminalLogs.data.totalTestCases ?? 0} test cases passed.
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (terminalLogs.data) {
-                              handleSelectSubmission(terminalLogs.data);
-                              setLeftTab('submissions');
-                            } else {
-                              setLeftTab('submissions');
-                            }
-                          }}
-                          className="text-xs text-accent hover:underline flex items-center gap-1 font-sans font-medium cursor-pointer"
-                        >
-                          View Details & Code →
-                        </button>
-                      </div>
-
-                      {/* Runtime & Memory Metrics */}
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="bg-surface-raised/40 border border-border/30 rounded p-2.5 flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 text-success" />
-                          <div>
-                            <span className="text-[10px] text-text-muted block">Runtime</span>
-                            <span className="font-mono text-text font-medium">
-                              {terminalLogs.data.runtime ?? 0} ms
-                            </span>
-                            {problemStats?.acceptedRuntimes?.length > 0 && terminalLogs.data.runtime != null && (
-                              <span className="text-[10px] text-accent block font-mono">
-                                Beats{' '}
-                                {Math.round(
-                                  (problemStats.acceptedRuntimes.filter((r) => r > terminalLogs.data.runtime).length /
-                                    problemStats.acceptedRuntimes.length) *
-                                    100
-                                )}
-                                % of users
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="bg-surface-raised/40 border border-border/30 rounded p-2.5 flex items-center gap-2">
-                          <HardDrive className="h-3.5 w-3.5 text-accent" />
-                          <div>
-                            <span className="text-[10px] text-text-muted block">Memory</span>
-                            <span className="font-mono text-text font-medium">
-                              {terminalLogs.data.memory ?? 0} MB
-                            </span>
-                            {problemStats?.acceptedMemories?.length > 0 && terminalLogs.data.memory != null && (
-                              <span className="text-[10px] text-accent block font-mono">
-                                Beats{' '}
-                                {Math.round(
-                                  (problemStats.acceptedMemories.filter((m) => m > terminalLogs.data.memory).length /
-                                    problemStats.acceptedMemories.length) *
-                                    100
-                                )}
-                                % of users
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col h-full min-h-[110px] items-center justify-center text-text-muted text-xs font-mono space-y-1.5 py-4">
-                  <Terminal className="h-4 w-4 text-text-muted" />
-                  <span>You must run your code first to evaluate against test cases.</span>
-                  <button
-                    type="button"
-                    onClick={triggerSandboxRun}
-                    disabled={running || submitting}
-                    className="mt-1 px-3 py-1 bg-surface-raised border border-border/40 rounded text-xs text-text hover:bg-surface-raised/80 transition-colors"
-                  >
-                    Run Code
-                  </button>
-                </div>
+                </>
               )}
-            </>
-          )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Seamless LeetCode-Style Footer Bar ─── */}
+        <div className="flex items-center justify-between px-3 h-10 border-t border-border/40 bg-surface/50 shrink-0 select-none">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setConsoleOpen(!consoleOpen)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
+                consoleOpen
+                  ? 'bg-surface-raised text-text font-medium'
+                  : 'text-text-muted hover:text-text hover:bg-surface-raised/50'
+              }`}
+              title={consoleOpen ? 'Collapse console' : 'Expand console'}
+            >
+              <Terminal className="h-3.5 w-3.5 text-accent" />
+              <span>Console</span>
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${consoleOpen ? '' : 'rotate-180'}`} />
+            </button>
+
+            {consoleOpen && (
+              <div className="flex items-center gap-1 ml-1.5 pl-1.5 border-l border-border/30">
+                <button
+                  type="button"
+                  onClick={() => setConsoleTab('testcase')}
+                  className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                    consoleTab === 'testcase'
+                      ? 'bg-surface-raised text-text font-medium'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  Testcase
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConsoleTab('result')}
+                  className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
+                    consoleTab === 'result'
+                      ? 'bg-surface-raised text-text font-medium'
+                      : 'text-text-muted hover:text-text'
+                  }`}
+                >
+                  <span>Test Result</span>
+                  {terminalLogs?.mode === 'sandbox' && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        terminalLogs.data?.overallStatus?.toLowerCase() === 'accepted'
+                          ? 'bg-emerald-400'
+                          : 'bg-rose-500'
+                      }`}
+                    />
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={triggerSandboxRun}
+              disabled={running || submitting}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors disabled:opacity-50"
+            >
+              {running ? <Loader2 className="h-3 w-3 animate-spin text-accent" /> : <Play className="h-3 w-3 text-accent" />}
+              <span>Run</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={triggerProductionTransmit}
+              disabled={running || submitting}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded text-xs font-semibold bg-emerald-500 text-black hover:bg-emerald-400 transition-colors disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+              <span>Submit</span>
+            </button>
           </div>
         </div>
       </div>

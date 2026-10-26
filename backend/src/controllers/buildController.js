@@ -1,7 +1,9 @@
+const mongoose = require('mongoose');
 const BuildProblem = require('../models/BuildProblem');
 const BuildSubmission = require('../models/BuildSubmission');
-const { buildQueue } = require('../queues/buildQueue');
+const { buildQueue, addBuildJob } = require('../queues/buildQueue');
 const { validateSubmissionFiles, validateTestCases } = require('../utils/buildValidation');
+const { executeDockerFlow } = require('../workers/buildWorker');
 
 /**
  * GET /api/build/problems
@@ -10,15 +12,24 @@ const { validateSubmissionFiles, validateTestCases } = require('../utils/buildVa
 const getBuildProblems = async (req, res) => {
   try {
     const problems = await BuildProblem.find({})
-      .select('slug title difficulty runtime limits createdAt visibleTests')
+      .select('slug title difficulty runtime limits createdAt visibleTests statement')
       .sort({ createdAt: -1 });
 
     const formatted = problems.map((p) => {
       const obj = p.toObject();
-      const uniqueEndpoints = new Set(
+      const uniqueEndpoints = Array.from(new Set(
         (obj.visibleTests || []).map((t) => `${(t.request?.method || 'GET').toUpperCase()} ${t.request?.path || ''}`)
-      );
-      obj.endpointCount = Math.max(uniqueEndpoints.size, 1);
+      ));
+      obj.endpointCount = Math.max(uniqueEndpoints.length, 1);
+      obj.endpoints = uniqueEndpoints;
+      
+      const cleanDesc = (obj.statement || '')
+        .replace(/#{1,6}\s+[^\n]+/g, '')
+        .replace(/`{1,3}[^`]*`{1,3}/g, (m) => m.replace(/`/g, ''))
+        .replace(/\r?\n+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      obj.summary = cleanDesc.length > 130 ? cleanDesc.substring(0, 130) + '...' : cleanDesc;
       delete obj.visibleTests;
       return obj;
     });
@@ -59,6 +70,91 @@ const getBuildProblemBySlug = async (req, res) => {
 };
 
 /**
+ * ADMIN: GET /api/build/admin/problems/:slug
+ * Get full problem details including hiddenTests for admin editing
+ */
+const getAdminBuildProblemBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const problem = await BuildProblem.findOne({ slug: slug.toLowerCase() });
+
+    if (!problem) {
+      return res.status(404).json({ message: `Problem with slug "${slug}" not found` });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      problem,
+    });
+  } catch (err) {
+    console.error('Error fetching admin problem details:', err.message);
+    return res.status(500).json({ message: 'Server error fetching problem details' });
+  }
+};
+
+/**
+ * POST /api/build/run
+ * POST /api/build/problems/:slug/run
+ * Run visible tests against user files in sandbox mode (does not save permanent submission)
+ */
+const runBuildSolution = async (req, res) => {
+  try {
+    const slug = req.params.slug || req.body?.slug;
+
+    if (!slug || typeof slug !== 'string') {
+      return res.status(400).json({ message: 'Problem slug is required.' });
+    }
+    const files = req.body?.files;
+
+    // 1. Submit validation (Max 20 files, 200KB total, relative paths only, server.js or index.js required, plain text only)
+    const validationError = validateSubmissionFiles(files);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    // 2. Find problem by slug
+    const problem = await BuildProblem.findOne({ slug: slug.toLowerCase() })
+      .select('slug title visibleTests limits');
+    if (!problem) {
+      return res.status(404).json({ message: `Problem with slug "${slug}" not found.` });
+    }
+
+    if (!problem.visibleTests || problem.visibleTests.length === 0) {
+      return res.status(400).json({ message: 'This problem has no visible test cases to run.' });
+    }
+
+    // 3. Ephemeral submission object with valid ObjectId for Docker network/container naming
+    const ephemeralId = new mongoose.Types.ObjectId();
+    const submission = {
+      _id: ephemeralId,
+      userId: req.user._id,
+      problemId: problem._id,
+      files,
+      status: 'Running',
+    };
+
+    const startTime = Date.now();
+    const evalResult = await executeDockerFlow(submission, problem, { isRun: true });
+    const timeTakenMs = Date.now() - startTime;
+
+    return res.status(200).json({
+      status: 'success',
+      isRun: true,
+      verdict: evalResult.verdict,
+      score: evalResult.score,
+      passed: evalResult.passed,
+      total: evalResult.total,
+      message: evalResult.message,
+      testResults: evalResult.testResults,
+      timeTakenMs,
+    });
+  } catch (err) {
+    console.error('Error running build solution:', err.message);
+    return res.status(500).json({ message: 'Error executing test run: ' + err.message });
+  }
+};
+
+/**
  * POST /api/build/submit
  * Submit files for a build problem
  */
@@ -91,10 +187,8 @@ const submitBuildSolution = async (req, res) => {
       status: 'Queued',
     });
 
-    // 4. Add BullMQ job to api-judge queue
-    await buildQueue.add('evaluate-submission', {
-      submissionId: submission._id.toString(),
-    });
+    // 4. Add BullMQ job to api-judge queue (with automatic in-process fallback if BullMQ/Redis is offline)
+    await addBuildJob(submission._id.toString());
 
     return res.status(202).json({
       status: 'success',
@@ -298,12 +392,34 @@ const updateBuildProblem = async (req, res) => {
   }
 };
 
+/**
+ * ADMIN: DELETE /api/build/problems/:slug
+ * Delete build problem
+ */
+const deleteBuildProblem = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const problem = await BuildProblem.findOneAndDelete({ slug: slug.toLowerCase() });
+    if (!problem) {
+      return res.status(404).json({ message: `Problem with slug "${slug}" not found.` });
+    }
+    return res.status(200).json({ status: 'success', message: 'Build problem deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting build problem:', err.message);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getBuildProblems,
   getBuildProblemBySlug,
+  getAdminBuildProblemBySlug,
+  runBuildSolution,
   submitBuildSolution,
   getBuildSubmissionById,
   getUserBuildSubmissions,
   createBuildProblem,
   updateBuildProblem,
+  deleteBuildProblem,
 };
+

@@ -4,7 +4,7 @@ const User = require('../models/Users');
 const mongoose = require('mongoose');
 const judge0Service = require('../services/judge0Service');
 const languageMap = require('../utils/languageMap');
-const { submissionQueue } = require('../queues/submissionQueue');
+const { submissionQueue, addSubmissionJob } = require('../queues/submissionQueue');
 
 // Helper for pagination
 const getPagination = (page, limit) => {
@@ -134,8 +134,8 @@ exports.createSubmission = async (req, res) => {
       });
     }
 
-    // NEW BULLMQ ASYNC QUEUE ROUTE (After BullMQ / Production mode)
-    await submissionQueue.add('execute-submission', {
+    // ASYNC QUEUE ROUTE with automatic in-process fallback if BullMQ/Redis is offline
+    await addSubmissionJob({
       submissionId: submission._id,
       code,
       languageId,

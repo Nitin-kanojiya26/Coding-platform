@@ -30,6 +30,7 @@ import SheetsList from './pages/SheetsList';
 import SubmissionDetail from './pages/SubmissionDetail';
 import BuildProblems from './pages/BuildProblems';
 import BuildWorkspace from './pages/BuildWorkspace';
+import CreateBuildProblem from './pages/CreateBuildProblem';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -69,6 +70,8 @@ function AppRoutes() {
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/create-problem" element={<AdminRoute><CreateProblem /></AdminRoute>} />
         <Route path="/edit-problem/:id" element={<AdminRoute><EditProblem /></AdminRoute>} />
+        <Route path="/create-build-problem" element={<AdminRoute><CreateBuildProblem /></AdminRoute>} />
+        <Route path="/edit-build-problem/:slug" element={<AdminRoute><CreateBuildProblem /></AdminRoute>} />
       </Route>
 
       {/* Fallback */}

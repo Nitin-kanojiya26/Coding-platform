@@ -1,5 +1,5 @@
 const { Queue } = require('bullmq');
-const { bullmqConnection } = require('../config/bullmqRedis');
+const { bullmqConnection, isBullMQAvailable } = require('../config/bullmqRedis');
 
 // BullMQ Queue "api-judge" dedicated for Build Mode
 const buildQueue = new Queue('api-judge', {
@@ -12,7 +12,40 @@ const buildQueue = new Queue('api-judge', {
 });
 
 buildQueue.on('error', (err) => {
-  console.error('⚠️ [BullMQ buildQueue] Queue connection error:', err.message);
+  if (isBullMQAvailable()) {
+    console.error('⚠️ [BullMQ buildQueue] Queue connection error:', err.message);
+  }
 });
 
-module.exports = { buildQueue };
+/**
+ * Safe build job dispatcher with automatic fallback:
+ * If Redis / BullMQ is available, pushes job to BullMQ queue.
+ * If Redis / BullMQ is offline, runs in-process immediately in background (zero downtime).
+ */
+async function addBuildJob(submissionId) {
+  if (isBullMQAvailable()) {
+    try {
+      const jobPromise = buildQueue.add('evaluate-submission', {
+        submissionId,
+      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Queue timeout')), 2000)
+      );
+      return await Promise.race([jobPromise, timeoutPromise]);
+    } catch (err) {
+      console.warn(`⚠️ [BuildQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
+    }
+  }
+
+  // Fallback: Run in background via setImmediate
+  const { processBuildSubmissionDirectly } = require('../workers/buildWorker');
+  setImmediate(() => {
+    processBuildSubmissionDirectly(submissionId).catch((err) => {
+      console.error('Unhandled in-process build submission error:', err);
+    });
+  });
+
+  return { id: `in-process-${submissionId}`, isFallback: true };
+}
+
+module.exports = { buildQueue, addBuildJob };

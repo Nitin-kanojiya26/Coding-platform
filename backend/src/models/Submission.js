@@ -53,10 +53,15 @@ const submissionSchema = new mongoose.Schema(
     type: Number,
     default: 0,
   },
-totalTestCases: {
-  type: Number,
-  default: 0,
-},
+    totalTestCases: {
+      type: Number,
+      default: 0,
+    },
+    contestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Contest',
+      default: null,
+    },
   },
   {
     timestamps: true, // adds createdAt and updatedAt
@@ -68,6 +73,7 @@ totalTestCases: {
 // Indexes for fast queries
 submissionSchema.index({ user: 1, problem: 1 });
 submissionSchema.index({ problem: 1, submittedAt: -1 });
+submissionSchema.index({ contestId: 1, user: 1, problem: 1, createdAt: 1 });
 
 // Virtual to get problem details (optional, use populate instead)
 submissionSchema.virtual('problemDetails', {

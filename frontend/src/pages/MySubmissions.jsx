@@ -75,7 +75,7 @@ export default function MySubmissions() {
             <History className="h-4 w-4 text-accent" /> Submission History
           </h1>
           <p className="text-xs text-text-muted mt-0.5">
-            Complete record of your code executions, memory metrics, and evaluation verdicts.
+            View all your past code runs, test results, and submission history.
           </p>
         </div>
 

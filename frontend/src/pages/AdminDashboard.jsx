@@ -5,12 +5,14 @@ import toast from 'react-hot-toast';
 import {
   Shield, Users, FileText, Code, Ban, ShieldCheck,
   Heart, Sparkles, Edit, Trash2, Loader2, Plus, Search,
+  Boxes, Server,
 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [problems, setProblems] = useState([]);
+  const [buildProblems, setBuildProblems] = useState([]);
   const [sheets, setSheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
@@ -19,6 +21,7 @@ export default function AdminDashboard() {
   // Search states
   const [userSearch, setUserSearch] = useState('');
   const [problemSearch, setProblemSearch] = useState('');
+  const [buildSearch, setBuildSearch] = useState('');
 
   // Sheet Form
   const [sheetForm, setSheetForm] = useState({ name: '', description: '', imageUrl: '' });
@@ -49,10 +52,11 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsRes, problemsRes, sheetsRes] = await Promise.all([
+      const [statsRes, problemsRes, sheetsRes, buildRes] = await Promise.all([
         API.get('/admin/dashboard'),
         API.get('/problems'),
         API.get('/sheets'),
+        API.get('/build/problems').catch(() => ({ data: { problems: [] } })),
       ]);
       setData(statsRes.data.data || statsRes.data);
       const rawProblems = problemsRes.data.problems || [];
@@ -61,6 +65,7 @@ export default function AdminDashboard() {
         tags: (p.tags || []).map(t => String(t).toLowerCase())
       })));
       setSheets(sheetsRes.data || []);
+      setBuildProblems(buildRes.data?.problems || []);
     } catch (err) {
       console.error('Admin fetch error', err);
     } finally {
@@ -122,6 +127,24 @@ export default function AdminDashboard() {
     navigate(`/edit-problem/${problemId}`);
   };
 
+  const handleEditBuildProblem = (slug) => {
+    navigate(`/edit-build-problem/${slug}`);
+  };
+
+  const handleDeleteBuildProblem = async (slug) => {
+    if (!window.confirm(`Delete project "${slug}" permanently?`)) return;
+    setActionLoading((prev) => ({ ...prev, [`delete-build-${slug}`]: true }));
+    try {
+      await API.delete(`/build/problems/${slug}`);
+      toast.success('Project challenge deleted');
+      setBuildProblems((prev) => prev.filter((p) => p.slug !== slug));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [`delete-build-${slug}`]: false }));
+    }
+  };
+
   const filteredUsers = (data?.users || []).filter((u) => {
     const q = userSearch.toLowerCase().trim();
     if (!q) return true;
@@ -140,6 +163,16 @@ export default function AdminDashboard() {
     );
   });
 
+  const filteredBuildProblems = buildProblems.filter((p) => {
+    const q = buildSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.slug || '').toLowerCase().includes(q) ||
+      (p.tags || []).some(t => String(t).toLowerCase().includes(q))
+    );
+  });
+
   if (loading) {
     return (
       <div className="w-full space-y-4 pt-2 animate-pulse">
@@ -155,7 +188,8 @@ export default function AdminDashboard() {
 
   const statCards = [
     { label: 'Total Users', value: data?.totalUsers || 0, icon: Users },
-    { label: 'Total Challenges', value: data?.totalProblems || 0, icon: Code },
+    { label: 'DSA Problems', value: data?.totalProblems || 0, icon: Code },
+    { label: 'Project Challenges', value: buildProblems.length || 0, icon: Server },
     { label: 'Submissions', value: data?.totalSubmissions || 0, icon: FileText },
     { label: 'Banned Accounts', value: data?.bannedUsers || 0, icon: Ban },
   ];
@@ -169,21 +203,30 @@ export default function AdminDashboard() {
             <Shield className="h-4 w-4 text-accent" /> Administration Control Panel
           </h1>
           <p className="text-xs text-text-muted mt-0.5">
-            Monitor users, manage challenge repositories, and configure study plans.
+            Monitor users, manage challenges, and configure learning tracks.
           </p>
         </div>
 
-        <Link
-          to="/create-problem"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-text text-bg hover:opacity-90 rounded transition-opacity self-start sm:self-auto"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>New Problem</span>
-        </Link>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <Link
+            to="/create-build-problem"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-bg hover:opacity-90 rounded transition-opacity shadow-sm"
+          >
+            <Server className="h-3.5 w-3.5" />
+            <span>New Project Challenge</span>
+          </Link>
+          <Link
+            to="/create-problem"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-text text-bg hover:opacity-90 rounded transition-opacity"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>New DSA Problem</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stat Strip (Flat) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 border-y border-border/40 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 py-3 border-y border-border/40 text-xs">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -398,6 +441,113 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* REST API Challenges (Build Mode) Table */}
+      <div className="border border-border/40 bg-surface/40 rounded overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Server className="h-4 w-4 text-accent" />
+            <span className="text-xs font-medium uppercase tracking-wider text-text">
+              Project Challenges ({filteredBuildProblems.length})
+            </span>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-48">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={buildSearch}
+                onChange={(e) => setBuildSearch(e.target.value)}
+                className="w-full pl-7 pr-2.5 py-1 text-xs bg-surface-raised/40 border border-border/40 rounded text-text placeholder-text-muted focus:outline-none"
+              />
+            </div>
+            <Link
+              to="/create-build-problem"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 rounded transition-colors whitespace-nowrap"
+            >
+              <Plus className="h-3 w-3" />
+              <span>New</span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-border/40 text-[11px] font-medium text-text-muted select-none">
+                <th className="py-2 px-3">Project</th>
+                <th className="py-2 px-3">Slug</th>
+                <th className="py-2 px-3">Difficulty</th>
+                <th className="py-2 px-3">Test Cases</th>
+                <th className="py-2 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/20">
+              {filteredBuildProblems.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="py-6 text-center text-text-muted text-xs">
+                    No project challenges found. Click "New Project Challenge" above to create one.
+                  </td>
+                </tr>
+              ) : (
+                filteredBuildProblems.map((bp) => (
+                  <tr key={bp.slug || bp._id} className="hover:bg-surface-raised/30 transition-colors">
+                    <td className="py-2 px-3">
+                      <div className="font-medium text-text">{bp.title}</div>
+                      <div className="text-[10px] text-text-muted font-mono">{bp.runtime || 'node-express'}</div>
+                    </td>
+                    <td className="py-2 px-3 font-mono text-[11px] text-text-muted">
+                      {bp.slug}
+                    </td>
+                    <td className="py-2 px-3 capitalize">
+                      <span className={
+                        bp.difficulty?.toLowerCase() === 'easy' ? 'text-success' :
+                        bp.difficulty?.toLowerCase() === 'medium' ? 'text-warning' : 'text-danger'
+                      }>
+                        {bp.difficulty || 'Medium'}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-text-muted font-mono text-[11px]">
+                      {(bp.testCases || []).length} integration tests
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          to={`/build/${bp.slug}`}
+                          className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text transition-colors"
+                          title="Open Challenge"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Code className="h-3.5 w-3.5" />
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleEditBuildProblem(bp.slug)}
+                          className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBuildProblem(bp.slug)}
+                          disabled={actionLoading[`delete-build-${bp.slug}`]}
+                          className="p-1 rounded hover:bg-danger/10 text-text-muted hover:text-danger transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

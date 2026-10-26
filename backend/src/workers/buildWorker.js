@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { Worker } = require('bullmq');
-const { bullmqConnection } = require('../config/bullmqRedis');
+const { bullmqConnection, isBullMQAvailable } = require('../config/bullmqRedis');
 const BuildProblem = require('../models/BuildProblem');
 const BuildSubmission = require('../models/BuildSubmission');
 
@@ -158,9 +158,10 @@ async function performStartupCleanup() {
 }
 
 /**
- * Execute Docker evaluation for a single submission
+ * Execute Docker evaluation for a single submission or run
  */
-async function executeDockerFlow(submission, problem) {
+async function executeDockerFlow(submission, problem, options = {}) {
+  const isRun = Boolean(options?.isRun);
   const id = submission._id.toString();
   const tempDir = path.resolve('.tmp', 'submissions', id);
   const userDir = path.join(tempDir, 'user');
@@ -171,11 +172,15 @@ async function executeDockerFlow(submission, problem) {
   const networkName = `judge-${id}`;
 
   const startTimeoutMs = problem.limits?.startTimeoutMs || 3000;
-  const hardTimeoutMs = problem.limits?.totalTimeoutMs || 20000;
+  const hardTimeoutMs = isRun
+    ? Math.min(problem.limits?.totalTimeoutMs || 15000, 15000)
+    : (problem.limits?.totalTimeoutMs || 20000);
 
   // Track visible vs hidden test names
   const visibleNames = new Set((problem.visibleTests || []).map((t) => t.name));
-  const allTests = [...(problem.visibleTests || []), ...(problem.hiddenTests || [])];
+  const allTests = isRun
+    ? [...(problem.visibleTests || [])]
+    : [...(problem.visibleTests || []), ...(problem.hiddenTests || [])];
 
   try {
     // 1. Write user files and tests.json
@@ -412,6 +417,7 @@ async function executeDockerFlow(submission, problem) {
       score,
       testResults: sanitizedResults,
       message: parsedOutput.message || null,
+      isRun,
     };
   } finally {
     // 5. finally: docker rm -f app-<id>, docker network rm judge-<id>, delete temp folder. Never throw.
@@ -432,54 +438,61 @@ async function executeDockerFlow(submission, problem) {
   }
 }
 
+/**
+ * Core build job processor - runs Docker evaluation and updates MongoDB
+ * Used both by the BullMQ worker and directly when Redis is offline.
+ */
+async function processBuildSubmissionDirectly(submissionId) {
+  console.log(`🔨 [BuildRunner] Processing submission ${submissionId}`);
+
+  // Atomically set status to Running
+  const submission = await BuildSubmission.findOneAndUpdate(
+    { _id: submissionId, status: 'Queued' },
+    { status: 'Running' },
+    { new: true }
+  );
+
+  if (!submission) {
+    console.warn(`⚠️ [BuildRunner] Submission ${submissionId} not found or already started.`);
+    return;
+  }
+
+  // Fetch problem with hiddenTests
+  const problem = await BuildProblem.findById(submission.problemId).select('+hiddenTests');
+  if (!problem) {
+    console.error(`❌ [BuildRunner] Problem ${submission.problemId} not found.`);
+    await BuildSubmission.updateOne(
+      { _id: submissionId },
+      { status: 'Internal Error', message: 'Referenced problem does not exist.' }
+    );
+    return;
+  }
+
+  // Run the Docker flow
+  const evalResult = await executeDockerFlow(submission, problem);
+
+  // Write final result EXACTLY ONCE
+  await BuildSubmission.updateOne(
+    { _id: submissionId },
+    {
+      status: evalResult.verdict,
+      message: evalResult.message,
+      passed: evalResult.passed,
+      total: evalResult.total,
+      score: evalResult.score,
+      testResults: evalResult.testResults,
+    }
+  );
+
+  console.log(`✅ [BuildRunner] Submission ${submissionId} finished with verdict: ${evalResult.verdict} (${evalResult.score}%)`);
+  return evalResult;
+}
+
 // Build Mode Worker
 const buildWorker = new Worker(
   'api-judge',
   async (job) => {
-    const { submissionId } = job.data;
-    console.log(`🔨 [BuildWorker] Processing submission ${submissionId}`);
-
-    // Atomically set status to Running
-    const submission = await BuildSubmission.findOneAndUpdate(
-      { _id: submissionId, status: 'Queued' },
-      { status: 'Running' },
-      { new: true }
-    );
-
-    if (!submission) {
-      console.warn(`⚠️ [BuildWorker] Submission ${submissionId} not found or already started.`);
-      return;
-    }
-
-    // Fetch problem with hiddenTests
-    const problem = await BuildProblem.findById(submission.problemId).select('+hiddenTests');
-    if (!problem) {
-      console.error(`❌ [BuildWorker] Problem ${submission.problemId} not found.`);
-      await BuildSubmission.updateOne(
-        { _id: submissionId },
-        { status: 'Internal Error', message: 'Referenced problem does not exist.' }
-      );
-      return;
-    }
-
-    // Run the Docker flow
-    const evalResult = await executeDockerFlow(submission, problem);
-
-    // Write final result EXACTLY ONCE
-    await BuildSubmission.updateOne(
-      { _id: submissionId },
-      {
-        status: evalResult.verdict,
-        message: evalResult.message,
-        passed: evalResult.passed,
-        total: evalResult.total,
-        score: evalResult.score,
-        testResults: evalResult.testResults,
-      }
-    );
-
-    console.log(`✅ [BuildWorker] Submission ${submissionId} finished with verdict: ${evalResult.verdict} (${evalResult.score}%)`);
-    return evalResult;
+    return await processBuildSubmissionDirectly(job.data.submissionId);
   },
   {
     connection: bullmqConnection.duplicate(),
@@ -496,10 +509,17 @@ buildWorker.on('failed', (job, err) => {
 });
 
 buildWorker.on('error', (err) => {
-  console.error('⚠️ [BuildWorker] Worker connection error:', err.message);
+  if (isBullMQAvailable()) {
+    console.error('⚠️ [BuildWorker] Worker connection error:', err.message);
+  }
 });
 
 // Run cleanup immediately on worker load
 performStartupCleanup();
 
-module.exports = { buildWorker, performStartupCleanup };
+module.exports = {
+  buildWorker,
+  performStartupCleanup,
+  processBuildSubmissionDirectly,
+  executeDockerFlow,
+};
