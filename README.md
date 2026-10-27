@@ -5,55 +5,75 @@ A comprehensive coding platform built with modern web technologies to facilitate
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [⚡ Performance Benchmarks & Concurrency Testing](#-performance-benchmarks--concurrency-testing)
 - [Features](#features)
-- [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [🚀 Feature: Build Mode (API-Building Problems)](#-feature-build-mode-api-building-problems)
 - [Getting Started](#getting-started)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Overview
 
-Coding Platform is a full-stack web application designed to provide users with an interactive environment for writing, executing, and sharing code online. Whether you're learning to code, conducting coding interviews, or collaborating on projects, this platform offers a seamless experience.
+Coding Platform is a high-performance full-stack online judge and competitive programming platform. It supports real-time code execution, LeetCode-style rating systems, timed live contests, sandboxed Docker evaluation for backend API challenges, and scalable distributed task queuing.
+
+## ⚡ Performance Benchmarks & Concurrency Testing
+
+The platform was subjected to automated distributed concurrency testing simulating **100 concurrent contestants** executing submissions, polling for verdicts, and refreshing live standings under high contention.
+
+### 📊 Empirical Results (100 Concurrent Virtual Users)
+
+| High-Traffic Path / Metric | Baseline (Un-cached) | Optimized (Redis + BullMQ + Sockets) | Impact / Speedup |
+| :--- | :--- | :--- | :--- |
+| **Leaderboard Query (P95)** | `12,637 ms` (12.6s) | **`271 ms`** | 🚀 **46.6x Faster (97.8% latency drop)** |
+| **Submission Ingestion (P95)** | `> 20,000 ms` | **`665 ms`** | ⚡ **Decoupled via BullMQ Task Queue** |
+| **System HTTP Error Rate** | `40.0%` (IP rate limit block) | **`0.00%`** | 🛡️ **Zero Dropped Requests (500/500 OK)** |
+| **Verdict Traffic Overhead** | `~200 req/sec` polling storm | **Socket.IO Event Push** | 📉 **85% Redundant Traffic Eliminated** |
+
+📖 **[Read the Full 100-User Benchmark Engineering Report ➔](backend/LOAD_TEST_REPORT.md)**  
+*(Includes sequence diagrams, failure mode post-mortems, and architectural deep-dives on Redis Sorted Sets, BullMQ worker throttling, and Socket.IO duplex event meshes).*
 
 ## Features
 
 ✨ **Key Features:**
-- 💻 Real-time code editor with syntax highlighting
-- ▶️ Execute code and view results instantly
-- 🎨 Clean and intuitive user interface
-- 📱 Responsive design for all devices
-- 🔧 Support for multiple programming languages
-- 👥 User-friendly platform for learning and collaboration
+- ⚡ **High-Throughput Judge Pipeline**: BullMQ & Redis queues decouple code ingestion from heavy sandboxed compilation.
+- 🏆 **Real-Time Contests & Leaderboards**: Redis Sorted Sets ($O(\log N)$ ranking updates) and 2-second micro-caching.
+- 📈 **LeetCode-Style Contest Rating System**: Real-time rating graphs, allocation badges, and performance histories.
+- 🔄 **Real-Time Duplex Event Mesh**: Socket.IO broadcasts live submission verdicts and rankings without polling storms.
+- 🐳 **Build Mode (API Sandboxing)**: Docker-isolated runtime evaluating live Express/Node.js student microservices.
+- 💻 **Interactive Code Studio**: Rich syntax-highlighted code editor supporting multiple programming languages.
+
+## Tech Stack
+
+### Frontend
+- **React 18 & Vite**: Fast SPA rendering with modern React hooks
+- **Tailwind CSS**: Clean, responsive, and minimalist UI design system
+- **Socket.IO Client**: Duplex real-time room communication
+- **Chart.js & Canvas**: Interactive contest rating trend visualizations
+
+### Backend & Distributed Infrastructure
+- **Node.js & Express**: High-throughput REST API and WebSocket gateway
+- **Redis 7**: In-memory micro-caching, Redis Sorted Sets (`ZADD`/`ZREVRANGE`) for leaderboards, and rate-limiting
+- **BullMQ**: Distributed message broker managing sandboxed compilation and judge worker pools
+- **Socket.IO**: Real-time WebSocket room broadcasting for instant verdict notifications
+- **MongoDB & Mongoose**: Document storage with composite indexing and atomic upserts
+- **Docker**: Isolated containerized sandbox environments for multi-file API testing
 
 ## Project Structure
 
 ```
 Coding-platform/
-├── frontend/          # React-based frontend application
-├── backend/           # Backend server & API
+├── frontend/          # React + Vite client-side application
+├── backend/           # Express API, BullMQ queues, Redis caching, & judge workers
+│   ├── LOAD_TEST_REPORT.md   # 100-user concurrency benchmark report
+│   ├── k6_contest_load_test.js # Distributed k6 load testing suite
+│   └── src/           # API routes, controllers, services, models, & sockets
 ├── .gitignore         # Git ignore rules
 └── README.md          # Project documentation
 ```
-
-### Frontend
-The frontend directory contains the client-side application built with modern JavaScript frameworks and libraries. It provides an intuitive interface for users to interact with the coding platform.
-
-### Backend
-The backend directory contains the server-side logic, APIs, and database integration required to power the coding platform.
-
-## Tech Stack
-
-### Frontend
-- **JavaScript** (97.2% - Primary language)
-- **HTML** (0.1%)
-- **CSS** (2.7%)
-
-### Backend
-- JavaScript/Node.js
 
 ## Getting Started
 
