@@ -200,24 +200,9 @@ node scripts/run-contest-load-test.js
 
 ---
 
-## 9. Resume & Interview Portfolio Guide
+## 9. Key Engineering Conclusions & Production Architecture
 
-### 📄 High-Impact Resume Bullet Points (XYZ Formula)
-
-#### Bullet Set 1: Full-Stack / Backend Engineering
-> - **Architected high-throughput online judge engine** with Node.js, Redis 7, BullMQ, and MongoDB, decoupling HTTP submission ingestion from sandboxed code execution to support **100+ concurrent contestants** with **0.00% error rate**.
-> - **Slashed leaderboard read latency by 97.8% (12.6s → 271ms P95)** under 100-user concurrency by engineering a multi-tier Redis micro-caching strategy with mutex synchronization to prevent cache stampedes.
-> - **Eliminated polling storms by 85%** via Socket.IO room-based event broadcasting, pushing asynchronous judge verdicts to clients in real-time.
-
-#### Bullet Set 2: Distributed Systems & Performance
-> - **Designed and executed distributed load tests via k6**, benchmarking API latency across 500+ requests and achieving **P95 submission ingestion under 665ms** while processing 100% of concurrent judge workloads.
-> - **Optimized API rate-limiting middleware** with authenticated identity keying, eliminating false-positive HTTP 429 throttles across shared-network contestants.
-
----
-
-### 🎙️ Technical Interview Talking Points (STAR Method)
-
-- **Situation:** "During contest simulations, when 100 participants submitted code and refreshed the leaderboard simultaneously, the server suffered from cache stampedes and event-loop lag, spiking leaderboard response times to over 12 seconds and dropping 40% of submissions."
-- **Task:** "I needed to decouple code compilation from request handling, eliminate database connection pool exhaustion, and reduce leaderboard latency to under 500ms without dropping user submissions."
-- **Action:** "I introduced BullMQ backed by Redis for asynchronous job scheduling so API ingestion responded in ~600ms with HTTP 202. For the leaderboard, I engineered a 2-second Redis micro-cache paired with a concurrency mutex lock to eliminate redundant aggregations. Finally, I replaced client polling with Socket.IO room broadcasting."
-- **Result:** "Under a 100-VU k6 load test, P95 leaderboard query latency dropped by 97.8% from 12.6s to 271ms, error rates dropped from 40% to exactly 0.00%, and redundant HTTP polling traffic was cut by 85%."
+1. **Decoupled Asynchronous Processing**: By offloading compilation and evaluation workloads to BullMQ workers backed by Redis, the HTTP API layer remains completely decoupled from compute bottlenecks, maintaining sub-700ms P95 ingestion latencies even under peak submission concurrency.
+2. **Mitigation of Cache Stampedes**: Applying a short-lived micro-cache (2s TTL) combined with process-level mutex locking eliminates the thundering herd problem for live contest standings, delivering a 97.8% latency reduction ($12.6\text{s} \longrightarrow 271\text{ms}$).
+3. **Optimized Network Utilization**: Replacing repetitive client HTTP polling with real-time Socket.IO room broadcasts eliminates over 85% of redundant network overhead, conserving server socket capacity and database read bandwidth.
+4. **Identity-Aware Protection**: Transitioning rate-limiting keys to authenticated user identities rather than static IP addresses prevents false-positive throttling on shared network infrastructures without compromising service availability.
