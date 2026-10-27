@@ -22,7 +22,8 @@ import {
   Search,
   Loader2,
   PlusCircle,
-  Boxes
+  Boxes,
+  Swords,
 } from 'lucide-react';
 import { getAvatarSrc } from '../utils/avatar';
 
@@ -100,6 +101,7 @@ export default function Navbar() {
   const navLinks = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/problems', label: 'Problems', icon: Code2 },
+    { to: '/contests', label: 'Contests', icon: Swords },
     { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { to: '/my-submissions', label: 'Submissions', icon: History },
     { to: '/build', label: 'Build Mode', icon: Boxes, isBuildMode: true },
@@ -179,56 +181,55 @@ export default function Navbar() {
     navigate('/login');
   };
 
+  const isWorkspace = 
+    /^\/problems\/[^/]+$/.test(location.pathname) || 
+    /^\/build\/[^/]+$/.test(location.pathname);
+
   return (
-    <header className="sticky top-2 sm:top-3 z-40 w-full max-w-7xl mx-auto px-3 sm:px-6">
-      <div className="h-12 sm:h-13 px-3.5 sm:px-4 bg-surface/95 border border-border rounded-lg shadow-xs backdrop-blur-md flex items-center justify-between gap-3 sm:gap-4 transition-colors">
+    <header className="sticky top-0 z-40 w-full bg-bg/95 border-b border-border/30 backdrop-blur-md shrink-0">
+      <div className="h-13 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 transition-colors">
 
-        {/* Brand / Logo Section */}
-        <div className="flex items-center gap-3.5 shrink-0">
+        {/* Brand / Logo + Navigation Links */}
+        <div className="flex items-center gap-5 sm:gap-6 shrink-0">
           <Logo />
-        </div>
 
-        {/* Primary Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-1 shrink-0">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = location.pathname === link.to || (link.to === '/build' && location.pathname.startsWith('/build'));
-            return (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all select-none ${
-                  isActive
-                    ? link.isBuildMode
-                      ? 'bg-accent-build/15 text-accent-build border border-accent-build/40 font-semibold shadow-xs'
-                      : 'bg-surface-raised text-text border border-border font-medium'
-                    : link.isBuildMode
-                    ? 'text-accent-build/80 hover:text-accent-build hover:bg-accent-build/10 border border-transparent'
-                    : 'text-text-muted hover:text-text hover:bg-surface-raised/60'
-                }`}
-              >
-                <Icon className={`h-3.5 w-3.5 ${link.isBuildMode ? 'text-accent-build' : isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
-                <span>{link.label}</span>
-                {link.isBuildMode && (
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent-build/20 text-accent-build uppercase tracking-wider ml-0.5">
-                    API
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Reserved Spacious Expansion Area for Future Custom Buttons */}
-        <div className="hidden xl:flex items-center gap-2 flex-1 justify-start ml-2 pl-2 border-l border-border/40 h-4" id="navbar-expansion-zone">
-          {/* User can easily drop extra buttons here in the future without overcrowding */}
+          {/* Primary Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.to || (link.to === '/build' && location.pathname.startsWith('/build'));
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex items-center gap-1.5 px-2 xl:px-3 py-1.5 text-xs font-medium rounded-md transition-all select-none ${
+                    isActive
+                      ? link.isBuildMode
+                        ? 'bg-accent-build/15 text-accent-build border border-accent-build/40 font-semibold shadow-xs'
+                        : 'bg-surface-raised text-text border border-border font-medium'
+                      : link.isBuildMode
+                      ? 'text-accent-build/80 hover:text-accent-build hover:bg-accent-build/10 border border-transparent'
+                      : 'text-text-muted hover:text-text hover:bg-surface-raised/60'
+                  }`}
+                >
+                  <Icon className={`h-3.5 w-3.5 ${link.isBuildMode ? 'text-accent-build' : isActive ? 'text-accent-blue' : 'text-text-muted'}`} />
+                  <span>{link.label}</span>
+                  {link.isBuildMode && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent-build/20 text-accent-build uppercase tracking-wider ml-0.5">
+                      API
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
         {/* Right Area: Search, Theme Toggle, Profile */}
-        <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
 
           {/* Desktop Search */}
-          <div className="relative hidden md:block w-40 lg:w-52" ref={searchRef}>
+          <div className="relative hidden md:block w-32 lg:w-36 xl:w-48" ref={searchRef}>
             <div className={`flex items-center gap-2 px-2.5 py-1 rounded-md bg-surface-inset border text-xs font-mono transition-colors ${
               searchFocused ? 'border-accent-blue ring-1 ring-accent-blue' : 'border-border'
             }`}>
@@ -315,22 +316,22 @@ export default function Navbar() {
           <div className="relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface-raised/50 transition-all max-w-[140px] sm:max-w-none"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-surface-raised/60 transition-colors shrink-0"
             >
               <NavAvatar
                 avatar={user?.avatar}
                 name={user?.name}
-                className="h-6 w-6 text-[10px] rounded-md"
+                className="h-6 w-6 text-[10px] rounded-md shrink-0"
               />
-              <span className="hidden sm:block text-xs font-medium text-text truncate max-w-[90px]">
+              <span className="hidden sm:block text-xs font-medium text-text truncate max-w-[72px] xl:max-w-[95px]">
                 {user?.name || 'Developer'}
               </span>
-              <ChevronDown className={`h-3 w-3 text-text-muted transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-3 w-3 text-text-muted transition-transform duration-150 shrink-0 ${dropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Profile Dropdown */}
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-surface border border-border rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.6)] overflow-hidden z-50 animate-in fade-in duration-150">
+              <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface border border-border rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.6)] overflow-hidden z-50 animate-in fade-in duration-150">
                 <div className="px-3.5 py-2.5 border-b border-border bg-surface-raised/40 flex items-center gap-2.5">
                   <NavAvatar
                     avatar={user?.avatar}
@@ -411,7 +412,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden mt-2 bg-surface border border-border rounded-lg shadow-2xl p-3 space-y-2.5 animate-in slide-in-from-top-2 duration-150 z-30">
+        <div className="lg:hidden border-t border-border/30 bg-bg px-4 sm:px-6 py-3 space-y-3 animate-in slide-in-from-top-2 duration-150">
           <div className="relative w-full">
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-surface-inset font-mono text-xs">
               {isSearching ? <Loader2 className="h-3.5 w-3.5 text-accent-blue animate-spin" /> : <Search className="h-3.5 w-3.5 text-text-muted" />}

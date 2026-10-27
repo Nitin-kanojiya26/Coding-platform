@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const BuildProblem = require('../models/BuildProblem');
 const BuildSubmission = require('../models/BuildSubmission');
+const Contest = require('../models/Contest');
+const ContestParticipant = require('../models/ContestParticipant');
 const { buildQueue, addBuildJob } = require('../queues/buildQueue');
 const { validateSubmissionFiles, validateTestCases } = require('../utils/buildValidation');
 const { executeDockerFlow } = require('../workers/buildWorker');
@@ -179,16 +181,79 @@ const submitBuildSolution = async (req, res) => {
       return res.status(404).json({ message: `Problem with slug "${slug}" not found.` });
     }
 
+    // 2b. Contest validation (if contestId is provided)
+    const contestId = req.body?.contestId || req.query?.contestId;
+    let validatedContest = null;
+    if (contestId) {
+      if (!mongoose.Types.ObjectId.isValid(contestId)) {
+        return res.status(400).json({ message: 'Invalid contestId format.' });
+      }
+      validatedContest = await Contest.findById(contestId);
+      if (!validatedContest) {
+        return res.status(404).json({ message: 'Contest not found.' });
+      }
+      if (validatedContest.isCancelled) {
+        return res.status(400).json({ message: 'Contest has been cancelled.' });
+      }
+      if (validatedContest.type !== 'api') {
+        return res.status(400).json({
+          message: 'This contest is a DSA contest. Submissions must be made via /api/submissions.',
+        });
+      }
+
+      const now = new Date();
+      if (now < new Date(validatedContest.startTime)) {
+        return res.status(400).json({ message: 'Contest has not started yet.' });
+      }
+      const isContestEnded = now >= new Date(validatedContest.endTime) || validatedContest.status === 'ended';
+
+      // Check participant (only enforced during live contest; after contest, any user can practice submit)
+      if (!isContestEnded) {
+        const isParticipant = await ContestParticipant.findOne({
+          contestId: validatedContest._id,
+          userId: req.user._id,
+        });
+        if (!isParticipant) {
+          return res.status(403).json({
+            message: 'You are not a registered participant in this contest.',
+          });
+        }
+      }
+
+      // Check problem belongs to contest
+      const belongsToContest = (validatedContest.problems || []).some(
+        (p) => p.problemId?.toString() === problem._id.toString()
+      );
+      if (!belongsToContest) {
+        return res.status(400).json({
+          message: 'This problem is not part of the specified contest.',
+        });
+      }
+
+      // One-in-flight rule for API contests
+      const inFlight = await BuildSubmission.findOne({
+        contestId: validatedContest._id,
+        userId: req.user._id,
+        status: { $in: ['Queued', 'Running'] },
+      });
+      if (inFlight) {
+        return res.status(429).json({
+          message: 'A submission is already in flight for this contest. Please wait for it to complete.',
+        });
+      }
+    }
+
     // 3. Save as Queued BEFORE adding the job
     const submission = await BuildSubmission.create({
       userId: req.user._id,
       problemId: problem._id,
+      contestId: validatedContest ? validatedContest._id : null,
       files,
       status: 'Queued',
     });
 
     // 4. Add BullMQ job to api-judge queue (with automatic in-process fallback if BullMQ/Redis is offline)
-    await addBuildJob(submission._id.toString());
+    await addBuildJob(submission._id.toString(), { priority: validatedContest ? 1 : 10 });
 
     return res.status(202).json({
       status: 'success',

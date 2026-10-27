@@ -138,6 +138,10 @@ const contestSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  ratingsCalculatedAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

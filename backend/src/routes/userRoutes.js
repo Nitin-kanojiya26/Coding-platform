@@ -17,7 +17,8 @@ const {
   searchUsers,
   getUserPublicProfile,
   getUserStatsById,
-  uploadAvatar
+  uploadAvatar,
+  getUserRatingHistory,
 } = require('../controllers/userController');
 const {
   profileUpdateLimiter,
@@ -39,7 +40,11 @@ router.get('/streak', protect, getUserStreak);
 router.post('/avatar', profileUpdateLimiter, protect, upload.single('avatar'), uploadAvatar);
 router.get('/search', protect, searchUsers);
 
+// Milestone 6: Contest Rating History (Logged in user or by ID)
+router.get('/rating-history', protect, getUserRatingHistory);
+router.get('/:id/rating-history', protect, getUserRatingHistory);
+
 // Public profile & stats (by ID)
 router.get('/:id/profile', protect, getUserPublicProfile);
 router.get('/:id/stats', protect, getUserStatsById);
-module.exports = router;
+module.exports = router;

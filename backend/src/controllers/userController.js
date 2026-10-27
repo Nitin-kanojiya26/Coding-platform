@@ -430,7 +430,7 @@ exports.getUserPublicProfile = async (req, res) => {
   try {
     const userId = req.params.id;
     const user = await User.findById(userId)
-      .select('name avatar role solvedProblems createdAt')
+      .select('name avatar role solvedProblems createdAt contestRating ratingBadge contestsAttended globalContestRank')
       .populate('solvedProblems', 'title slug difficulty tags');
 
     if (!user) {
@@ -566,3 +566,26 @@ exports.searchUsers = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// ─── Get Contest Rating History ────────────────────────────
+// @desc    Get user's contest rating history (for chart & profile telemetry)
+// @route   GET /api/users/:id/rating-history or GET /api/users/rating-history
+// @access  Private
+exports.getUserRatingHistory = async (req, res) => {
+  try {
+    const targetUserId = req.params.id || req.user._id;
+    const ContestRatingHistory = require('../models/ContestRatingHistory');
+
+    const history = await ContestRatingHistory.find({ userId: targetUserId })
+      .sort({ calculatedAt: 1 })
+      .select('contestId contestTitle rank totalParticipants solvedCount oldRating newRating delta ratingBadge performance calculatedAt');
+
+    res.status(200).json({
+      status: 'success',
+      count: history.length,
+      history,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

@@ -1,6 +1,10 @@
 const Submission = require('../models/Submission');
+const BuildSubmission = require('../models/BuildSubmission');
 const Problem = require('../models/Problem');
 const User = require('../models/Users');
+const Contest = require('../models/Contest');
+const ContestParticipant = require('../models/ContestParticipant');
+const { updateUserContestStanding } = require('../services/contestLeaderboardService');
 const mongoose = require('mongoose');
 const judge0Service = require('../services/judge0Service');
 const languageMap = require('../utils/languageMap');
@@ -41,7 +45,11 @@ const getLanguageId = (lang) => {
     'java': 62,       // Java (OpenJDK 13.0.1)
     'javascript': 63, // JavaScript (Node.js 12.14.0)
     'js': 63,
-    'c': 50          // C (GCC 9.2.0)
+    'c': 50,          // C (GCC 9.2.0)
+    'assembly': 45,   // Assembly (NASM 2.14.02)
+    'asm': 45,
+    'cobol': 77,      // COBOL (GnuCOBOL 3.0.0)
+    'cob': 77,
   };
 
   return fallbackMap[normalized] || null;
@@ -52,12 +60,70 @@ const getLanguageId = (lang) => {
 // @access  Private
 exports.createSubmission = async (req, res) => {
   try {
-    const { problemId, language, code } = req.body;
+    const { problemId, language, code, contestId } = req.body;
 
     if (!problemId || !language || !code) {
       return res.status(400).json({
         message: 'Please provide problemId, language, and code',
       });
+    }
+
+    // 0. Contest validation (if contestId is provided)
+    let validatedContest = null;
+    let isContestEnded = false;
+    if (contestId) {
+      if (!mongoose.Types.ObjectId.isValid(contestId)) {
+        return res.status(400).json({ message: 'Invalid contestId format.' });
+      }
+      validatedContest = await Contest.findById(contestId);
+      if (!validatedContest) {
+        return res.status(404).json({ message: 'Contest not found.' });
+      }
+      if (validatedContest.isCancelled) {
+        return res.status(400).json({ message: 'Contest has been cancelled.' });
+      }
+      if (validatedContest.type !== 'dsa') {
+        return res.status(400).json({
+          message: 'This contest is an API contest. Submissions must be made via /api/build/submit.',
+        });
+      }
+
+      const now = new Date();
+      if (now < new Date(validatedContest.startTime)) {
+        return res.status(400).json({ message: 'Contest has not started yet.' });
+      }
+      isContestEnded = now >= new Date(validatedContest.endTime) || validatedContest.status === 'ended';
+
+      // Check participant (only enforced during live contest; after contest, any user can practice submit)
+      if (!isContestEnded) {
+        let isParticipant = await ContestParticipant.findOne({
+          contestId: validatedContest._id,
+          userId: req.user._id,
+        });
+        if (!isParticipant) {
+          if (validatedContest.kind === 'public' || validatedContest.creatorId?.toString() === req.user._id.toString() || req.user.role === 'admin') {
+            isParticipant = await ContestParticipant.create({
+              contestId: validatedContest._id,
+              userId: req.user._id,
+            });
+            await Contest.findByIdAndUpdate(validatedContest._id, { $inc: { participantsCount: 1 } });
+          } else {
+            return res.status(403).json({
+              message: 'You are not a registered participant in this contest.',
+            });
+          }
+        }
+      }
+
+      // Check problem belongs to contest
+      const belongsToContest = (validatedContest.problems || []).some(
+        (p) => p.problemId?.toString() === problemId.toString()
+      );
+      if (!belongsToContest) {
+        return res.status(400).json({
+          message: 'This problem is not part of the specified contest.',
+        });
+      }
     }
 
     // 1. Convert language string or ID to valid Judge0 language ID
@@ -83,6 +149,7 @@ exports.createSubmission = async (req, res) => {
     const submission = await Submission.create({
       user: req.user._id,
       problem: problemId,
+      contestId: validatedContest ? validatedContest._id : null,
       language,
       code,
       status: 'pending',
@@ -127,6 +194,11 @@ exports.createSubmission = async (req, res) => {
         );
       }
 
+      // If part of contest, update standing
+      if (validatedContest) {
+        await updateUserContestStanding(validatedContest._id, req.user._id).catch(() => {});
+      }
+
       return res.status(201).json({
         status: 'success',
         mode: 'sync',
@@ -135,15 +207,19 @@ exports.createSubmission = async (req, res) => {
     }
 
     // ASYNC QUEUE ROUTE with automatic in-process fallback if BullMQ/Redis is offline
-    await addSubmissionJob({
-      submissionId: submission._id,
-      code,
-      languageId,
-      testCases,
-      timeLimit: problem.timeLimit || 2000,
-      userId: req.user._id,
-      problemId: problem._id,
-    });
+    await addSubmissionJob(
+      {
+        submissionId: submission._id,
+        code,
+        languageId,
+        testCases,
+        timeLimit: problem.timeLimit || 2000,
+        userId: req.user._id,
+        problemId: problem._id,
+        contestId: validatedContest ? validatedContest._id : null,
+      },
+      { priority: validatedContest ? 1 : 10 }
+    );
 
     return res.status(202).json({
       status: 'success',
@@ -164,8 +240,94 @@ exports.createSubmission = async (req, res) => {
 // @access  Private
 exports.getMySubmissions = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, type = 'dsa' } = req.query;
     const { skip, page: pageNum, limit: limitNum } = getPagination(page, limit);
+
+    if (type === 'build') {
+      const [submissions, total] = await Promise.all([
+        BuildSubmission.find({ userId: req.user._id })
+          .populate('problemId', 'title slug difficulty')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limitNum)
+          .lean(),
+        BuildSubmission.countDocuments({ userId: req.user._id }),
+      ]);
+
+      const formatted = submissions.map((s) => ({
+        _id: s._id,
+        user: s.userId,
+        problem: s.problemId,
+        status: s.status,
+        score: s.score,
+        passed: s.passed,
+        total: s.total,
+        language: 'node',
+        isBuild: true,
+        submittedAt: s.createdAt,
+        createdAt: s.createdAt,
+      }));
+
+      return res.status(200).json({
+        status: 'success',
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+        count: formatted.length,
+        submissions: formatted,
+      });
+    }
+
+    if (type === 'all') {
+      const [dsaSubs, buildSubs] = await Promise.all([
+        Submission.find({ user: req.user._id })
+          .populate('problem', 'title slug difficulty')
+          .sort({ createdAt: -1 })
+          .lean(),
+        BuildSubmission.find({ userId: req.user._id })
+          .populate('problemId', 'title slug difficulty')
+          .sort({ createdAt: -1 })
+          .lean(),
+      ]);
+
+      const normalizedDsa = dsaSubs.map((s) => ({
+        ...s,
+        isBuild: false,
+        submittedAt: s.submittedAt || s.createdAt,
+      }));
+
+      const normalizedBuild = buildSubs.map((s) => ({
+        _id: s._id,
+        user: s.userId,
+        problem: s.problemId,
+        status: s.status,
+        score: s.score,
+        passed: s.passed,
+        total: s.total,
+        language: 'node',
+        isBuild: true,
+        submittedAt: s.createdAt,
+        createdAt: s.createdAt,
+      }));
+
+      const merged = [...normalizedDsa, ...normalizedBuild].sort(
+        (a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)
+      );
+
+      const total = merged.length;
+      const paginated = merged.slice(skip, skip + limitNum);
+
+      return res.status(200).json({
+        status: 'success',
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+        count: paginated.length,
+        submissions: paginated,
+      });
+    }
 
     const [submissions, total] = await Promise.all([
       Submission.find({ user: req.user._id })
@@ -250,12 +412,60 @@ exports.getSubmissionById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid submission ID' });
     }
 
-    const submission = await Submission.findById(id)
+    let submission = await Submission.findById(id)
       .populate('user', 'name email')
       .populate('problem', 'title slug difficulty description')
       .lean();
 
     if (!submission) {
+      // Check BuildSubmission
+      const buildSub = await BuildSubmission.findById(id)
+        .populate('userId', 'name email')
+        .populate('problemId', 'title slug statement difficulty')
+        .lean();
+
+      if (buildSub) {
+        const isOwner = (buildSub.userId?._id || buildSub.userId)?.toString() === req.user._id.toString();
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin) {
+          return res.status(403).json({
+            message: 'You are not authorized to view this submission',
+          });
+        }
+
+        return res.status(200).json({
+          status: 'success',
+          submission: {
+            _id: buildSub._id,
+            isBuild: true,
+            user: buildSub.userId,
+            problem: {
+              _id: buildSub.problemId?._id,
+              title: buildSub.problemId?.title || 'Build API Challenge',
+              slug: buildSub.problemId?.slug || '',
+              difficulty: buildSub.problemId?.difficulty || 'Medium',
+              description: buildSub.problemId?.statement || '',
+            },
+            status: buildSub.status,
+            score: buildSub.score,
+            passed: buildSub.passed,
+            total: buildSub.total,
+            testResults: (buildSub.testResults || []).map((tr) => ({
+              name: tr.name,
+              passed: tr.passed,
+              visible: tr.visible,
+              ...(tr.visible && tr.got ? { got: tr.got } : {}),
+            })),
+            files: buildSub.files,
+            code: buildSub.files?.[0]?.content || '',
+            message: buildSub.message,
+            createdAt: buildSub.createdAt,
+            submittedAt: buildSub.createdAt,
+            language: 'javascript',
+          },
+        });
+      }
+
       return res.status(404).json({ message: 'Submission not found' });
     }
 

@@ -62,6 +62,10 @@ async function verifyMilestone2() {
     });
   }
 
+  // Clean up any test contests created in prior runs for these test users
+  await Contest.deleteMany({ createdBy: { $in: [userA._id, userB._id, userC._id] } });
+  await ContestParticipant.deleteMany({ userId: { $in: [userA._id, userB._id, userC._id] } });
+
   const dsaProb = await Problem.findOne();
 
   const adminToken = jwt.sign({ id: admin._id }, process.env.JWT_SECRET || 'secret');

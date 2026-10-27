@@ -116,8 +116,14 @@ const otpVerifyLimiter = createLimiter('otp_verify', 10 * 60 * 1000, 15, 'Too ma
 const problemsListLimiter = createLimiter('problems_list', 60 * 1000, 500);
 const problemDetailsLimiter = createLimiter('problem_details', 60 * 1000, 2000);
 
-// Submissions / Code Execution Limiters
-const submitCodeLimiter = createLimiter('submit_code', 60 * 1000, 60, 'Too many code submissions. Please try again after a minute.');
+// Submissions / Code Execution Limiters (Keyed by authenticated user ID with IP fallback)
+const submitCodeLimiter = createLimiter(
+  'submit_code',
+  60 * 1000,
+  60,
+  'Too many code submissions. Please try again after a minute.',
+  (req) => req.user?._id?.toString() || req.ip
+);
 const runCodeLimiter = createLimiter('run_code', 60 * 1000, 100, 'Too many code runs. Please try again after a minute.');
 
 // General Limiters

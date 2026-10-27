@@ -44,6 +44,7 @@ export default function SubmissionDetail() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeGraphTab, setActiveGraphTab] = useState('runtime'); // 'runtime' | 'memory'
+  const [selectedFileIdx, setSelectedFileIdx] = useState(0);
 
   useEffect(() => {
     async function fetchSubmissionData() {
@@ -54,13 +55,15 @@ export default function SubmissionDetail() {
         const sub = res.data.submission || res.data;
         setSubmission(sub);
 
-        const problemId = sub.problem?._id || sub.problem;
-        if (problemId) {
-          try {
-            const statsRes = await API.get(`/submissions/problem/${problemId}/stats`);
-            setProblemStats(statsRes.data?.data || statsRes.data || null);
-          } catch (e) {
-            console.error('Failed to load problem distribution stats:', e);
+        if (!sub.isBuild) {
+          const problemId = sub.problem?._id || sub.problem;
+          if (problemId) {
+            try {
+              const statsRes = await API.get(`/submissions/problem/${problemId}/stats`);
+              setProblemStats(statsRes.data?.data || statsRes.data || null);
+            } catch (e) {
+              console.error('Failed to load problem distribution stats:', e);
+            }
           }
         }
       } catch (err) {
@@ -77,8 +80,11 @@ export default function SubmissionDetail() {
   }, [id]);
 
   const handleCopyCode = () => {
-    if (!submission?.code) return;
-    navigator.clipboard.writeText(submission.code);
+    const codeToCopy = submission?.isBuild
+      ? (submission?.files?.[selectedFileIdx]?.content || submission?.code || '')
+      : (submission?.code || '');
+    if (!codeToCopy) return;
+    navigator.clipboard.writeText(codeToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -86,6 +92,10 @@ export default function SubmissionDetail() {
   const handleEditInWorkspace = () => {
     if (!submission?.problem) return;
     const slug = submission.problem.slug || submission.problem._id;
+    if (submission.isBuild) {
+      navigate(`/build/${slug}`);
+      return;
+    }
     // Preload the submitted code into localStorage so it opens directly in the workspace editor
     try {
       const savedKey = `code_${slug}`;
@@ -130,21 +140,26 @@ export default function SubmissionDetail() {
   const problem = submission.problem || {};
   const isAccepted = submission.status?.toLowerCase() === 'accepted';
 
-  // Compute beats percentiles
+  // Compute beats percentiles for DSA
   let beatsRuntime = null;
-  if (problemStats?.acceptedRuntimes?.length > 0 && submission.runtime != null) {
+  if (!submission.isBuild && problemStats?.acceptedRuntimes?.length > 0 && submission.runtime != null) {
     const slowerCount = problemStats.acceptedRuntimes.filter((r) => r > submission.runtime).length;
     beatsRuntime = Math.round((slowerCount / problemStats.acceptedRuntimes.length) * 100);
   }
 
   let beatsMemory = null;
-  if (problemStats?.acceptedMemories?.length > 0 && submission.memory != null) {
+  if (!submission.isBuild && problemStats?.acceptedMemories?.length > 0 && submission.memory != null) {
     const higherCount = problemStats.acceptedMemories.filter((m) => m > submission.memory).length;
     beatsMemory = Math.round((higherCount / problemStats.acceptedMemories.length) * 100);
   }
 
-  const monacoLanguage =
-    LANGUAGES.find((l) => l.id === submission.language)?.monaco || submission.language || 'cpp';
+  const monacoLanguage = submission.isBuild
+    ? 'javascript'
+    : (LANGUAGES.find((l) => l.id === submission.language)?.monaco || submission.language || 'cpp');
+
+  const currentDisplayCode = submission.isBuild
+    ? (submission.files?.[selectedFileIdx]?.content ?? submission.code ?? '// No code recorded')
+    : (submission.code || '// No code recorded');
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 pt-2 text-text">
@@ -154,7 +169,9 @@ export default function SubmissionDetail() {
           type="button"
           onClick={() => {
             const slug = problem.slug || problem._id;
-            if (slug) {
+            if (submission.isBuild) {
+              navigate(slug ? `/build/${slug}` : '/build');
+            } else if (slug) {
               navigate(`/problems/${slug}`);
             } else {
               navigate(-1);
@@ -164,19 +181,35 @@ export default function SubmissionDetail() {
           title="Return to problem solving workspace"
         >
           <ArrowLeft className="h-4 w-4 text-accent transition-transform group-hover:-translate-x-0.5" />
-          <span>Return to Problem</span>
+          <span>{submission.isBuild ? 'Return to Build Workspace' : 'Return to Problem'}</span>
         </button>
 
         <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
-          <Link to="/problems" className="hover:text-text transition-colors">
-            Problems
-          </Link>
-          <ChevronRight className="h-3 w-3 text-border" />
-          <Link to={`/problems/${problem.slug || problem._id}`} className="hover:text-text transition-colors truncate max-w-xs">
-            {problem.title || 'Challenge'}
-          </Link>
-          <ChevronRight className="h-3 w-3 text-border" />
-          <span className="text-text font-medium">Submission Details</span>
+          {submission.isBuild ? (
+            <>
+              <Link to="/build" className="hover:text-text transition-colors">
+                Build APIs
+              </Link>
+              <ChevronRight className="h-3 w-3 text-border" />
+              <Link to={`/build/${problem.slug}`} className="hover:text-text transition-colors truncate max-w-xs">
+                {problem.title || 'API Challenge'}
+              </Link>
+              <ChevronRight className="h-3 w-3 text-border" />
+              <span className="text-accent-build font-medium">Build Submission</span>
+            </>
+          ) : (
+            <>
+              <Link to="/problems" className="hover:text-text transition-colors">
+                Problems
+              </Link>
+              <ChevronRight className="h-3 w-3 text-border" />
+              <Link to={`/problems/${problem.slug || problem._id}`} className="hover:text-text transition-colors truncate max-w-xs">
+                {problem.title || 'Challenge'}
+              </Link>
+              <ChevronRight className="h-3 w-3 text-border" />
+              <span className="text-text font-medium">Submission Details</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -244,70 +277,192 @@ export default function SubmissionDetail() {
 
       {/* ─── Performance Summary Cards ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Runtime Card */}
-        <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-text-muted">
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-success" /> Runtime
-            </span>
-            {beatsRuntime != null && (
-              <span className="text-[11px] font-mono text-success bg-success/10 px-1.5 py-0.2 rounded border border-success/30">
-                Beats {beatsRuntime}%
-              </span>
-            )}
-          </div>
-          <div className="text-2xl font-bold font-mono text-text">
-            {submission.runtime != null ? `${submission.runtime} ms` : '—'}
-          </div>
-          <p className="text-[11px] text-text-muted font-sans">
-            {beatsRuntime != null
-              ? `Faster than ${beatsRuntime}% of ${submission.language} online submissions.`
-              : 'Total time taken to run your solution.'}
-          </p>
-        </div>
+        {submission.isBuild ? (
+          <>
+            {/* Score Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-accent-build" /> Score
+                </span>
+                <span className="text-[11px] text-accent-build bg-accent-build/10 px-1.5 py-0.2 rounded border border-accent-build/30 font-semibold">
+                  {submission.score ?? 0}%
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-text">
+                {submission.score ?? 0}%
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {submission.score === 100
+                  ? 'Perfect score! All API requirements satisfied.'
+                  : `${submission.passed ?? 0} of ${submission.total ?? 0} tests passing.`}
+              </p>
+            </div>
 
-        {/* Memory Card */}
-        <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-text-muted">
-            <span className="flex items-center gap-1.5">
-              <HardDrive className="h-3.5 w-3.5 text-accent" /> Memory
-            </span>
-            {beatsMemory != null && (
-              <span className="text-[11px] font-mono text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/30">
-                Beats {beatsMemory}%
-              </span>
-            )}
-          </div>
-          <div className="text-2xl font-bold font-mono text-text">
-            {submission.memory != null ? `${submission.memory} MB` : '—'}
-          </div>
-          <p className="text-[11px] text-text-muted font-sans">
-            {beatsMemory != null
-              ? `Less memory than ${beatsMemory}% of ${submission.language} online submissions.`
-              : 'Peak memory used by your solution.'}
-          </p>
-        </div>
+            {/* Test Cases Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="h-3.5 w-3.5 text-warning" /> Tests Passed
+                </span>
+                <span className="text-[11px] text-warning bg-warning/10 px-1.5 py-0.2 rounded border border-warning/30 font-semibold">
+                  {submission.passed ?? 0}/{submission.total ?? 0}
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-text">
+                {submission.passed ?? 0} <span className="text-sm font-normal text-text-muted">/ {submission.total ?? 0}</span>
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {submission.passed === submission.total
+                  ? 'All automated test requirements passed.'
+                  : 'Review checklist below for failed edge cases.'}
+              </p>
+            </div>
 
-        {/* Test Cases Passed Card */}
-        <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-text-muted">
-            <span className="flex items-center gap-1.5">
-              <Cpu className="h-3.5 w-3.5 text-warning" /> Test Cases
-            </span>
-            <span className="text-[11px] font-mono uppercase bg-surface-raised px-1.5 py-0.2 rounded text-text-muted">
-              {submission.language}
-            </span>
-          </div>
-          <div className="text-2xl font-bold font-mono text-text">
-            {submission.passedTestCases ?? 0} / {submission.totalTestCases ?? 0}
-          </div>
-          <p className="text-[11px] text-text-muted font-sans">
-            {isAccepted ? 'All test cases passed successfully.' : 'Did not pass all private test cases.'}
-          </p>
-        </div>
+            {/* Runtime Stack Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <HardDrive className="h-3.5 w-3.5 text-accent-blue" /> Environment
+                </span>
+                <span className="text-[10px] uppercase bg-surface-raised px-1.5 py-0.2 rounded text-text-muted">
+                  Node.js
+                </span>
+              </div>
+              <div className="text-xl font-bold text-text">
+                Express Server
+              </div>
+              <p className="text-[11px] text-text-muted">
+                In-memory microservice container sandbox.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Runtime Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-success" /> Runtime
+                </span>
+                {beatsRuntime != null && (
+                  <span className="text-[11px] text-success bg-success/10 px-1.5 py-0.2 rounded border border-success/30">
+                    Beats {beatsRuntime}%
+                  </span>
+                )}
+              </div>
+              <div className="text-2xl font-bold text-text">
+                {submission.runtime != null ? `${submission.runtime} ms` : '—'}
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {beatsRuntime != null
+                  ? `Faster than ${beatsRuntime}% of ${submission.language} online submissions.`
+                  : 'Total time taken to run your solution.'}
+              </p>
+            </div>
+
+            {/* Memory Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <HardDrive className="h-3.5 w-3.5 text-accent" /> Memory
+                </span>
+                {beatsMemory != null && (
+                  <span className="text-[11px] text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/30">
+                    Beats {beatsMemory}%
+                  </span>
+                )}
+              </div>
+              <div className="text-2xl font-bold text-text">
+                {submission.memory != null ? `${submission.memory} MB` : '—'}
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {beatsMemory != null
+                  ? `Less memory than ${beatsMemory}% of ${submission.language} online submissions.`
+                  : 'Peak memory used by your solution.'}
+              </p>
+            </div>
+
+            {/* Test Cases Passed Card */}
+            <div className="border border-border/40 bg-surface/40 rounded p-4 space-y-1">
+              <div className="flex items-center justify-between text-xs text-text-muted">
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="h-3.5 w-3.5 text-warning" /> Test Cases
+                </span>
+                <span className="text-[11px] uppercase bg-surface-raised px-1.5 py-0.2 rounded text-text-muted">
+                  {submission.language}
+                </span>
+              </div>
+              <div className="text-2xl font-bold text-text">
+                {submission.passedTestCases ?? 0} / {submission.totalTestCases ?? 0}
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {isAccepted ? 'All test cases passed successfully.' : 'Did not pass all private test cases.'}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* ─── LeetCode Distribution Graphs (Runtime & Memory) ─── */}
+      {/* ─── Middle Section: Test Checklist (for Build) OR Distribution Graphs (for DSA) ─── */}
+      {submission.isBuild ? (
+        <div className="border border-border/40 bg-surface/30 rounded p-4 sm:p-5 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-accent-build" />
+              <h2 className="text-xs sm:text-sm font-semibold text-text">
+                Automated Test Checklist Results ({submission.passed ?? 0}/{submission.total ?? 0})
+              </h2>
+            </div>
+            <span className="text-xs font-mono font-semibold text-text">
+              Score: {submission.score ?? 0}%
+            </span>
+          </div>
+
+          <div className="space-y-2 pt-1">
+            {(submission.testResults || []).map((tr, idx) => (
+              <div
+                key={idx}
+                className={`p-3 rounded border text-xs font-mono transition-colors ${
+                  tr.passed
+                    ? 'bg-success/5 border-success/30 text-text'
+                    : 'bg-danger/5 border-danger/30 text-text'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {tr.passed ? (
+                      <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-danger shrink-0" />
+                    )}
+                    <span className="font-semibold text-text">{tr.name}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                      tr.passed ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
+                    }`}
+                  >
+                    {tr.passed ? 'Passed' : 'Failed'}
+                  </span>
+                </div>
+
+                {!tr.passed && tr.got && (
+                  <div className="mt-2.5 pt-2 border-t border-danger/20 space-y-1">
+                    <span className="text-[10px] text-danger font-medium uppercase tracking-wider block">
+                      Received Output / Error Details:
+                    </span>
+                    <pre className="p-2 rounded bg-black/60 text-danger-text text-[11px] overflow-x-auto whitespace-pre-wrap">
+                      {typeof tr.got === 'object' ? JSON.stringify(tr.got, null, 2) : String(tr.got)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+      /* ─── LeetCode Distribution Graphs (Runtime & Memory) ─── */
       <div className="border border-border/40 bg-surface/30 rounded p-4 sm:p-5 space-y-4">
         {/* Distribution Tab Switcher */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/30">
@@ -472,6 +627,7 @@ export default function SubmissionDetail() {
           </div>
         )}
       </div>
+      )}
 
       {/* ─── Error Log Output (if compilation / runtime error) ─── */}
       {submission.errorLog && (
@@ -493,7 +649,7 @@ export default function SubmissionDetail() {
             <Code2 className="h-4 w-4 text-accent" />
             <span className="font-semibold text-text">Submitted Code</span>
             <span className="text-[10px] font-mono uppercase bg-surface-raised px-1.5 py-0.2 rounded text-text-muted">
-              {submission.language}
+              {submission.isBuild ? 'Node.js' : submission.language}
             </span>
           </div>
 
@@ -509,12 +665,32 @@ export default function SubmissionDetail() {
           </div>
         </div>
 
+        {/* Multi-file tab selector for Build submissions */}
+        {submission.isBuild && submission.files && submission.files.length > 0 && (
+          <div className="flex items-center gap-1 overflow-x-auto px-4 py-1.5 bg-surface/40 border-b border-border/30 text-xs select-none">
+            {submission.files.map((file, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setSelectedFileIdx(idx)}
+                className={`px-3 py-1 font-mono text-[11px] rounded transition-all ${
+                  selectedFileIdx === idx
+                    ? 'bg-accent-build/15 text-accent-build font-bold border border-accent-build/30 shadow-xs'
+                    : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
+                }`}
+              >
+                {file.path}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="h-[420px] bg-[#1e1e1e]">
           <Editor
             height="100%"
             theme="vs-dark"
             language={monacoLanguage}
-            value={submission.code || '// No code recorded'}
+            value={currentDisplayCode}
             options={{
               readOnly: true,
               fontSize: 13,

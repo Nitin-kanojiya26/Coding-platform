@@ -31,14 +31,17 @@ import SubmissionDetail from './pages/SubmissionDetail';
 import BuildProblems from './pages/BuildProblems';
 import BuildWorkspace from './pages/BuildWorkspace';
 import CreateBuildProblem from './pages/CreateBuildProblem';
+import Contests from './pages/Contests';
+import ContestLobby from './pages/ContestLobby';
+import ContestArena from './pages/ContestArena';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#0f172a]">
-        <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
+      <div className="flex h-screen w-full items-center justify-center bg-bg text-text">
+        <Loader2 className="h-8 w-8 text-accent animate-spin" />
       </div>
     );
   }
@@ -50,11 +53,24 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      {/* Protected */}
+
+      {/* Fullscreen Dedicated Arena Workspace */}
+      <Route
+        path="/contests/:id/arena"
+        element={
+          <ProtectedRoute>
+            <ContestArena />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Main Layout Pages */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/problems" element={<ProtectedRoute><Problems /></ProtectedRoute>} />
         <Route path="/problems/:slug" element={<ProtectedRoute><ProblemDetail /></ProtectedRoute>} />
+        <Route path="/contests" element={<ProtectedRoute><Contests /></ProtectedRoute>} />
+        <Route path="/contests/:id" element={<ProtectedRoute><ContestLobby /></ProtectedRoute>} />
         <Route path="/build" element={<ProtectedRoute><BuildProblems /></ProtectedRoute>} />
         <Route path="/build/:slug" element={<ProtectedRoute><BuildWorkspace /></ProtectedRoute>} />
         <Route path="/problems/:slug/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
@@ -88,22 +104,48 @@ export default function App() {
           <AppRoutes />
           <Toaster 
             position="top-right" 
+            gutter={8}
             toastOptions={{
+              duration: 3500,
               style: {
-                background: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid #334155',
+                background: 'rgba(10, 10, 10, 0.95)',
+                color: '#ffffff',
+                border: '1px solid #222222',
+                fontSize: '12.5px',
+                fontWeight: '500',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                fontFamily: `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`,
+                letterSpacing: '-0.01em',
               },
               success: {
                 iconTheme: {
-                  primary: '#22c55e',
-                  secondary: '#1e293b',
+                  primary: '#2cbb5d',
+                  secondary: '#0a0a0a',
+                },
+                style: {
+                  border: '1px solid rgba(44, 187, 93, 0.3)',
                 },
               },
               error: {
                 iconTheme: {
                   primary: '#ef4444',
-                  secondary: '#1e293b',
+                  secondary: '#0a0a0a',
+                },
+                style: {
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                },
+              },
+              loading: {
+                iconTheme: {
+                  primary: '#f97316',
+                  secondary: '#0a0a0a',
+                },
+                style: {
+                  border: '1px solid rgba(249, 115, 22, 0.25)',
                 },
               },
             }}

@@ -11,7 +11,26 @@ process.on('uncaughtException', (err) => {
   console.warn('⚠️ [Process] Intercepted uncaught exception:', err?.message || err);
 });
 
+const http = require('http');
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.IO with CORS
+try {
+  const { Server } = require('socket.io');
+  const io = new Server(server, {
+    cors: {
+      origin: process.env.CLIENT_URL || '*',
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
+  });
+  const { initializeSocket } = require('./sockets/contestSocket');
+  initializeSocket(io);
+  console.log('⚡ [Socket.IO] Real-time engine initialized.');
+} catch (err) {
+  console.warn('⚠️ [Socket.IO] socket.io package not loaded yet. Live updates will activate once npm install socket.io is run.');
+}
 
 app.use(cors()); // Allows our React frontend to communicate with this API
 app.use(express.json()); 
@@ -28,20 +47,26 @@ app.use('/api/sheets', require('./routes/sheetRoutes'));
 app.use('/api/build', require('./routes/buildRoutes'));
 app.use('/api/contests', require('./routes/contestRoutes'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Initialize Background Workers
 require('./workers/buildWorker');
+require('./workers/emailWorker');
 const { reconcileContestLifecycle } = require('./workers/contestLifecycleWorker');
 
 // 5. Start Server Listener
 const PORT = process.env.PORT || 5000;
-connectDB().then(() => {
+if (require.main === module) {
+  connectDB().then(() => {
     // Startup reconciliation for scheduled contests
     reconcileContestLifecycle().catch((err) => {
-        console.warn('⚠️ Contest reconciliation warning:', err.message);
+      console.warn('⚠️ Contest reconciliation warning:', err.message);
     });
 
-    app.listen(PORT, () => {
-        console.log(`🚀 Server spinning up on port ${PORT}`);
+    server.listen(PORT, () => {
+      console.log(`🚀 Server spinning up on port ${PORT}`);
     });
-});
+  });
+}
+
+module.exports = { app, server };

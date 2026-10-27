@@ -13,6 +13,12 @@ const {
   joinContestByCode,
   leaveContest,
   inviteParticipants,
+  getContestStandings,
+  getContestStats,
+  getContestUserSubmissions,
+  calculateContestRatings,
+  unsubscribeFromEmails,
+  toggleEmailNotifications,
 } = require('../controllers/contestController');
 const { protect, optionalAuth } = require('../middleware/authMiddleware');
 const { isAdmin } = require('../middleware/roleMiddleware');
@@ -20,6 +26,12 @@ const { contestJoinLimiter } = require('../middleware/rateLimiter');
 
 // List contests (public list, or with private contests if logged in)
 router.get('/', optionalAuth, getContests);
+
+// One-click email unsubscribe: GET /api/contests/unsubscribe?token=...
+router.get('/unsubscribe', unsubscribeFromEmails);
+
+// User notification preferences: POST /api/contests/notifications/preferences
+router.post('/notifications/preferences', protect, toggleEmailNotifications);
 
 // Create Public Contest (Admin only): POST /api/contests/public
 router.post('/public', protect, isAdmin, createPublicContest);
@@ -53,5 +65,17 @@ router.post('/:id/invite', protect, inviteParticipants);
 
 // Get contest problems (only active during/after contest for participants/admins)
 router.get('/:id/problems', protect, getContestProblems);
+
+// Leaderboard standings: GET /api/contests/:id/standings
+router.get('/:id/standings', optionalAuth, getContestStandings);
+
+// User contest submissions: GET /api/contests/:id/submissions
+router.get('/:id/submissions', protect, getContestUserSubmissions);
+
+// Contest aggregate stats: GET /api/contests/:id/stats
+router.get('/:id/stats', optionalAuth, getContestStats);
+
+// Trigger rating calculation: POST /api/contests/:id/ratings/calculate (Admin or Creator)
+router.post('/:id/ratings/calculate', protect, calculateContestRatings);
 
 module.exports = router;

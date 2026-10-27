@@ -403,8 +403,8 @@ export default function ProblemDetail() {
   return (
     <div
       ref={containerRef}
-      className={`h-[calc(100vh-5.5rem)] overflow-hidden flex flex-col lg:flex-row gap-0 border border-border/40 rounded-md bg-bg text-text ${
-        isDragging ? 'select-none cursor-col-resize' : isDraggingConsole ? 'select-none cursor-row-resize' : ''
+      className={`h-[calc(100vh-3rem)] w-full flex flex-col lg:flex-row overflow-hidden bg-bg text-text select-none ${
+        isDragging ? 'cursor-col-resize select-none' : isDraggingConsole ? 'cursor-row-resize select-none' : ''
       }`}
     >
       {/* ─── LEFT PANEL: Problem Workspace & Submissions ─── */}
@@ -421,7 +421,7 @@ export default function ProblemDetail() {
                 setLeftTab('description');
                 setSelectedSubmission(null);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors cursor-pointer ${
                 leftTab === 'description'
                   ? 'bg-accent/15 text-accent font-semibold'
                   : 'text-text-muted hover:text-text'
@@ -434,7 +434,7 @@ export default function ProblemDetail() {
             <button
               type="button"
               onClick={() => setLeftTab('submissions')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors cursor-pointer ${
                 leftTab === 'submissions'
                   ? 'bg-accent/15 text-accent font-semibold'
                   : 'text-text-muted hover:text-text'
@@ -455,7 +455,7 @@ export default function ProblemDetail() {
                 setLeftTab('discussion');
                 setSelectedSubmission(null);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors cursor-pointer ${
                 leftTab === 'discussion'
                   ? 'bg-surface-raised text-text font-medium border border-border/50'
                   : 'text-text-muted hover:text-text'
@@ -476,7 +476,7 @@ export default function ProblemDetail() {
               type="button"
               onClick={toggleBookmark}
               disabled={bookmarkLoading}
-              className="p-1.5 rounded hover:bg-surface-raised text-text-muted hover:text-text transition-colors"
+              className="p-1.5 rounded hover:bg-surface-raised text-text-muted hover:text-text transition-colors cursor-pointer"
               title={isBookmarked ? 'Remove bookmark' : 'Bookmark problem'}
             >
               <Bookmark
@@ -488,37 +488,79 @@ export default function ProblemDetail() {
           </div>
         </div>
 
-        {/* ─── TAB 1: Problem Description ─── */}
+        {/* ─── TAB 1: Problem Description (Contest Arena Seamless Style) ─── */}
         {leftTab === 'description' && (
-          <div className="p-4 space-y-4 flex-1 text-xs sm:text-sm">
+          <div className="p-4 sm:p-5 flex-1 overflow-y-auto text-xs space-y-5 select-text">
             {/* Header info */}
             <div className="space-y-2 pb-3 border-b border-border/30">
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-semibold text-text truncate">
+                <h1 className="text-base sm:text-lg font-semibold text-text">
                   {problem?.title}
                 </h1>
-                {problem?.difficulty && <DifficultyBadge difficulty={problem.difficulty} />}
               </div>
 
-              {problem?.tags?.length > 0 && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  {problem.tags.map((tag, idx) => (
-                    <span
-                      key={idx}
-                      className="text-[10px] font-mono text-text-muted bg-surface-raised/50 px-1.5 py-0.5 rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-3 pt-0.5 flex-wrap">
+                {problem?.difficulty && <DifficultyBadge difficulty={problem.difficulty} />}
+
+                {problem?.timeLimit && (
+                  <span className="text-[11px] font-mono text-text-muted">
+                    Time Limit: {problem.timeLimit} ms
+                  </span>
+                )}
+
+                {problem?.memoryLimit && (
+                  <span className="text-[11px] font-mono text-text-muted">
+                    Memory Limit: {problem.memoryLimit} MB
+                  </span>
+                )}
+
+                {problem?.tags?.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {problem.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="text-[10px] font-mono text-text-muted bg-surface-raised/50 px-1.5 py-0.5 rounded"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Description Body */}
-            <div className="leading-relaxed text-text whitespace-pre-wrap font-sans text-xs sm:text-sm">
-              {problem?.description}
+            <div className="leading-relaxed text-text space-y-3 font-sans text-xs sm:text-sm whitespace-pre-wrap">
+              {problem?.description || problem?.statement || (
+                <span className="text-text-muted italic">No problem statement provided.</span>
+              )}
             </div>
 
+            {/* Input Format */}
+            {problem?.inputFormat && (
+              <div className="space-y-1 pt-2">
+                <h3 className="font-semibold text-text text-xs uppercase tracking-wider text-[11px]">
+                  Input Format
+                </h3>
+                <div className="text-text-muted font-sans text-xs leading-relaxed whitespace-pre-wrap">
+                  {problem.inputFormat}
+                </div>
+              </div>
+            )}
+
+            {/* Output Format */}
+            {problem?.outputFormat && (
+              <div className="space-y-1 pt-2">
+                <h3 className="font-semibold text-text text-xs uppercase tracking-wider text-[11px]">
+                  Output Format
+                </h3>
+                <div className="text-text-muted font-sans text-xs leading-relaxed whitespace-pre-wrap">
+                  {problem.outputFormat}
+                </div>
+              </div>
+            )}
+
+            {/* Data structure hint */}
             {problem?.tags?.some((tag) =>
               ['linked list', 'tree', 'binary tree', 'graph'].includes(tag.toLowerCase())
             ) && (
@@ -527,48 +569,55 @@ export default function ProblemDetail() {
               </div>
             )}
 
-            {/* Sample Test Cases (LeetCode Seamless Style, No Hide Icon) */}
-            {problem?.sampleTestCases?.length > 0 && (
-              <div className="space-y-4 pt-1">
-                {problem.sampleTestCases.map((tc, i) => (
-                  <div key={i} className="space-y-1.5 text-xs">
-                    <span className="font-semibold text-text">Example {i + 1}:</span>
-                    <div className="bg-surface-raised/25 border-l-2 border-border/70 pl-3 py-2 pr-3 rounded-r font-mono text-xs space-y-1">
-                      <div>
-                        <span className="font-medium text-text-muted select-none">Input: </span>
-                        <span className="text-text font-mono">{tc.displayInput || tc.input}</span>
+            {/* Examples / Test Cases (Exact Contest Arena Style) */}
+            {(problem?.sampleTestCases || problem?.testCases)?.length > 0 && (
+              <div className="space-y-3 pt-3 border-t border-border/30">
+                <h3 className="font-semibold text-text uppercase tracking-wider text-[11px]">
+                  Examples
+                </h3>
+
+                <div className="space-y-3">
+                  {(problem.sampleTestCases || problem.testCases).map((tc, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-surface-raised/30 border border-border/30 rounded p-3 space-y-2 font-mono text-xs"
+                    >
+                      <div className="text-[11px] text-text-muted font-sans font-medium">
+                        Example {idx + 1}:
                       </div>
                       <div>
-                        <span className="font-medium text-text-muted select-none">Output: </span>
-                        <span className="text-text font-mono">{tc.output}</span>
+                        <div className="text-[10px] text-text-muted font-mono mb-0.5">Input:</div>
+                        <pre className="p-2 bg-surface-inset rounded border border-border/30 text-text overflow-x-auto text-xs whitespace-pre-wrap font-mono">
+                          {tc.input || tc.displayInput || ''}
+                        </pre>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-text-muted font-mono mb-0.5">Output:</div>
+                        <pre className="p-2 bg-surface-inset rounded border border-border/30 text-text overflow-x-auto text-xs whitespace-pre-wrap font-mono">
+                          {tc.output || ''}
+                        </pre>
                       </div>
                       {tc.explanation && (
-                        <div className="pt-0.5">
-                          <span className="font-medium text-text-muted select-none">Explanation: </span>
-                          <span className="text-text-muted font-sans text-[11px] leading-relaxed">{tc.explanation}</span>
+                        <div className="text-[11px] text-text-muted font-sans pt-1">
+                          <span className="font-medium text-text">Explanation: </span>
+                          {tc.explanation}
                         </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 
+            {/* Constraints */}
             {problem?.constraints && (
-              <div className="space-y-1.5 pt-2">
-                <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block">
-                  Constraints:
-                </span>
-                <ul className="text-xs space-y-1 font-mono text-text-muted">
-                  {problem.constraints
-                    .split('\n')
-                    .filter(Boolean)
-                    .map((c, i) => (
-                      <li key={i} className="before:content-['•'] before:mr-2 before:text-border">
-                        {c}
-                      </li>
-                    ))}
-                </ul>
+              <div className="space-y-1.5 pt-3 border-t border-border/30">
+                <h3 className="font-semibold text-text uppercase tracking-wider text-[11px]">
+                  Constraints
+                </h3>
+                <div className="bg-surface-raised/30 border border-border/30 rounded p-2.5 font-mono text-xs text-text-muted whitespace-pre-wrap">
+                  {problem.constraints}
+                </div>
               </div>
             )}
           </div>
@@ -1341,9 +1390,9 @@ export default function ProblemDetail() {
               type="button"
               onClick={triggerSandboxRun}
               disabled={running || submitting}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors border border-border/40 disabled:opacity-50 cursor-pointer"
             >
-              {running ? <Loader2 className="h-3 w-3 animate-spin text-accent" /> : <Play className="h-3 w-3 text-accent" />}
+              {running ? <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" /> : <Play className="h-3.5 w-3.5 text-accent fill-accent/20" />}
               <span>Run</span>
             </button>
 
@@ -1351,9 +1400,9 @@ export default function ProblemDetail() {
               type="button"
               onClick={triggerProductionTransmit}
               disabled={running || submitting}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded text-xs font-semibold bg-emerald-500 text-black hover:bg-emerald-400 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white transition-all shadow-xs disabled:opacity-50 active:scale-[0.98] cursor-pointer"
             >
-              {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               <span>Submit</span>
             </button>
           </div>

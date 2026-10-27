@@ -5,10 +5,13 @@ const ContestNotification = require('../models/ContestNotification');
 const User = require('../models/Users');
 const Problem = require('../models/Problem');
 const BuildProblem = require('../models/BuildProblem');
+const Submission = require('../models/Submission');
+const BuildSubmission = require('../models/BuildSubmission');
 const { computeContestStatus } = require('../utils/contestStatus');
 const { generateJoinCode } = require('../utils/contestAlphabet');
 const { scheduleContestLifecycleJobs, cancelContestLifecycleJobs } = require('../queues/contestLifecycleQueue');
 const { executeProblemSelection } = require('../services/contestSelectionService');
+const { getContestLeaderboard, getContestStats: fetchContestStats } = require('../services/contestLeaderboardService');
 
 // Configurable Environment Limits with safe defaults
 const getEnvLimits = () => ({
@@ -145,8 +148,8 @@ exports.createContest = async (req, res) => {
     }
 
     const now = new Date();
-    // Allow a small 30-second leeway for "start now" creation
-    const earliestAllowed = new Date(now.getTime() - 30 * 1000);
+    // Allow a 60-second leeway for "start now" creation
+    const earliestAllowed = new Date(now.getTime() - 60 * 1000);
     if (start < earliestAllowed) {
       return res.status(400).json({ message: 'Start time cannot be in the past.' });
     }
@@ -176,7 +179,7 @@ exports.createContest = async (req, res) => {
     }
 
     // 8. Problem selection validation & pool availability check
-    const selectionMode = selection?.mode === 'random' || (!problems && !isAdmin) ? 'random' : 'manual';
+    const selectionMode = selection?.mode === 'manual' || (Array.isArray(problems) && problems.length > 0) ? 'manual' : 'random';
     let contestProblems = [];
     let contestSelection = {
       mode: selectionMode,
@@ -349,10 +352,32 @@ exports.createContest = async (req, res) => {
       joinedAt: new Date(),
     });
 
+    // If random selection mode, select problems immediately so they are pre-populated and ready
+    if (contestSelection.mode === 'random') {
+      try {
+        const selected = await executeProblemSelection(contest._id);
+        if (selected && selected.length > 0) {
+          contest.problems = selected;
+        }
+      } catch (selErr) {
+        console.warn('⚠️ Problem selection notice on creation:', selErr.message);
+      }
+    }
+
     // Schedule BullMQ lifecycle jobs (start, end, reminder)
     scheduleContestLifecycleJobs(contest).catch((err) => {
       console.warn('⚠️ Lifecycle job schedule warning:', err.message);
     });
+
+    // If public contest, queue announcement broadcast to opted-in users
+    if (contest.kind === 'public') {
+      try {
+        const { addEmailJob } = require('../queues/emailQueue');
+        addEmailJob('announce-contest', { contestId: contest._id }, { priority: 5 }).catch((err) => {
+          console.warn('⚠️ Announcement email queue warning:', err.message);
+        });
+      } catch (_) {}
+    }
 
     return res.status(201).json({
       status: 'success',
@@ -656,50 +681,98 @@ exports.getContestProblems = async (req, res) => {
     const status = computeContestStatus(contest, now);
     const user = req.user;
     const isAdmin = user && user.role === 'admin';
+    const isCreator = user && contest.createdBy && contest.createdBy.toString() === user._id.toString();
 
-    // 1. Hide statements before start
-    if (status === 'scheduled' && !isAdmin) {
+    // 1. Hide statements before start (admins and creators can always preview)
+    if (status === 'scheduled' && !isAdmin && !isCreator) {
       return res.status(403).json({ message: 'Problem statements are hidden until the contest begins.' });
     }
 
-    // 2. Only participants and admins can view problems
+    // 2. Only participants, creators, and admins can view problems
     let isParticipant = false;
     if (user) {
       const part = await ContestParticipant.findOne({ contestId: contest._id, userId: user._id });
       isParticipant = Boolean(part);
     }
 
-    if (!isParticipant && !isAdmin) {
+    if (!isParticipant && !isAdmin && !isCreator) {
       return res.status(403).json({ message: 'Only contest participants can access contest problems.' });
     }
 
-    // 3. Ensure random problems are selected if contest is active/ended and problems not yet populated
+    // 3. Ensure problems are selected if random mode and problems array is empty
     if (contest.selection?.mode === 'random' && (!contest.problems || contest.problems.length === 0)) {
-      contest.problems = await executeProblemSelection(contest._id);
+      try {
+        contest.problems = await executeProblemSelection(contest._id);
+      } catch (selErr) {
+        console.warn('⚠️ Problem selection on getContestProblems warning:', selErr.message);
+      }
     }
 
-    // 4. Populate problems safely (no hidden test cases)
+    // 4. Populate problems safely with statement, description, testCases, constraints
     const problemsWithDetails = [];
     for (const item of contest.problems || []) {
-      if (item.problemModel === 'Problem') {
-        const dsaProb = await Problem.findById(item.problemId)
-          .select('title slug description difficulty constraints sampleTestCases timeLimit memoryLimit tags');
+      const isApi = item.problemModel === 'BuildProblem' || contest.type === 'api';
+
+      if (!isApi) {
+        let dsaProb = await Problem.findById(item.problemId)
+          .select('title slug description difficulty constraints sampleTestCases timeLimit memoryLimit tags inputFormat outputFormat');
+        if (!dsaProb) {
+          dsaProb = await BuildProblem.findById(item.problemId);
+        }
+
         if (dsaProb) {
+          const text = dsaProb.description || dsaProb.statement || '';
           problemsWithDetails.push({
+            _id: dsaProb._id,
+            problemId: dsaProb._id,
             label: item.label,
             points: item.points,
-            problemModel: item.problemModel,
+            problemModel: 'Problem',
+            title: dsaProb.title,
+            slug: dsaProb.slug,
+            description: text,
+            statement: text,
+            difficulty: dsaProb.difficulty,
+            constraints: dsaProb.constraints || '',
+            inputFormat: dsaProb.inputFormat || '',
+            outputFormat: dsaProb.outputFormat || '',
+            testCases: dsaProb.sampleTestCases || (dsaProb.visibleTests || []).map((t) => ({
+              input: `${t.request?.method || 'GET'} ${t.request?.path || '/'}`,
+              output: `Status: ${t.expect?.status || 200}`,
+              explanation: t.name,
+            })),
+            timeLimit: dsaProb.timeLimit || 2000,
+            memoryLimit: dsaProb.memoryLimit || 256,
+            tags: dsaProb.tags || [],
             problem: dsaProb,
           });
         }
-      } else if (item.problemModel === 'BuildProblem') {
-        const buildProb = await BuildProblem.findById(item.problemId)
+      } else {
+        let buildProb = await BuildProblem.findById(item.problemId)
           .select('title slug statement difficulty starterFiles visibleTests limits runtime');
+        if (!buildProb) {
+          buildProb = await Problem.findById(item.problemId);
+        }
+
         if (buildProb) {
+          const text = buildProb.statement || buildProb.description || '';
           problemsWithDetails.push({
+            _id: buildProb._id,
+            problemId: buildProb._id,
             label: item.label,
             points: item.points,
-            problemModel: item.problemModel,
+            problemModel: 'BuildProblem',
+            title: buildProb.title,
+            slug: buildProb.slug,
+            description: text,
+            statement: text,
+            difficulty: buildProb.difficulty,
+            testCases: (buildProb.visibleTests || []).map((t) => ({
+              input: `${t.request?.method || 'GET'} ${t.request?.path || '/'}`,
+              output: `Status: ${t.expect?.status || 200}`,
+              explanation: t.name,
+            })),
+            runtime: buildProb.runtime || 'node-express',
             problem: buildProb,
           });
         }
@@ -988,6 +1061,18 @@ exports.inviteParticipants = async (req, res) => {
         { upsert: true, new: true }
       );
 
+      // Queue email notification
+      try {
+        const { addEmailJob } = require('../queues/emailQueue');
+        addEmailJob('invite-contest', {
+          contestId: contest._id,
+          userId: targetUser._id,
+          inviterId: req.user._id,
+        }, { priority: 2 }).catch((err) => {
+          console.warn(`⚠️ Failed to queue invitation email for ${targetUser.email}:`, err.message);
+        });
+      } catch (_) {}
+
       invited.push({ email: targetUser.email, userId: targetUser._id });
     }
 
@@ -1005,3 +1090,224 @@ exports.inviteParticipants = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/contests/:id/standings
+ * Get contest leaderboard standings with ranks
+ */
+exports.getContestStandings = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const contest = await Contest.findById(id);
+    if (!contest) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const { page, limit } = req.query;
+    const leaderboard = await getContestLeaderboard(contest._id, { page, limit });
+
+    return res.status(200).json({
+      status: 'success',
+      ...leaderboard,
+      serverNow: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Error fetching contest standings:', err);
+    return res.status(500).json({ message: 'Server error fetching standings.' });
+  }
+};
+
+/**
+ * GET /api/contests/:id/stats
+ * Get contest analytics: total participants, total submissions, problem acceptance rates
+ */
+exports.getContestStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const stats = await fetchContestStats(id);
+
+    return res.status(200).json({
+      status: 'success',
+      stats,
+      serverNow: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Error fetching contest stats:', err);
+    return res.status(500).json({ message: 'Server error fetching contest stats.' });
+  }
+};
+
+/**
+ * GET /api/contests/unsubscribe?token=xyz
+ * One-click unsubscribe from contest email notifications
+ */
+exports.unsubscribeFromEmails = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ message: 'Missing or invalid unsubscribe token.' });
+    }
+
+    const user = await User.findOne({ unsubscribeToken: token });
+    if (!user) {
+      return res.status(404).json({ message: 'Invalid or expired unsubscribe token.' });
+    }
+
+    user.emailNotifications = false;
+    await user.save();
+
+    // If client requested HTML (e.g. clicked link in email client)
+    if (req.accepts('html') && !req.xhr && !req.headers.accept?.includes('application/json')) {
+      return res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Unsubscribed - Codexium</title>
+</head>
+<body style="margin: 0; padding: 60px 20px; background-color: #0f172a; font-family: sans-serif; color: #f8fafc; text-align: center;">
+  <div style="max-width: 500px; margin: 0 auto; background-color: #1e293b; padding: 40px; border-radius: 12px; border: 1px solid #334155;">
+    <div style="font-size: 48px; margin-bottom: 16px;">🔕</div>
+    <h2 style="margin: 0 0 12px 0; color: #ffffff;">Successfully Unsubscribed</h2>
+    <p style="color: #94a3b8; font-size: 15px; line-height: 1.5;">You will no longer receive contest announcements or reminder emails for <strong>${user.email}</strong>.</p>
+    <p style="color: #64748b; font-size: 13px; margin-top: 24px;">You can re-enable notifications at any time in your Codexium profile settings.</p>
+  </div>
+</body>
+</html>
+      `.trim());
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'You have been successfully unsubscribed from contest notifications.',
+      email: user.email,
+      emailNotifications: false,
+    });
+  } catch (err) {
+    console.error('Error processing unsubscribe:', err);
+    return res.status(500).json({ message: 'Server error processing unsubscribe request.' });
+  }
+};
+
+/**
+ * POST /api/contests/notifications/preferences
+ * Update current user's contest notification settings (Authenticated)
+ */
+exports.toggleEmailNotifications = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (enabled === undefined) {
+      return res.status(400).json({ message: 'Field "enabled" (boolean) is required.' });
+    }
+
+    req.user.emailNotifications = Boolean(enabled);
+    await req.user.save();
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Contest notifications ${req.user.emailNotifications ? 'enabled' : 'disabled'}.`,
+      emailNotifications: req.user.emailNotifications,
+    });
+  } catch (err) {
+    console.error('Error toggling email notifications:', err);
+    return res.status(500).json({ message: 'Server error updating notification settings.' });
+  }
+};
+
+/**
+ * GET /api/contests/:id/submissions
+ * Fetch submissions for the authenticated user in this contest, optionally filtered by problemId
+ */
+exports.getContestUserSubmissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { problemId } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const contest = await Contest.findById(id);
+    if (!contest) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    let submissions = [];
+
+    if (contest.type === 'dsa') {
+      const filter = {
+        contestId: contest._id,
+        user: req.user._id,
+      };
+      if (problemId && mongoose.Types.ObjectId.isValid(problemId)) {
+        filter.problem = problemId;
+      }
+      submissions = await Submission.find(filter)
+        .sort({ createdAt: -1 })
+        .select('status language runtime memory createdAt submittedAt passedTestCases totalTestCases code errorLog problem');
+    } else {
+      const filter = {
+        contestId: contest._id,
+        userId: req.user._id,
+      };
+      if (problemId && mongoose.Types.ObjectId.isValid(problemId)) {
+        filter.problemId = problemId;
+      }
+      submissions = await BuildSubmission.find(filter)
+        .sort({ createdAt: -1 })
+        .select('status language runtime score passed total createdAt submittedAt repoUrl problemId');
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      count: submissions.length,
+      submissions,
+    });
+  } catch (err) {
+    console.error('Error fetching contest user submissions:', err);
+    return res.status(500).json({ message: 'Server error fetching submissions.' });
+  }
+};
+
+/**
+ * POST /api/contests/:id/ratings/calculate
+ * Calculate or re-calculate LeetCode-style ratings for this contest (Admin or Creator)
+ */
+exports.calculateContestRatings = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const contest = await Contest.findById(id);
+    if (!contest) {
+      return res.status(404).json({ message: 'Contest not found.' });
+    }
+
+    const isAdmin = req.user && req.user.role === 'admin';
+    const isCreator = req.user && contest.createdBy?.toString() === req.user._id?.toString();
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({ message: 'Only admin or contest creator can trigger rating calculation.' });
+    }
+
+    const { applyContestRatings } = require('../services/contestRatingService');
+    const result = await applyContestRatings(contest._id);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Ratings successfully calculated.',
+      ...result,
+    });
+  } catch (err) {
+    console.error('Error calculating contest ratings:', err);
+    return res.status(500).json({ message: err.message || 'Server error calculating ratings.' });
+  }
+};

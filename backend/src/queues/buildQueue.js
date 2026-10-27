@@ -22,12 +22,15 @@ buildQueue.on('error', (err) => {
  * If Redis / BullMQ is available, pushes job to BullMQ queue.
  * If Redis / BullMQ is offline, runs in-process immediately in background (zero downtime).
  */
-async function addBuildJob(submissionId) {
+async function addBuildJob(submissionId, options = {}) {
+  const priority = options.priority || 10;
   if (isBullMQAvailable()) {
     try {
-      const jobPromise = buildQueue.add('evaluate-submission', {
-        submissionId,
-      });
+      const jobPromise = buildQueue.add(
+        'evaluate-submission',
+        { submissionId },
+        { priority }
+      );
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Queue timeout')), 2000)
       );

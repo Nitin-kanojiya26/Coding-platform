@@ -3,9 +3,13 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/client';
 import ActivityHeatmap from '../components/ActivityHeatmap';
+import RatingBadge from '../components/RatingBadge';
+import AllocatedRatingBadge from '../components/AllocatedRatingBadge';
+import ContestRatingGraph from '../components/ContestRatingGraph';
 import {
   Settings, Save, Loader2, Code, Flame, Calendar,
-  TrendingUp, CheckCircle, Bookmark, Camera
+  TrendingUp, CheckCircle, Bookmark, Camera,
+  Trophy, Award, ArrowUpRight
 } from 'lucide-react';
 import { getAvatarSrc } from '../utils/avatar';
 
@@ -44,20 +48,37 @@ export default function Profile() {
   const [submissions, setSubmissions] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [loginDates, setLoginDates] = useState([]);
+  const [ratingHistory, setRatingHistory] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, subsRes, bookmarksRes, loginRes] = await Promise.all([
+        const [statsRes, subsRes, bookmarksRes, loginRes, buildSubsRes, ratingHistRes] = await Promise.all([
           API.get('/users/stats').catch(() => ({ data: {} })),
           API.get('/submissions/my?limit=1000').catch(() => ({ data: {} })),
           API.get('/users/bookmarks').catch(() => ({ data: {} })),
           API.get('/users/login-activity').catch(() => ({ data: {} })),
+          API.get('/build/submissions').catch(() => ({ data: {} })),
+          API.get('/users/rating-history').catch(() => ({ data: { history: [] } })),
         ]);
         setStats(statsRes.data.stats || statsRes.data?.data?.stats || {});
-        setSubmissions(subsRes.data.submissions || subsRes.data?.data?.submissions || []);
+
+        const rawDsa = subsRes.data.submissions || subsRes.data?.data?.submissions || [];
+        const rawBuild = buildSubsRes.data?.submissions || buildSubsRes.data?.data?.submissions || [];
+
+        const normalizedBuild = rawBuild.map((b) => ({
+          _id: b._id,
+          isBuild: true,
+          problem: b.problemId,
+          status: b.status,
+          language: 'Node.js',
+          submittedAt: b.createdAt,
+        }));
+
+        setSubmissions([...rawDsa, ...normalizedBuild]);
         setBookmarks(bookmarksRes.data.bookmarks || bookmarksRes.data || []);
         setLoginDates(loginRes.data?.data || loginRes.data || []);
+        setRatingHistory(ratingHistRes.data?.history || []);
       } catch (err) {
         console.error('Profile fetch error', err);
       }
@@ -304,6 +325,16 @@ export default function Profile() {
             )}
           </div>
 
+          {/* Allocated Contest Rating Badge Showcase (LeetCode Style) */}
+          <div className="space-y-2 pb-5 border-b border-border/40">
+            <AllocatedRatingBadge
+              rating={user?.contestRating || 1500}
+              tierName={user?.ratingBadge}
+              contestsAttended={user?.contestsAttended || 0}
+              globalRank={user?.globalContestRank}
+            />
+          </div>
+
           {/* Core Languages Flat List */}
           <div className="space-y-2.5 pb-5 border-b border-border/40">
             <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
@@ -422,6 +453,78 @@ export default function Profile() {
             />
           </div>
 
+          {/* Interactive Contest Rating Graph (LeetCode Style) */}
+          <ContestRatingGraph
+            ratingHistory={ratingHistory}
+            currentRating={user?.contestRating || 1500}
+            globalRank={user?.globalContestRank}
+            contestsAttended={user?.contestsAttended || 0}
+            ratingBadge={user?.ratingBadge}
+          />
+
+          {/* Contest History & Rating Progression (LeetCode Style) */}
+          <div className="space-y-2.5 pb-5 border-b border-border/40">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
+                <Trophy className="h-3.5 w-3.5 text-warning" /> Contest Rating History
+              </span>
+              <span className="text-[11px] font-mono text-text-muted">
+                {ratingHistory.length} contests participated
+              </span>
+            </div>
+
+            {ratingHistory.length > 0 ? (
+              <div className="border-t border-border/40 divide-y divide-border/25">
+                {ratingHistory.map((h, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between py-2 px-1 text-xs hover:bg-surface-raised/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <RatingBadge tierName={h.ratingBadge} size="xs" />
+                      <Link
+                        to={`/contests/${h.contestId}/arena`}
+                        className="text-text hover:text-accent font-medium transition-colors truncate max-w-[180px] sm:max-w-xs"
+                      >
+                        {h.contestTitle}
+                      </Link>
+                      <span className="text-[11px] font-mono text-text-muted hidden sm:inline">
+                        Rank {h.rank} / {h.totalParticipants} ({h.solvedCount} solved)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 text-xs font-mono">
+                      <span className="text-text-muted">
+                        {h.oldRating} → <strong className="text-text">{h.newRating}</strong>
+                      </span>
+                      <span
+                        className={`text-[11px] font-bold ${
+                          h.delta > 0
+                            ? 'text-success'
+                            : h.delta < 0
+                            ? 'text-danger'
+                            : 'text-text-muted'
+                        }`}
+                      >
+                        {h.delta > 0 ? `+${h.delta}` : h.delta}
+                      </span>
+                      <span className="text-[10px] text-text-muted hidden md:inline">
+                        {h.calculatedAt ? new Date(h.calculatedAt).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-4 text-center border-t border-border/20 space-y-1">
+                <p className="text-xs text-text-muted">No rated contests attended yet.</p>
+                <Link to="/contests" className="text-xs text-accent hover:underline inline-flex items-center gap-1">
+                  Browse upcoming contests <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
+          </div>
+
           {/* Recent Accepted Solutions Flat List */}
           <div className="space-y-2.5">
             <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider block flex items-center gap-1.5">
@@ -435,10 +538,15 @@ export default function Profile() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
                       <Link
-                        to={`/problems/${s.problem?.slug || s.problem?._id || '#'}`}
-                        className="text-text hover:text-accent transition-colors truncate max-w-[200px] sm:max-w-md font-normal"
+                        to={s.isBuild ? `/build/${s.problem?.slug || '#'}` : `/problems/${s.problem?.slug || s.problem?._id || '#'}`}
+                        className="text-text hover:text-accent transition-colors truncate max-w-[200px] sm:max-w-md font-normal inline-flex items-center gap-1.5"
                       >
-                        {s.problem?.title || 'Problem'}
+                        {s.isBuild && (
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent-build/15 text-accent-build uppercase shrink-0">
+                            API
+                          </span>
+                        )}
+                        <span className="truncate">{s.problem?.title || 'Problem'}</span>
                       </Link>
                     </div>
 

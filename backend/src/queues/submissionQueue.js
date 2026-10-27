@@ -54,6 +54,27 @@ async function processSubmissionDirectly(jobData) {
                     { new: true }
                 );
             }
+
+            // If part of a contest, recalculate standing and update live leaderboard
+            if (submission.contestId) {
+                try {
+                    const { updateUserContestStanding } = require('../services/contestLeaderboardService');
+                    updateUserContestStanding(submission.contestId, userId).catch((stErr) => {
+                        console.warn(`⚠️ Error updating contest standing for user ${userId}:`, stErr.message);
+                    });
+
+                    const { emitSubmissionUpdate } = require('../sockets/contestSocket');
+                    emitSubmissionUpdate(submission.contestId, userId, {
+                        submissionId: submission._id,
+                        problemId,
+                        status: submission.status,
+                        passedTestCases: submission.passedTestCases,
+                        totalTestCases: submission.totalTestCases,
+                        runtime: submission.runtime,
+                        memory: submission.memory,
+                    });
+                } catch (_) {}
+            }
         }
 
         return result;
@@ -107,10 +128,11 @@ submissionQueue.on('error', (err) => {
  * If Redis / BullMQ is available, dispatches to queue.
  * If Redis / BullMQ is offline, runs in-process immediately in background (zero downtime).
  */
-async function addSubmissionJob(jobData) {
+async function addSubmissionJob(jobData, options = {}) {
+    const priority = options.priority || (jobData.contestId ? 1 : 10);
     if (isBullMQAvailable()) {
         try {
-            const jobPromise = submissionQueue.add('execute-submission', jobData);
+            const jobPromise = submissionQueue.add('execute-submission', jobData, { priority });
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Queue timeout')), 2000)
             );

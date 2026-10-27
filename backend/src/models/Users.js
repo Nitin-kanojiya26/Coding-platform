@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
     bannedAt: { type: Date, default: null },
     emailNotifications: { type: Boolean, default: true },
     unsubscribeToken: { type: String, default: null, index: true },
+    contestRating: { type: Number, default: 1500, index: true },
+    ratingBadge: { type: String, default: 'Contender' },
+    contestsAttended: { type: Number, default: 0 },
+    globalContestRank: { type: Number, default: null },
 }, {
     timestamps: true 
 });

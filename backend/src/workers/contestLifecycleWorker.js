@@ -30,18 +30,34 @@ async function processLifecycleJob(job) {
       await executeProblemSelection(contestId);
     }
     console.log(`🚀 [ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has officially started.`);
-    // Global Socket.IO notification hook (will be populated in Milestone 4)
-    if (global.io) {
-      global.io.emit('contest:started', { contestId });
-    }
+    try {
+      const { emitContestStarted } = require('../sockets/contestSocket');
+      emitContestStarted(contestId);
+    } catch (_) {}
   } else if (name === 'contest-end') {
     console.log(`🏁 [ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has ended.`);
-    if (global.io) {
-      global.io.emit('contest:ended', { contestId });
+    try {
+      const { emitContestEnded } = require('../sockets/contestSocket');
+      emitContestEnded(contestId);
+    } catch (_) {}
+
+    // Milestone 6: Automatically compute LeetCode-style ratings upon contest conclusion
+    try {
+      const { applyContestRatings } = require('../services/contestRatingService');
+      console.log(`🏆 [ContestLifecycleWorker] Computing post-contest ratings for contest ${contestId}...`);
+      await applyContestRatings(contestId);
+      console.log(`✅ [ContestLifecycleWorker] Ratings successfully calculated for contest ${contestId}.`);
+    } catch (ratingErr) {
+      console.error(`⚠️ [ContestLifecycleWorker] Error computing ratings for contest ${contestId}:`, ratingErr.message);
     }
   } else if (name === 'contest-reminder') {
     console.log(`⏰ [ContestLifecycleWorker] 1-hour reminder triggered for contest "${contest.title}" (${contestId}).`);
-    // Mail notifications will be dispatched here in Milestone 5
+    try {
+      const { addEmailJob } = require('../queues/emailQueue');
+      await addEmailJob('reminder-contest', { contestId }, { priority: 2 });
+    } catch (err) {
+      console.warn(`⚠️ [ContestLifecycleWorker] Failed to dispatch reminder job:`, err.message);
+    }
   }
 }
 
@@ -102,6 +118,23 @@ async function reconcileContestLifecycle() {
 
     for (const c of upcomingContests) {
       await scheduleContestLifecycleJobs(c);
+    }
+
+    // 3. Catch up rating computation for concluded contests that missed calculation
+    const uncalculatedEnded = await Contest.find({
+      isCancelled: false,
+      endTime: { $lte: now },
+      ratingsCalculatedAt: null,
+    }).limit(10);
+
+    for (const c of uncalculatedEnded) {
+      console.log(`🔄 [ContestReconciler] Catching up ratings for concluded contest ${c._id}...`);
+      try {
+        const { applyContestRatings } = require('../services/contestRatingService');
+        await applyContestRatings(c._id);
+      } catch (err) {
+        console.warn(`⚠️ [ContestReconciler] Error calculating ratings for ${c._id}:`, err.message);
+      }
     }
   } catch (err) {
     console.warn(`⚠️ [ContestReconciler] Reconciliation sweep error:`, err.message);

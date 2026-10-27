@@ -60,6 +60,22 @@ const contestStandingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  oldRating: {
+    type: Number,
+    default: 1500,
+  },
+  newRating: {
+    type: Number,
+    default: 1500,
+  },
+  ratingDelta: {
+    type: Number,
+    default: 0,
+  },
+  ratingBadge: {
+    type: String,
+    default: 'Contender',
+  },
   updatedAt: {
     type: Date,
     default: Date.now,

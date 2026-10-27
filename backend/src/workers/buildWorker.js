@@ -484,6 +484,25 @@ async function processBuildSubmissionDirectly(submissionId) {
     }
   );
 
+  // If part of a contest, recalculate standing and update leaderboard
+  if (submission.contestId) {
+    try {
+      const { updateUserContestStanding } = require('../services/contestLeaderboardService');
+      updateUserContestStanding(submission.contestId, submission.userId).catch((err) => {
+        console.warn(`⚠️ Error updating contest standing for build submission ${submissionId}:`, err.message);
+      });
+      const { emitSubmissionUpdate } = require('../sockets/contestSocket');
+      emitSubmissionUpdate(submission.contestId, submission.userId, {
+        submissionId,
+        problemId: submission.problemId,
+        status: evalResult.verdict,
+        passed: evalResult.passed,
+        total: evalResult.total,
+        score: evalResult.score,
+      });
+    } catch (_) {}
+  }
+
   console.log(`✅ [BuildRunner] Submission ${submissionId} finished with verdict: ${evalResult.verdict} (${evalResult.score}%)`);
   return evalResult;
 }

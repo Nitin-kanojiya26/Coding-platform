@@ -115,3 +115,78 @@ exports.getLeaderboard = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+/**
+ * @desc    Get platform contest rating leaderboard (LeetCode-style rankings)
+ * @route   GET /api/leaderboard/contest
+ * @access  Public / Private
+ */
+exports.getContestRatingLeaderboard = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitNum;
+    const useCache = process.env.USE_CACHE !== 'false';
+    const cacheKey = `leaderboard:contest:${pageNum}:${limitNum}`;
+
+    if (useCache) {
+      const cachedData = await redis.get(cacheKey);
+      if (cachedData) {
+        return res.status(200).json({
+          ...JSON.parse(cachedData),
+          source: 'cache',
+        });
+      }
+    }
+
+    // Filter to users who have attended at least 1 contest, or all users if none have attended yet
+    let count = await User.countDocuments({ contestsAttended: { $gt: 0 } });
+    let query = { contestsAttended: { $gt: 0 } };
+    if (count === 0) {
+      count = await User.countDocuments({});
+      query = {};
+    }
+
+    const users = await User.find(query)
+      .sort({ contestRating: -1, contestsAttended: -1, updatedAt: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .select('name avatar role contestRating ratingBadge contestsAttended globalContestRank solvedProblems');
+
+    const ranked = users.map((u, idx) => ({
+      rank: skip + idx + 1,
+      userId: u._id,
+      _id: u._id,
+      name: u.name,
+      username: u.name,
+      avatar: u.avatar,
+      role: u.role,
+      contestRating: u.contestRating || 1500,
+      ratingBadge: u.ratingBadge || 'Contender',
+      contestsAttended: u.contestsAttended || 0,
+      globalContestRank: u.globalContestRank || (skip + idx + 1),
+      problemsSolved: Array.isArray(u.solvedProblems) ? u.solvedProblems.length : 0,
+    }));
+
+    const responsePayload = {
+      status: 'success',
+      source: 'database',
+      page: pageNum,
+      limit: limitNum,
+      totalUsers: count,
+      totalPages: Math.ceil(count / limitNum),
+      count: ranked.length,
+      leaderboard: ranked,
+    };
+
+    if (useCache) {
+      await redis.setex(cacheKey, 60, JSON.stringify(responsePayload));
+    }
+
+    return res.status(200).json(responsePayload);
+  } catch (error) {
+    console.error('Error fetching contest rating leaderboard:', error);
+    return res.status(500).json({ message: error.message });
+  }
+};

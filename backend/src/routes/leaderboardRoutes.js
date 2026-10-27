@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getLeaderboard } = require('../controllers/leaderboardController');
-const { protect } = require('../middleware/authMiddleware');
+const { getLeaderboard, getContestRatingLeaderboard } = require('../controllers/leaderboardController');
+const { protect, optionalAuth } = require('../middleware/authMiddleware');
 const { leaderboardLimiter } = require('../middleware/rateLimiter');
 
-// Public (anyone can view)
-// router.get('/', getLeaderboard);
+// Problem-solving Leaderboard
+router.get('/', leaderboardLimiter, optionalAuth, getLeaderboard);
 
-router.get('/', leaderboardLimiter, protect, getLeaderboard);
+// Milestone 6: Contest Rating Leaderboard (LeetCode-style)
+router.get('/contest', leaderboardLimiter, optionalAuth, getContestRatingLeaderboard);
 
 module.exports = router;
+

@@ -1,14 +1,41 @@
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const net = require('net');
 require('dotenv').config();
 
-const API_BASE = 'http://localhost:5000/api';
+function checkPort(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+      .once('error', () => resolve(true)) // In use
+      .once('listening', () => {
+        tester.once('close', () => resolve(false)).close(); // Available
+      })
+      .listen(port);
+  });
+}
+
+let API_BASE = 'http://localhost:5000/api';
 
 async function verifyMilestone1() {
   console.log('======================================================');
   console.log('🧪 Verifying Milestone 1: Contest Models & APIs');
   console.log('======================================================\n');
+
+  // Check if port 5000 is running; if not, spin up in-process server
+  const isPort5000InUse = await checkPort(5000);
+  let activeServer = null;
+
+  if (!isPort5000InUse) {
+    console.log('ℹ️ Server is not running on port 5000. Launching in-process test server...');
+    const { server } = require('../src/server');
+    const testPort = 5051;
+    API_BASE = `http://localhost:${testPort}/api`;
+    await new Promise((resolve) => {
+      activeServer = server.listen(testPort, resolve);
+    });
+    console.log(`🚀 In-process test server listening on port ${testPort}`);
+  }
 
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/coding-platform');
   const User = require('../src/models/Users');
@@ -284,6 +311,9 @@ async function verifyMilestone1() {
     console.error('Unexpected test error:', outerErr);
     process.exit(1);
   } finally {
+    if (activeServer) {
+      activeServer.close();
+    }
     await mongoose.disconnect();
   }
 }
