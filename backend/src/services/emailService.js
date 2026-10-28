@@ -1,4 +1,11 @@
 // backend/src/services/emailService.js
+const dns = require('dns');
+
+// Force Node.js to prioritize IPv4 over IPv6, fixing Google SMTP connection timeouts
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
