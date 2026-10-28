@@ -25,7 +25,8 @@ import {
   RotateCcw,
   Calendar,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
 
@@ -293,9 +294,16 @@ export default function ProblemDetail() {
       });
       setTerminalLogs({ mode: 'sandbox', data: res.data });
     } catch (e) {
+      const isOffline = e.response?.status === 503 || e.response?.data?.isServiceUnavailable;
+      const message =
+        e.response?.data?.message ||
+        (isOffline
+          ? 'The code execution engine is temporarily offline. Please try again shortly.'
+          : 'Code execution encountered an error.');
       setTerminalLogs({
         mode: 'error',
-        out: e.response?.data?.message || 'Compilation execution error.',
+        isServiceUnavailable: isOffline,
+        out: message,
       });
     } finally {
       setRunning(false);
@@ -340,9 +348,16 @@ export default function ProblemDetail() {
       fetchProblemSubmissions(problem._id);
       fetchProblemStats(problem._id);
     } catch (e) {
+      const isOffline = e.response?.status === 503 || e.response?.data?.isServiceUnavailable;
+      const message =
+        e.response?.data?.message ||
+        (isOffline
+          ? 'The code execution engine is temporarily offline. Please try again shortly.'
+          : 'Submission processing encountered an error.');
       setTerminalLogs({
         mode: 'error',
-        out: e.response?.data?.message || 'Submission runtime fault.',
+        isServiceUnavailable: isOffline,
+        out: message,
       });
     } finally {
       setSubmitting(false);
@@ -1143,14 +1158,29 @@ export default function ProblemDetail() {
                     <div className="font-mono text-xs space-y-3">
                       {/* Execution Error */}
                       {terminalLogs.mode === 'error' && (
-                        <div className="p-3 rounded-lg bg-rose-500/10 text-rose-400 space-y-1">
+                        <div
+                          className={`p-3.5 rounded-lg space-y-1.5 ${
+                            terminalLogs.isServiceUnavailable
+                              ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
+                              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                          }`}
+                        >
                           <div className="flex items-center gap-1.5 font-semibold text-xs">
-                            <ShieldAlert className="h-4 w-4" />
-                            <span>Execution Error</span>
+                            {terminalLogs.isServiceUnavailable ? (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                                <span className="text-amber-300 font-bold">Execution Engine Notice</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0" />
+                                <span>Execution Notice</span>
+                              </>
+                            )}
                           </div>
-                          <pre className="whitespace-pre-wrap text-xs font-mono leading-relaxed select-text">
+                          <p className="whitespace-pre-wrap text-xs font-sans leading-relaxed select-text opacity-95">
                             {terminalLogs.out}
-                          </pre>
+                          </p>
                         </div>
                       )}
 
@@ -1248,14 +1278,19 @@ export default function ProblemDetail() {
                                 <span className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
                                   <CheckCircle className="h-5 w-5" /> Accepted
                                 </span>
+                              ) : terminalLogs.data.status?.toLowerCase() === 'error' ? (
+                                <span className="text-base font-bold text-amber-400 flex items-center gap-1.5">
+                                  <AlertTriangle className="h-5 w-5" /> Service Unavailable
+                                </span>
                               ) : (
                                 <span className="text-base font-bold text-rose-400 flex items-center gap-1.5">
-                                  <XCircle className="h-5 w-5" /> {terminalLogs.data.status || 'Wrong Answer'}
+                                  <XCircle className="h-5 w-5" /> {terminalLogs.data.status?.replace(/_/g, ' ') || 'Wrong Answer'}
                                 </span>
                               )}
                               <div className="text-xs text-text-muted font-sans mt-0.5">
-                                {terminalLogs.data.passedTestCases ?? 0} /{' '}
-                                {terminalLogs.data.totalTestCases ?? 0} test cases passed.
+                                {terminalLogs.data.status?.toLowerCase() === 'error'
+                                  ? (terminalLogs.data.errorLog || 'The execution service is temporarily offline. Please try again shortly.')
+                                  : `${terminalLogs.data.passedTestCases ?? 0} / ${terminalLogs.data.totalTestCases ?? 0} test cases passed.`}
                               </div>
                             </div>
 

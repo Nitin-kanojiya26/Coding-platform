@@ -80,11 +80,42 @@ async function processSubmissionDirectly(jobData) {
         return result;
     } catch (err) {
         console.error(`❌ [SubmissionRunner] Error processing ${submissionId}:`, err.message);
+        const isUnavailable =
+            err.isServiceUnavailable ||
+            err.code === 'ECONNREFUSED' ||
+            err.message?.toLowerCase().includes('offline') ||
+            err.message?.includes('ECONNREFUSED');
+
+        const friendlyError = isUnavailable
+            ? 'The code execution engine is temporarily offline. Your submission has been saved. Please try submitting again in a moment.'
+            : (err.friendlyMessage || err.message || 'Execution error');
+
         try {
-            await Submission.findByIdAndUpdate(submissionId, {
-                status: 'error',
-                errorLog: err.message,
-            });
+            const updated = await Submission.findByIdAndUpdate(
+                submissionId,
+                {
+                    status: 'error',
+                    errorLog: friendlyError,
+                },
+                { new: true }
+            );
+
+            // Broadcast error status to contest participants immediately so client does not hang
+            if (updated && updated.contestId) {
+                try {
+                    const { emitSubmissionUpdate } = require('../sockets/contestSocket');
+                    emitSubmissionUpdate(updated.contestId, userId, {
+                        submissionId: updated._id,
+                        problemId,
+                        status: 'error',
+                        errorLog: friendlyError,
+                        passedTestCases: 0,
+                        totalTestCases: testCases?.length || 0,
+                        runtime: 0,
+                        memory: 0,
+                    });
+                } catch (_) {}
+            }
         } catch (_) {}
     }
 }

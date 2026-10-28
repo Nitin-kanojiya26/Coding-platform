@@ -550,11 +550,17 @@ export default function BuildWorkspace() {
       }
     } catch (err) {
       console.error('Run failed:', err);
+      const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
+      const message =
+        err.response?.data?.message ||
+        (isOffline
+          ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+          : 'Could not execute test run. Check your server code.');
       setSubmissionStatus('error');
       setSubmissionResult({
-        status: 'Run Error',
-        verdict: 'Run Error',
-        message: err.response?.data?.message || 'Could not execute test run. Check your server code.',
+        status: isOffline ? 'Service Unavailable' : 'Run Error',
+        verdict: isOffline ? 'Service Unavailable' : 'Run Error',
+        message,
         isRun: true,
       });
     } finally {
@@ -613,11 +619,16 @@ export default function BuildWorkspace() {
           message: 'You have reached the submission rate limit (5 per minute). Please wait 60s.',
         });
       } else {
+        const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
         setSubmissionStatus('error');
         setSubmissionResult({
-          status: 'Submission Error',
-          verdict: 'Submission Error',
-          message: err.response?.data?.message || 'Could not queue your submission. Check your network.',
+          status: isOffline ? 'Service Unavailable' : 'Submission Error',
+          verdict: isOffline ? 'Service Unavailable' : 'Submission Error',
+          message:
+            err.response?.data?.message ||
+            (isOffline
+              ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+              : 'Could not queue your submission. Check your network.'),
         });
       }
     }
@@ -1783,7 +1794,7 @@ export default function BuildWorkspace() {
                       className={`p-2.5 rounded border flex items-start gap-2.5 ${
                         isAccepted
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          : verdict === 'Start Timeout'
+                          : verdict === 'Start Timeout' || verdict === 'Service Unavailable'
                           ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                           : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                       }`}
@@ -1791,7 +1802,11 @@ export default function BuildWorkspace() {
                       {isAccepted ? (
                         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                        <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                          verdict === 'Start Timeout' || verdict === 'Service Unavailable'
+                            ? 'text-amber-400'
+                            : 'text-rose-400'
+                        }`} />
                       )}
                       <div className="space-y-1">
                         <span className="font-bold text-xs uppercase tracking-wide block">
@@ -1800,8 +1815,10 @@ export default function BuildWorkspace() {
                         <p className="text-[11px] font-sans leading-relaxed">
                           {verdict === 'Start Timeout'
                             ? "Server did not respond on port 3000 in time. Verify app.listen(3000, '0.0.0.0') is in server.js."
+                            : verdict === 'Service Unavailable'
+                            ? (submissionResult.message || 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.')
                             : verdict === 'Internal Error'
-                            ? 'Evaluation error. Please retry.'
+                            ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
                             : isAccepted
                             ? (submissionResult.isRun ? 'All visible requirements passed! Ready to submit solution.' : 'All requirements met!')
                             : submissionResult.message || 'Some test cases did not pass. Check the checklist for details.'}

@@ -54,7 +54,7 @@ const redisClient = new Redis(process.env.REDIS_CACHE_URL || process.env.REDIS_U
 redisClient.on('connect', () => {
   isRedisConnected = true;
   hasLoggedFailure = false;
-  console.log('⚡ Redis Client Connected successfully (Port 6380)');
+  console.log('⚡ Redis Client Connected successfully');
 });
 
 redisClient.on('ready', () => {

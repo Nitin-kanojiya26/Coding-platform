@@ -152,7 +152,16 @@ const runBuildSolution = async (req, res) => {
     });
   } catch (err) {
     console.error('Error running build solution:', err.message);
-    return res.status(500).json({ message: 'Error executing test run: ' + err.message });
+    const isOffline =
+      err.message?.toLowerCase().includes('docker') ||
+      err.message?.toLowerCase().includes('sandbox') ||
+      err.message?.includes('ECONNREFUSED') ||
+      err.code === 'ECONNREFUSED';
+    const statusCode = isOffline ? 503 : 500;
+    const message = isOffline
+      ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+      : 'Error executing test run: ' + err.message;
+    return res.status(statusCode).json({ message, isServiceUnavailable: isOffline });
   }
 };
 

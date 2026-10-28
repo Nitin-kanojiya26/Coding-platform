@@ -16,9 +16,14 @@ export function useContestSocket(contestId) {
   useEffect(() => {
     if (!contestId) return;
 
-    const token = localStorage.getItem('token');
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const socketHost = apiUrl.replace(/\/api\/?$/, '');
+    let socketHost = 'http://localhost:5000';
+    if (import.meta.env.VITE_SOCKET_URL) {
+      socketHost = import.meta.env.VITE_SOCKET_URL;
+    } else if (import.meta.env.VITE_API_URL) {
+      socketHost = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '');
+    } else if (import.meta.env.PROD) {
+      socketHost = window.location.origin;
+    }
 
     const socket = io(socketHost, {
       auth: { token },

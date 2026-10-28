@@ -19,7 +19,8 @@ import {
   BarChart2,
   Cpu,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle
 } from 'lucide-react';
 import DifficultyBadge from '../components/DifficultyBadge';
 import { getAvatarSrc } from '../utils/avatar';
@@ -220,6 +221,11 @@ export default function SubmissionDetail() {
             {isAccepted ? (
               <span className="text-xl sm:text-2xl font-bold text-success flex items-center gap-2">
                 <CheckCircle className="h-6 w-6 shrink-0" /> Accepted
+              </span>
+            ) : submission.status === 'error' ? (
+              <span className="text-xl sm:text-2xl font-bold text-amber-400 flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 shrink-0" />
+                <span>Service Unavailable</span>
               </span>
             ) : (
               <span className="text-xl sm:text-2xl font-bold text-danger flex items-center gap-2">
@@ -631,14 +637,29 @@ export default function SubmissionDetail() {
 
       {/* ─── Error Log Output (if compilation / runtime error) ─── */}
       {submission.errorLog && (
-        <div className="p-4 rounded bg-danger/10 border border-danger/30 text-danger space-y-1.5 font-mono text-xs">
+        <div
+          className={`p-4 rounded border space-y-1.5 text-xs ${
+            submission.status === 'error' || submission.errorLog.toLowerCase().includes('offline')
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 font-sans'
+              : 'bg-danger/10 border-danger/30 text-danger font-mono'
+          }`}
+        >
           <div className="flex items-center gap-2 font-medium">
-            <ShieldAlert className="h-4 w-4" />
-            <span>Compiler Output / Diagnostic Trace</span>
+            {submission.status === 'error' || submission.errorLog.toLowerCase().includes('offline') ? (
+              <>
+                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="font-semibold text-amber-300">Execution Engine Notice</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span>Compiler Output / Diagnostic Trace</span>
+              </>
+            )}
           </div>
-          <pre className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed bg-black/40 p-3 rounded overflow-x-auto">
+          <div className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed bg-black/40 p-3 rounded overflow-x-auto">
             {submission.errorLog}
-          </pre>
+          </div>
         </div>
       )}
 

@@ -168,12 +168,36 @@ exports.createSubmission = async (req, res) => {
 
     if (isSyncMode) {
       // OLD SYNCHRONOUS ROUTE (Before BullMQ / Baseline benchmark)
-      const result = await judge0Service.runAllTestCases(
-        code,
-        languageId,
-        testCases,
-        problem.timeLimit || 2000
-      );
+      let result;
+      try {
+        result = await judge0Service.runAllTestCases(
+          code,
+          languageId,
+          testCases,
+          problem.timeLimit || 2000
+        );
+      } catch (execErr) {
+        const isUnavailable =
+          execErr.isServiceUnavailable ||
+          execErr.code === 'ECONNREFUSED' ||
+          execErr.message?.toLowerCase().includes('offline') ||
+          execErr.message?.includes('ECONNREFUSED');
+
+        const friendlyMsg = isUnavailable
+          ? 'The code execution engine is temporarily offline. Please try again shortly.'
+          : (execErr.friendlyMessage || execErr.message || 'Execution error');
+
+        submission.status = 'error';
+        submission.errorLog = friendlyMsg;
+        await submission.save().catch(() => {});
+
+        return res.status(isUnavailable ? 503 : 500).json({
+          status: 'error',
+          message: friendlyMsg,
+          isServiceUnavailable: isUnavailable,
+          submission,
+        });
+      }
 
       submission.status = result.status;
       submission.runtime = result.runtime;
@@ -231,7 +255,18 @@ exports.createSubmission = async (req, res) => {
     });
   } catch (error) {
     console.error('🔥 createSubmission controller error:', error.message);
-    res.status(500).json({ message: error.message });
+    const isUnavailable =
+      error.isServiceUnavailable ||
+      error.code === 'ECONNREFUSED' ||
+      error.message?.toLowerCase().includes('offline') ||
+      error.message?.includes('ECONNREFUSED');
+
+    const statusCode = isUnavailable ? 503 : 500;
+    const message = isUnavailable
+      ? 'The code execution engine is temporarily offline. Please try again shortly.'
+      : (error.friendlyMessage || error.message);
+
+    res.status(statusCode).json({ message, isServiceUnavailable: isUnavailable });
   }
 };
 

@@ -380,7 +380,21 @@ exports.runSampleTestCases = async (req, res) => {
       );
     } catch (serviceError) {
       console.error('❌ Judge0 service error:', serviceError.message);
-      return res.status(500).json({ message: 'Code execution failed: ' + serviceError.message });
+      const isUnavailable =
+        serviceError.isServiceUnavailable ||
+        serviceError.code === 'ECONNREFUSED' ||
+        serviceError.message?.toLowerCase().includes('offline') ||
+        serviceError.message?.includes('ECONNREFUSED');
+
+      const statusCode = isUnavailable ? 503 : 500;
+      const friendlyMessage = isUnavailable
+        ? 'The code execution engine is temporarily offline. Please try again shortly.'
+        : (serviceError.friendlyMessage || `Code execution failed: ${serviceError.message}`);
+
+      return res.status(statusCode).json({
+        message: friendlyMessage,
+        isServiceUnavailable: isUnavailable,
+      });
     }
 
     // ✅ Guard against undefined or broken service return

@@ -10,6 +10,22 @@ const BM_APP_IMAGE = process.env.BM_APP_IMAGE || 'bm-node-express';
 const BM_HARNESS_IMAGE = process.env.BM_HARNESS_IMAGE || 'bm-harness';
 const BM_CONCURRENCY = Math.max(1, parseInt(process.env.BM_CONCURRENCY, 10) || 2);
 
+// Detect if Docker engine / daemon is offline, stopped, or unreachable
+function isDockerOfflineError(str) {
+  if (!str) return false;
+  const s = String(str).toLowerCase();
+  return (
+    s.includes('docker daemon is not running') ||
+    s.includes('cannot connect to the docker daemon') ||
+    s.includes('error during connect') ||
+    s.includes('pipe/docker_engine') ||
+    s.includes('is the docker daemon running') ||
+    s.includes('connection refused') ||
+    s.includes('econnrefused') ||
+    s.includes('enoent')
+  );
+}
+
 // Helper to spawn a command with args array (NEVER shell string)
 function spawnCommand(cmd, args, options = {}) {
   return new Promise((resolve) => {
@@ -200,12 +216,15 @@ async function executeDockerFlow(submission, problem, options = {}) {
     // 2. docker network create --internal judge-<id>
     const netRes = await spawnCommand('docker', ['network', 'create', '--internal', networkName]);
     if (netRes.code !== 0) {
+      const isOffline = isDockerOfflineError(netRes.stderr) || isDockerOfflineError(netRes.error?.message);
       return {
-        verdict: 'Internal Error',
+        verdict: isOffline ? 'Service Unavailable' : 'Internal Error',
         passed: 0,
         total: allTests.length,
         score: 0,
-        message: `Failed to create internal network: ${netRes.stderr.trim()}`,
+        message: isOffline
+          ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+          : `Failed to create internal network: ${netRes.stderr.trim()}`,
         testResults: [],
       };
     }
@@ -231,12 +250,15 @@ async function executeDockerFlow(submission, problem, options = {}) {
 
     const appRunRes = await spawnCommand('docker', appArgs);
     if (appRunRes.code !== 0) {
+      const isOffline = isDockerOfflineError(appRunRes.stderr) || isDockerOfflineError(appRunRes.error?.message);
       return {
-        verdict: 'Internal Error',
+        verdict: isOffline ? 'Service Unavailable' : 'Internal Error',
         passed: 0,
         total: allTests.length,
         score: 0,
-        message: `Failed to start app container: ${appRunRes.stderr.trim()}`,
+        message: isOffline
+          ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+          : `Failed to start app container: ${appRunRes.stderr.trim()}`,
         testResults: [],
       };
     }
@@ -355,12 +377,15 @@ async function executeDockerFlow(submission, problem, options = {}) {
       .filter((l) => l.length > 0);
 
     if (stdoutLines.length === 0) {
+      const isOffline = isDockerOfflineError(harnessRes.stderr) || isDockerOfflineError(harnessRes.error?.message);
       return {
-        verdict: 'Internal Error',
+        verdict: isOffline ? 'Service Unavailable' : 'Internal Error',
         passed: 0,
         total: allTests.length,
         score: 0,
-        message: 'No output from harness runner: ' + harnessRes.stderr.trim(),
+        message: isOffline
+          ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+          : 'No output from harness runner: ' + harnessRes.stderr.trim(),
         testResults: [],
       };
     }
@@ -541,4 +566,16 @@ module.exports = {
   performStartupCleanup,
   processBuildSubmissionDirectly,
   executeDockerFlow,
+  isDockerOfflineError,
+  checkDockerHealth: async () => {
+    try {
+      const res = await spawnCommand('docker', ['version', '--format', '{{.Server.Version}}']);
+      if (res.code === 0 && res.stdout.trim()) {
+        return { ok: true, version: res.stdout.trim() };
+      }
+      return { ok: false, error: 'Docker daemon offline' };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
 };

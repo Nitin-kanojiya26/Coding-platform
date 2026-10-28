@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  AlertTriangle,
   RotateCcw,
   Loader2,
   Users,
@@ -473,8 +474,14 @@ export default function ContestArena() {
         toast.error(res.data?.overallStatus?.toUpperCase() || 'Sample test cases failed', { id: 'run-toast' });
       }
     } catch (err) {
-      setRunError(err.response?.data?.message || 'Error executing code in sandbox.');
-      toast.error('Sandbox execution error', { id: 'run-toast' });
+      const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
+      const message =
+        err.response?.data?.message ||
+        (isOffline
+          ? 'The code execution engine is temporarily offline. Please try again shortly.'
+          : 'Execution encountered an error.');
+      setRunError(message);
+      toast.error(isOffline ? 'Execution engine offline' : 'Execution notice', { id: 'run-toast' });
     } finally {
       setRunningCode(false);
     }
@@ -552,7 +559,13 @@ export default function ContestArena() {
       }
     } catch (err) {
       setSubmitting(false);
-      toast.error(err.response?.data?.message || 'Error submitting solution.');
+      const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
+      const message =
+        err.response?.data?.message ||
+        (isOffline
+          ? 'The code execution engine is temporarily offline. Please try submitting again shortly.'
+          : 'Error submitting solution.');
+      toast.error(message);
     }
   };
 
@@ -1151,14 +1164,29 @@ export default function ContestArena() {
                         <span>Running code against sample test cases...</span>
                       </div>
                     ) : runError ? (
-                      <div className="p-3 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 space-y-1.5">
+                      <div
+                        className={`p-3.5 rounded-lg border space-y-1.5 ${
+                          runError.toLowerCase().includes('offline') || runError.toLowerCase().includes('temporarily')
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                            : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                        }`}
+                      >
                         <div className="flex items-center gap-1.5 font-semibold text-xs">
-                          <ShieldAlert className="h-4 w-4 shrink-0" />
-                          <span>Sandbox Execution Error</span>
+                          {runError.toLowerCase().includes('offline') || runError.toLowerCase().includes('temporarily') ? (
+                            <>
+                              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                              <span className="text-amber-300 font-bold">Execution Engine Notice</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0" />
+                              <span>Execution Notice</span>
+                            </>
+                          )}
                         </div>
-                        <pre className="whitespace-pre-wrap text-xs font-mono select-text leading-relaxed">
+                        <p className="whitespace-pre-wrap text-xs font-sans leading-relaxed select-text opacity-95">
                           {runError}
-                        </pre>
+                        </p>
                       </div>
                     ) : runResults ? (
                       <div className="space-y-3">
@@ -1267,6 +1295,8 @@ export default function ContestArena() {
                           className={`p-3.5 rounded-lg border space-y-2 ${
                             judgingVerdict.status?.toLowerCase() === 'accepted' || judgingVerdict.status?.toLowerCase() === 'ac'
                               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : judgingVerdict.status?.toLowerCase() === 'error'
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                               : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                           }`}
                         >
@@ -1276,6 +1306,11 @@ export default function ContestArena() {
                                 <>
                                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                                   <span>Accepted</span>
+                                </>
+                              ) : judgingVerdict.status?.toLowerCase() === 'error' ? (
+                                <>
+                                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                                  <span>Service Unavailable</span>
                                 </>
                               ) : (
                                 <>

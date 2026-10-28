@@ -1,9 +1,10 @@
 // backend/src/services/judge0Service.js
 const axios = require('axios');
-const { JUDGE0_API_URL } = process.env;
 
-if (!JUDGE0_API_URL) {
-  throw new Error('Missing JUDGE0_API_URL in .env');
+const JUDGE0_API_URL = process.env.JUDGE0_API_URL || 'http://localhost:2358';
+
+if (!process.env.JUDGE0_API_URL) {
+  console.warn('⚠️ [Judge0] JUDGE0_API_URL not specified in .env, falling back to http://localhost:2358');
 }
 
 const judge0 = axios.create({
@@ -11,6 +12,40 @@ const judge0 = axios.create({
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
+
+// User-friendly error indicating the code execution engine is down or offline
+class ExecutionUnavailableError extends Error {
+  constructor(message = 'The code execution engine is temporarily offline. Please try again shortly.') {
+    super(message);
+    this.name = 'ExecutionUnavailableError';
+    this.isServiceUnavailable = true;
+    this.statusCode = 503;
+    this.friendlyMessage = message;
+  }
+}
+
+// Helper to detect if Judge0 is completely unreachable or offline
+function isJudge0OfflineError(err) {
+  if (!err) return false;
+  const code = err.code || '';
+  const msg = (err.message || '').toLowerCase();
+  const status = err.response?.status;
+
+  return (
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND' ||
+    code === 'ECONNABORTED' ||
+    code === 'EHOSTUNREACH' ||
+    status === 502 ||
+    status === 503 ||
+    status === 504 ||
+    msg.includes('econnrefused') ||
+    msg.includes('connect econnrefused') ||
+    msg.includes('network error') ||
+    msg.includes('socket hang up')
+  );
+}
 
 // Helper functions for safe Base64 encoding/decoding
 const encodeBase64 = (str) => Buffer.from(str || '').toString('base64');
@@ -38,13 +73,19 @@ exports.runAllTestCases = async (code, languageId, testCases, timeLimit = 2000) 
     // Send with base64_encoded=true
     batchResponse = await judge0.post('/submissions/batch?base64_encoded=true', { submissions });
   } catch (err) {
+    if (isJudge0OfflineError(err)) {
+      console.warn('⚠️ [Judge0] Service offline or unreachable:', err.message);
+      throw new ExecutionUnavailableError(
+        'The code execution engine is temporarily offline. Please try again shortly.'
+      );
+    }
     console.error('❌ Judge0 error:', err.response?.data || err.message);
-    throw new Error(`Judge0 batch submission failed: ${err.message}`);
+    throw new Error(`Execution error: ${err.response?.data?.message || err.message}`);
   }
 
   const tokens = batchResponse.data.map((s) => s.token);
   if (!tokens || tokens.length === 0) {
-    throw new Error('No tokens received from Judge0');
+    throw new Error('No tokens received from execution service');
   }
 
   const results = await pollBatchResults(tokens);
@@ -65,12 +106,18 @@ const pollBatchResults = async (tokens, maxAttempts = 30, delayMs = 1000) => {
         `/submissions/batch?tokens=${tokenString}&base64_encoded=true&fields=${fields}`
       );
     } catch (err) {
-      throw new Error(`Judge0 polling failed: ${err.message}`);
+      if (isJudge0OfflineError(err)) {
+        console.warn('⚠️ [Judge0] Polling lost connection:', err.message);
+        throw new ExecutionUnavailableError(
+          'The code execution engine is temporarily offline. Please try again shortly.'
+        );
+      }
+      throw new Error(`Execution polling error: ${err.message}`);
     }
 
     const submissions = response.data.submissions;
     if (!submissions || submissions.length === 0) {
-      throw new Error('Empty response from Judge0');
+      throw new Error('Empty response from execution service');
     }
 
     // Status ID >= 3 means execution finished
@@ -83,7 +130,9 @@ const pollBatchResults = async (tokens, maxAttempts = 30, delayMs = 1000) => {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
-  throw new Error('Judge0 execution timed out during polling');
+  throw new ExecutionUnavailableError(
+    'Code execution timed out waiting for results. Please try again shortly.'
+  );
 };
 
 const aggregateResults = (judgeResults, originalTestCases) => {
@@ -172,3 +221,14 @@ const aggregateResults = (judgeResults, originalTestCases) => {
 };
 
 exports.runTestCasesDetailed = exports.runAllTestCases;
+exports.ExecutionUnavailableError = ExecutionUnavailableError;
+exports.isJudge0OfflineError = isJudge0OfflineError;
+
+exports.checkHealth = async () => {
+  try {
+    const res = await judge0.get('/about', { timeout: 2500 });
+    return { ok: true, version: res.data?.version || 'online' };
+  } catch (err) {
+    return { ok: false, error: 'Judge0 offline or unreachable' };
+  }
+};

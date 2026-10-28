@@ -5,10 +5,10 @@ const Redis = require('ioredis');
 let isBullMQConnected = false;
 let hasLoggedOfflineWarning = false;
 
+const redisUrl = process.env.REDIS_QUEUE_URL || process.env.REDIS_URL;
+
 // BullMQ STRICTLY requires maxRetriesPerRequest: null
 const connectionOptions = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number(process.env.REDIS_PORT) || 6380,
   maxRetriesPerRequest: null, // Required by BullMQ to prevent crashes
   enableReadyCheck: false,
   enableOfflineQueue: false, // Prevent queuing commands indefinitely when Redis is offline
@@ -24,13 +24,19 @@ const connectionOptions = {
   },
 };
 
+// Only specify host/port if a complete connection URL was not supplied
+if (!redisUrl) {
+  connectionOptions.host = process.env.REDIS_HOST || '127.0.0.1';
+  connectionOptions.port = Number(process.env.REDIS_PORT) || 6380;
+}
+
 // Dedicated ioredis instance for BullMQ
-const bullmqConnection = new Redis(process.env.REDIS_QUEUE_URL || process.env.REDIS_URL || 'redis://127.0.0.1:6380', connectionOptions);
+const bullmqConnection = new Redis(redisUrl || 'redis://127.0.0.1:6380', connectionOptions);
 
 bullmqConnection.on('connect', () => {
   isBullMQConnected = true;
   hasLoggedOfflineWarning = false;
-  console.log('⚡ BullMQ Redis Connection Established (Port 6380)');
+  console.log('⚡ BullMQ Redis Connection Established');
 });
 
 bullmqConnection.on('ready', () => {
