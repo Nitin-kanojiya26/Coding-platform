@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../api/client';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import {
   Shield, Users, FileText, Code, Ban, ShieldCheck,
   Heart, Sparkles, Edit, Trash2, Loader2, Plus, Search,
@@ -10,6 +11,7 @@ import {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [data, setData] = useState(null);
   const [problems, setProblems] = useState([]);
   const [buildProblems, setBuildProblems] = useState([]);
@@ -106,6 +108,24 @@ export default function AdminDashboard() {
       toast.error(err.response?.data?.message || 'Action failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`promote-${userId}`]: false }));
+    }
+  };
+
+  const handleDemote = async (userId, userName) => {
+    if (userId === currentUser?._id) {
+      toast.error('You cannot remove your own admin privileges.');
+      return;
+    }
+    if (!window.confirm(`Remove admin privileges from ${userName || 'this user'}?`)) return;
+    setActionLoading((prev) => ({ ...prev, [`demote-${userId}`]: true }));
+    try {
+      await API.put(`/admin/users/${userId}/demote`);
+      toast.success('Admin privileges removed');
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Demotion failed');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [`demote-${userId}`]: false }));
     }
   };
 
@@ -346,7 +366,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="py-2 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {u.role !== 'admin' && (
+                        {u.role !== 'admin' ? (
                           <button
                             type="button"
                             onClick={() => handlePromote(u._id)}
@@ -354,6 +374,16 @@ export default function AdminDashboard() {
                             className="text-[10px] px-2 py-0.5 rounded border border-border/40 hover:bg-surface-raised text-text transition-colors"
                           >
                             Promote
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDemote(u._id, u.name)}
+                            disabled={actionLoading[`demote-${u._id}`] || u._id === currentUser?._id}
+                            title={u._id === currentUser?._id ? "You cannot demote yourself" : "Remove admin privileges"}
+                            className="text-[10px] px-2 py-0.5 rounded border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Remove Admin
                           </button>
                         )}
                         <button

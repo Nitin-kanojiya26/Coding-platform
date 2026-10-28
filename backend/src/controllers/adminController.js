@@ -142,3 +142,43 @@ exports.promoteUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Demote an admin back to regular user
+// @route   PUT /api/admin/users/:id/demote
+// @access  Private/Admin
+exports.demoteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Safety Rule 1: Prevent self-demotion
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot remove your own admin privileges.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role !== 'admin') {
+      return res.status(400).json({ message: 'User is not an admin' });
+    }
+
+    // Safety Rule 2: Ensure at least one admin remains on the platform
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    if (adminCount <= 1) {
+      return res.status(400).json({ message: 'Cannot demote the last remaining admin on the platform.' });
+    }
+
+    user.role = 'user';
+    await user.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: `Admin privileges removed for ${user.name}`,
+      user: { id: user._id, name: user.name, role: user.role }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
