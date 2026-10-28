@@ -44,15 +44,6 @@ exports.registerUser = async (req, res) => {
             await sendOTPEmail(email, generatedOtp, 'Codexium - Verify Your Email Account');
         } catch (emailError) {
             console.error(`⚠️ [EmailService] Could not send email to ${email}:`, emailError.message);
-            if (process.env.NODE_ENV !== 'production') {
-                return res.status(200).json({
-                    status: 'success',
-                    message: 'Verification code generated! (Logged to backend terminal for local dev).'
-                });
-            }
-            return res.status(503).json({
-                message: 'Unable to deliver verification email at this moment. Please try again shortly.'
-            });
         }
 
         res.status(200).json({
@@ -175,15 +166,6 @@ exports.requestPasswordResetOTP = async (req, res) => {
             await sendOTPEmail(email, resetOtpCode, 'CodeArena - Reset Your Password');
         } catch (emailError) {
             console.error(`⚠️ [EmailService] Could not send reset email to ${email}:`, emailError.message);
-            if (process.env.NODE_ENV !== 'production') {
-                return res.status(200).json({
-                    status: 'success',
-                    message: 'Password reset code generated! (Logged to backend terminal for local dev).'
-                });
-            }
-            return res.status(503).json({
-                message: 'Unable to deliver reset email at this moment. Please try again shortly.'
-            });
         }
 
         res.status(200).json({

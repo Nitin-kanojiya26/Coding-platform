@@ -4,21 +4,24 @@ const path = require('path');
 const fs = require('fs');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  connectionTimeout: 8000, // 8s connection timeout to prevent long hanging
-  greetingTimeout: 5000,   // 5s greeting timeout
-  socketTimeout: 10000,    // 10s socket timeout
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // Use STARTTLS on port 587 (avoids port 465 cloud timeout)
+  requireTLS: true,
+  connectionTimeout: 10000,
+  greetingTimeout: 5000,
+  socketTimeout: 15000,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
   },
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
 
 const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification Code') => {
-  // Always log OTP in terminal for instant developer fallback
+  // Always log OTP in terminal/Render logs for instant fallback
   console.log(`🔑 [Auth OTP] Code for ${email}: ${otp}`);
   const logoPath = path.join(__dirname, '../assets/Codexium.png');
   const attachments = [];
