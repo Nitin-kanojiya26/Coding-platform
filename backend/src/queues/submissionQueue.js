@@ -152,9 +152,21 @@ async function addSubmissionJob(jobData, options = {}) {
     return { id: `in-process-${jobData.submissionId}`, isFallback: true };
 }
 
+function setWorkerConcurrency(concurrency) {
+    const val = Math.max(1, parseInt(concurrency, 10) || 5);
+    submissionWorker.concurrency = val;
+    return submissionWorker.concurrency;
+}
+
+function getWorkerConcurrency() {
+    return submissionWorker.concurrency;
+}
+
 module.exports = {
     submissionQueue,
     submissionWorker,
     addSubmissionJob,
     processSubmissionDirectly,
+    setWorkerConcurrency,
+    getWorkerConcurrency,
 };

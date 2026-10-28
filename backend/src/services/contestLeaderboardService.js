@@ -151,36 +151,45 @@ async function syncMissingStandings(contest) {
  * Fetch paginated contest standings with rankings.
  * Automatically synchronizes standings for any registered or submitting participant so leaderboard is always accurate.
  */
-async function getContestLeaderboard(contestId, { page = 1, limit = 50 } = {}) {
+async function getContestLeaderboard(contestId, { page = 1, limit = 50, bypassCache = false } = {}) {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
   const skip = (pageNum - 1) * limitNum;
   const cacheKey = `contest:${contestId}:leaderboard:${pageNum}:${limitNum}`;
 
-  // Check Redis micro-cache (2s TTL) to absorb concurrent polling storms
-  try {
-    const cached = await redisClient.get(cacheKey);
-    if (cached) {
-      return typeof cached === 'string' ? JSON.parse(cached) : cached;
-    }
-  } catch (_) {}
+  const { getMongoQueryCount } = require('../config/db');
+  const startQueries = getMongoQueryCount();
+  let lockWaitTimeMs = 0;
+
+  // Check Redis micro-cache (2s TTL) unless explicitly bypassed
+  if (!bypassCache) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        return {
+          ...parsed,
+          _telemetry: {
+            cacheHit: true,
+            lockWaitTimeMs: 0,
+            mongoQueries: 0,
+          },
+        };
+      }
+    } catch (_) {}
+  }
 
   const contest = await Contest.findById(contestId);
   if (!contest) {
-    return {
-      contestId,
-      totalParticipants: 0,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: 0,
-      standings: [],
-    };
+    return null;
   }
 
-  // Check if any standings exist; if empty, await sync once. Otherwise sync in background.
+  // Check if any standings exist; if empty, await sync once and measure lock wait time.
   const standingCount = await ContestStanding.countDocuments({ contestId });
   if (standingCount === 0) {
+    const lockWaitStart = Date.now();
     await syncMissingStandings(contest);
+    lockWaitTimeMs = Date.now() - lockWaitStart;
   } else {
     syncMissingStandings(contest).catch(() => {});
   }
@@ -223,6 +232,13 @@ async function getContestLeaderboard(contestId, { page = 1, limit = 50 } = {}) {
     updatedAt: st.updatedAt,
   }));
 
+  const endQueries = getMongoQueryCount();
+  const telemetry = {
+    cacheHit: false,
+    lockWaitTimeMs,
+    mongoQueries: Math.max(0, endQueries - startQueries),
+  };
+
   const result = {
     contestId,
     totalParticipants,
@@ -232,11 +248,14 @@ async function getContestLeaderboard(contestId, { page = 1, limit = 50 } = {}) {
     ratingsCalculated: !!contest.ratingsCalculatedAt,
     ratingsCalculatedAt: contest.ratingsCalculatedAt,
     standings: ranked,
+    _telemetry: telemetry,
   };
 
-  try {
-    await redisClient.setex(cacheKey, 2, JSON.stringify(result));
-  } catch (_) {}
+  if (!bypassCache) {
+    try {
+      await redisClient.setex(cacheKey, 2, JSON.stringify(result));
+    } catch (_) {}
+  }
 
   return result;
 }

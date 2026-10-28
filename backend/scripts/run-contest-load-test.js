@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000/api';
-const CONCURRENT_USERS = 100;
+const CONCURRENT_USERS = parseInt(process.env.CONCURRENT_USERS || process.argv[2] || '500', 10);
 
 function calculatePercentile(values, percentile) {
   if (values.length === 0) return 0;
@@ -19,7 +19,7 @@ function mean(values) {
 
 async function runLoadTest() {
   console.log('================================================================');
-  console.log('🚀 CODEXIUM CONTEST PLATFORM: 100-USER CONCURRENCY LOAD BENCHMARK');
+  console.log(`🚀 CODEXIUM CONTEST PLATFORM: ${CONCURRENT_USERS}-USER CONCURRENCY LOAD BENCHMARK`);
   console.log('================================================================');
   console.log(`Target Base URL:     ${BASE_URL}`);
   console.log(`Virtual Users (VUs): ${CONCURRENT_USERS}`);
@@ -57,7 +57,7 @@ async function runLoadTest() {
     const adminUser = (await User.findOne({ role: 'admin' })) || (await User.findOne({}));
     contest = await Contest.create({
       title: `Load Test Contest - ${Date.now()}`,
-      description: 'Automated 100-user concurrency benchmark contest',
+      description: `Automated ${CONCURRENT_USERS}-user concurrency benchmark contest`,
       kind: 'public',
       type: 'dsa',
       createdBy: adminUser._id,
@@ -78,31 +78,44 @@ async function runLoadTest() {
   }
   console.log(`🏆 Active Contest: "${contest.title}" (ID: ${contest._id})\n`);
 
-  // 2. Prepare 100 Virtual Users and generate JWT tokens
+  // 2. Prepare Virtual Users and generate JWT tokens in bulk
   console.log(`👥 Seeding / preparing ${CONCURRENT_USERS} virtual users...`);
   const jwtSecret = process.env.JWT_SECRET || 'secret';
   const users = [];
   const participantsToInsert = [];
 
+  const existingUsers = await User.find({ email: { $regex: '^load_contestant_.*@codexium\\.benchmark$' } });
+  const existingMap = new Map(existingUsers.map((u) => [u.email, u]));
+  const toCreate = [];
+
   for (let i = 1; i <= CONCURRENT_USERS; i++) {
     const email = `load_contestant_${i}@codexium.benchmark`;
-    const name = `LoadRacer_${i}`;
-    let u = await User.findOne({ email });
-    if (!u) {
-      u = await User.create({
-        name,
+    if (!existingMap.has(email)) {
+      toCreate.push({
+        name: `LoadRacer_${i}`,
         email,
         password: 'Password123!',
         role: 'user',
         contestRating: 1500,
       });
     }
+  }
+
+  if (toCreate.length > 0) {
+    console.log(`⚡ Bulk inserting ${toCreate.length} new contestant accounts...`);
+    const created = await User.insertMany(toCreate);
+    created.forEach((u) => existingMap.set(u.email, u));
+  }
+
+  for (let i = 1; i <= CONCURRENT_USERS; i++) {
+    const email = `load_contestant_${i}@codexium.benchmark`;
+    const u = existingMap.get(email);
     const token = jwt.sign({ id: u._id }, jwtSecret, { expiresIn: '1d' });
     users.push({ id: u._id, name: u.name, email: u.email, token });
     participantsToInsert.push({ contestId: contest._id, userId: u._id });
   }
 
-  // Pre-register all 100 contestants in bulk
+  // Pre-register all contestants in bulk
   await ContestParticipant.deleteMany({ contestId: contest._id });
   await ContestParticipant.insertMany(participantsToInsert);
   console.log(`✅ ${CONCURRENT_USERS} virtual contestants registered into contest.\n`);
@@ -120,8 +133,8 @@ int main() {
 }
   `.trim();
 
-  // 3. PHASE 1: 100 Concurrent Submissions (Testing BullMQ Queue Ingestion)
-  console.log('⚡ [PHASE 1] Firing 100 simultaneous submissions to POST /api/submissions...');
+  // 3. PHASE 1: Concurrent Submissions (Testing BullMQ Queue Ingestion)
+  console.log(`⚡ [PHASE 1] Firing ${CONCURRENT_USERS} simultaneous submissions to POST /api/submissions...`);
   const submitLatencies = [];
   const submissionIds = [];
   let submitErrors = 0;
@@ -166,21 +179,21 @@ int main() {
 
   await Promise.all(submitPromises);
   const totalSubmitDuration = Date.now() - submitStartTime;
-  console.log(`✅ Phase 1 complete: 100 submissions dispatched in ${totalSubmitDuration}ms.`);
+  console.log(`✅ Phase 1 complete: ${CONCURRENT_USERS} submissions dispatched in ${totalSubmitDuration}ms.`);
   console.log(`   Successful Queue Ingestions: ${submissionIds.length} / ${CONCURRENT_USERS}`);
   console.log(`   Submit Ingestion Errors: ${submitErrors}\n`);
 
   // 4. PHASE 2: Polling & Time to Verdict (Worker & Queue Processing)
-  console.log('⏱️ [PHASE 2] Simulating 100 contestants polling for verdict until finalized...');
+  console.log(`⏱️ [PHASE 2] Simulating ${submissionIds.length} contestants polling for verdict until finalized...`);
   const timeToVerdictList = [];
   let verdictErrors = 0;
 
+  const maxPollAttempts = Math.max(120, Math.ceil(CONCURRENT_USERS / 3));
   const verdictPromises = submissionIds.map(async (item) => {
-    const maxPollAttempts = 60;
     let resolved = false;
 
     for (let attempt = 0; attempt < maxPollAttempts; attempt++) {
-      await new Promise((r) => setTimeout(r, 800)); // Poll interval: 800ms
+      await new Promise((r) => setTimeout(r, 1000)); // Poll interval: 1000ms
       try {
         const res = await fetch(`${BASE_URL}/submissions/${item.submissionId}`, {
           headers: { 'Authorization': `Bearer ${item.token}` },
@@ -207,7 +220,7 @@ int main() {
   console.log(`   Verdicts Resolved: ${timeToVerdictList.length} / ${submissionIds.length}\n`);
 
   // 5. PHASE 3: Real-Time Leaderboard Fetch (Redis Sorted Sets + MongoDB Cache)
-  console.log('📊 [PHASE 3] Simulating 100 concurrent leaderboard queries to GET /api/contests/:id/standings...');
+  console.log(`📊 [PHASE 3] Simulating ${CONCURRENT_USERS} concurrent leaderboard queries to GET /api/contests/:id/standings...`);
   const leaderboardLatencies = [];
   let leaderboardErrors = 0;
 
@@ -257,7 +270,7 @@ int main() {
   const avgLB = mean(leaderboardLatencies);
 
   console.log('================================================================');
-  console.log('📈 EMPIRICAL BENCHMARK RESULTS (100 CONCURRENT USERS)');
+  console.log(`📈 EMPIRICAL BENCHMARK RESULTS (${CONCURRENT_USERS} CONCURRENT USERS)`);
   console.log('================================================================');
   console.table([
     {

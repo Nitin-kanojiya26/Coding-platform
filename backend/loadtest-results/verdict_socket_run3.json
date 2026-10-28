@@ -1,0 +1,15 @@
+{
+  "test": "verdict_socket",
+  "run": 3,
+  "timestamp": "2026-10-28T08:56:29.505Z",
+  "submissions_count": 20,
+  "resolved_count": 10,
+  "total_http_verdict_requests": 0,
+  "mean_http_requests_per_submission": 0,
+  "time_to_verdict_mean_ms": 20967.8,
+  "time_to_verdict_p50_ms": 3409,
+  "time_to_verdict_p90_ms": 40000,
+  "time_to_verdict_p95_ms": 40000,
+  "time_to_verdict_min_ms": 1254,
+  "time_to_verdict_max_ms": 40000
+}

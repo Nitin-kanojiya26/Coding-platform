@@ -32,6 +32,13 @@ try {
   console.warn('⚠️ [Socket.IO] socket.io package not loaded yet. Live updates will activate once npm install socket.io is run.');
 }
 
+const { queryLocalStorage } = require('./config/db');
+app.use((req, res, next) => {
+  queryLocalStorage.run({ mongoQueries: 0 }, () => {
+    next();
+  });
+});
+
 app.use(cors()); // Allows our React frontend to communicate with this API
 app.use(express.json()); 
 

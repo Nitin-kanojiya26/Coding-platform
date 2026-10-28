@@ -1101,13 +1101,18 @@ exports.getContestStandings = async (req, res) => {
       return res.status(404).json({ message: 'Contest not found.' });
     }
 
-    const contest = await Contest.findById(id);
-    if (!contest) {
+    const { page, limit, nocache } = req.query;
+    const bypassCache = nocache === 'true';
+    const leaderboard = await getContestLeaderboard(id, { page, limit, bypassCache });
+    if (!leaderboard) {
       return res.status(404).json({ message: 'Contest not found.' });
     }
 
-    const { page, limit } = req.query;
-    const leaderboard = await getContestLeaderboard(contest._id, { page, limit });
+    if (leaderboard._telemetry) {
+      res.set('X-Cache-Hit', String(leaderboard._telemetry.cacheHit));
+      res.set('X-Lock-Wait-Ms', String(leaderboard._telemetry.lockWaitTimeMs));
+      res.set('X-Mongo-Queries', String(leaderboard._telemetry.mongoQueries));
+    }
 
     return res.status(200).json({
       status: 'success',

@@ -14,7 +14,18 @@ const {
   historyLimiter
 } = require('../middleware/rateLimiter');
 
-// All routes require authentication
+// Internal benchmark control route (No auth required)
+router.post('/test/worker-concurrency', (req, res) => {
+  const { setWorkerConcurrency, getWorkerConcurrency } = require('../queues/submissionQueue');
+  const { concurrency } = req.body || {};
+  if (concurrency !== undefined) {
+    const updated = setWorkerConcurrency(concurrency);
+    return res.json({ success: true, concurrency: updated });
+  }
+  return res.json({ success: true, concurrency: getWorkerConcurrency() });
+});
+
+// All routes below require authentication
 router.use(protect);
 
 // POST /api/submissions - create a new submission
