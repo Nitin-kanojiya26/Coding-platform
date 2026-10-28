@@ -93,7 +93,7 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
 
   // 2. If Resend is not present, dispatch via Nodemailer SMTP!
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    const port = Number(process.env.EMAIL_PORT) || 465;
+    const port = Number(process.env.EMAIL_PORT) || 2525;
     const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
     const isSecure = port === 465;
 
