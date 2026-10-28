@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -55,6 +56,34 @@ async function sendMailSafe(options) {
     html: options.html,
     attachments,
   };
+
+  // 1. Priority: Resend REST API (HTTPS Port 443 - Never blocked)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const fromSender = process.env.EMAIL_FROM || 'Codexium <onboarding@resend.dev>';
+      const res = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: fromSender,
+          to: [options.to],
+          subject: options.subject,
+          html: options.html,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 8000,
+        }
+      );
+      console.log(`📧 [ContestEmail] Dispatched via Resend HTTPS API to ${options.to} (ID: ${res.data?.id})`);
+      return { success: true, messageId: res.data?.id };
+    } catch (apiErr) {
+      console.warn(`⚠️ [ContestEmail] Resend API error (${apiErr.message}). Mocking delivery.`);
+      return { success: true, mocked: true, reason: apiErr.message };
+    }
+  }
 
   if (transporter) {
     try {

@@ -1,31 +1,29 @@
 // backend/src/services/emailService.js
-const dns = require('dns');
-
-// Force Node.js to prioritize IPv4 over IPv6, fixing Google SMTP connection timeouts
-if (typeof dns.setDefaultResultOrder === 'function') {
-  dns.setDefaultResultOrder('ipv4first');
-}
-
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Use STARTTLS on port 587 (avoids port 465 cloud timeout)
-  requireTLS: true,
-  connectionTimeout: 10000,
-  greetingTimeout: 5000,
-  socketTimeout: 15000,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+// Primary Nodemailer transporter fallback for environments where SMTP is allowed
+let transporter = null;
+try {
+  const nodemailer = require('nodemailer');
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
+      },
+      tls: { rejectUnauthorized: false },
+    });
+  }
+} catch (_) {}
 
 const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification Code') => {
   // Always log OTP in terminal/Render logs for instant fallback
@@ -102,7 +100,41 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
     `,
   };
 
-  return await transporter.sendMail(mailOptions);
+  // 1. Priority: Resend REST API (HTTPS Port 443 - Never blocked by firewalls)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const fromSender = process.env.EMAIL_FROM || 'Codexium <onboarding@resend.dev>';
+      const res = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: fromSender,
+          to: [email],
+          subject,
+          html: mailOptions.html,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 8000,
+        }
+      );
+      console.log(`✅ [EmailService] Dispatched OTP via Resend HTTPS API (ID: ${res.data?.id})`);
+      return res.data;
+    } catch (apiErr) {
+      console.error(`⚠️ [EmailService] Resend API error:`, apiErr.response?.data || apiErr.message);
+      throw apiErr;
+    }
+  }
+
+  // 2. Fallback: Nodemailer SMTP
+  if (transporter) {
+    return await transporter.sendMail(mailOptions);
+  }
+
+  console.log(`ℹ️ [EmailService] Ready via local OTP console fallback.`);
+  return { success: true, localOnly: true };
 };
 
 module.exports = { sendOTPEmail };
