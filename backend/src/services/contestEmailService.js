@@ -1,3 +1,4 @@
+const nodemailer = require('nodemailer');
 const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
@@ -72,8 +73,39 @@ async function sendMailSafe(options) {
     }
   }
 
-  console.log(`ℹ️ [ContestEmail] RESEND_API_KEY not configured. Mock delivery to ${options.to}: "${options.subject}"`);
-  return { success: true, mocked: true, reason: 'Resend unconfigured' };
+  // 2. If Resend is not present, dispatch via Nodemailer SMTP!
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    const port = Number(process.env.EMAIL_PORT) || 465;
+    const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const isSecure = port === 465;
+
+    try {
+      const cleanPass = process.env.EMAIL_PASS.replace(/\s+/g, '');
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: isSecure,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: cleanPass,
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 4000,
+        socketTimeout: 10000,
+        tls: { rejectUnauthorized: false },
+      });
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`📧 [ContestEmail] Dispatched via SMTP to ${options.to} (Message ID: ${info.messageId})`);
+      return { success: true, messageId: info.messageId };
+    } catch (err) {
+      console.warn(`⚠️ [ContestEmail] SMTP delivery failed on port ${port} (${err.message}). Mocking delivery for ${options.to}`);
+      return { success: true, mocked: true, reason: err.message };
+    }
+  }
+
+  console.log(`ℹ️ [ContestEmail] No email provider configured. Mock delivery to ${options.to}: "${options.subject}"`);
+  return { success: true, mocked: true, reason: 'Unconfigured' };
 }
 
 /**
