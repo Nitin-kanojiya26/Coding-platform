@@ -1,15 +1,18 @@
 {
   "test": "verdict_socket",
   "run": 1,
-  "timestamp": "2026-10-28T08:55:07.017Z",
+  "timestamp": "2026-10-28T09:46:44.544Z",
   "submissions_count": 20,
-  "resolved_count": 10,
-  "total_http_verdict_requests": 0,
-  "mean_http_requests_per_submission": 0,
-  "time_to_verdict_mean_ms": 20888.85,
-  "time_to_verdict_p50_ms": 2353,
-  "time_to_verdict_p90_ms": 40000,
-  "time_to_verdict_p95_ms": 40000,
-  "time_to_verdict_min_ms": 1197,
-  "time_to_verdict_max_ms": 40000
+  "resolved_count": 20,
+  "worker_concurrency": 5,
+  "bullmq_completed_jobs": 20,
+  "is_valid": true,
+  "total_http_verdict_requests": 5,
+  "mean_http_requests_per_submission": 0.25,
+  "time_to_verdict_mean_ms": 2849,
+  "time_to_verdict_p50_ms": 2337,
+  "time_to_verdict_p90_ms": 4515,
+  "time_to_verdict_p95_ms": 4529,
+  "time_to_verdict_min_ms": 1147,
+  "time_to_verdict_max_ms": 4536
 }

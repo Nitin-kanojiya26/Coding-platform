@@ -1,15 +1,18 @@
 {
   "test": "verdict_polling",
   "run": 3,
-  "timestamp": "2026-10-28T08:54:25.767Z",
+  "timestamp": "2026-10-28T09:46:32.992Z",
   "submissions_count": 20,
   "resolved_count": 20,
-  "total_http_verdict_requests": 113,
-  "mean_http_requests_per_submission": 5.65,
-  "time_to_verdict_mean_ms": 2719.65,
-  "time_to_verdict_p50_ms": 3275,
-  "time_to_verdict_p90_ms": 3349,
-  "time_to_verdict_p95_ms": 3473,
-  "time_to_verdict_min_ms": 1476,
-  "time_to_verdict_max_ms": 3698
+  "worker_concurrency": 5,
+  "bullmq_completed_jobs": 20,
+  "is_valid": true,
+  "total_http_verdict_requests": 132,
+  "mean_http_requests_per_submission": 6.6,
+  "time_to_verdict_mean_ms": 3136.95,
+  "time_to_verdict_p50_ms": 2530,
+  "time_to_verdict_p90_ms": 4753,
+  "time_to_verdict_p95_ms": 5034,
+  "time_to_verdict_min_ms": 1442,
+  "time_to_verdict_max_ms": 5034
 }

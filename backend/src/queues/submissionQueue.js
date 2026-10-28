@@ -101,9 +101,21 @@ const submissionWorker = new Worker(
     }
 );
 
+let completedJobsCount = 0;
+
 submissionWorker.on('completed', (job) => {
+    completedJobsCount++;
     console.log(`✅ [BullMQ] Submission ${job.data?.submissionId} finished with status: ${job.returnvalue?.status}`);
 });
+
+function getCompletedJobCount() {
+    return completedJobsCount;
+}
+
+function resetCompletedJobCount() {
+    completedJobsCount = 0;
+    return completedJobsCount;
+}
 
 submissionWorker.on('failed', (job, err) => {
     console.error(`❌ [BullMQ] Submission ${job?.data?.submissionId} failed:`, err.message);
@@ -169,4 +181,6 @@ module.exports = {
     processSubmissionDirectly,
     setWorkerConcurrency,
     getWorkerConcurrency,
+    getCompletedJobCount,
+    resetCompletedJobCount,
 };

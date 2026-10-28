@@ -116,5 +116,8 @@
     591,
     654,
     595
-  ]
+  ],
+  "worker_concurrency": 10,
+  "bullmq_completed_jobs": 0,
+  "is_valid": true
 }

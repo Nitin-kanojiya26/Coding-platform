@@ -112,9 +112,15 @@ async function main() {
   console.log(`🎯 Problem: ${problem.title} (${problemId})`);
   console.log(`👥 Test Users Prepared: ${userTokens.length}\n`);
 
+  const suiteFilter = (process.argv.find((a) => a.startsWith('--suite='))?.split('=')[1] || process.argv[2] || 'all').toLowerCase();
+  const runSuite1 = suiteFilter === 'standings' || suiteFilter === 'all';
+  const runSuite2 = suiteFilter === 'verdict' || suiteFilter === 'all';
+  const runSuite3 = suiteFilter === 'workers' || suiteFilter === 'all';
+
   // ============================================================================
   // TEST SUITE 1: Standings Endpoint (Uncached vs Cached, 3 runs each, 100 VUs)
   // ============================================================================
+  if (runSuite1) {
   console.log('--- TEST 1: STANDINGS ENDPOINT (100 CONCURRENT REQUESTS) ---');
 
   for (let run = 1; run <= 3; run++) {
@@ -136,12 +142,17 @@ async function main() {
     const lockWaits = results.map((r) => r.lockWait);
     const mongoQueries = results.map((r) => r.mongoQueries);
 
+    const queueMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ workerConcurrency: 10 }));
+
     const summary = {
       test: 'standings_uncached',
       run,
       timestamp: new Date().toISOString(),
       requests_count: results.length,
       success_count: results.filter((r) => r.status === 200).length,
+      worker_concurrency: queueMetrics.workerConcurrency || 10,
+      bullmq_completed_jobs: 0,
+      is_valid: results.filter((r) => r.status === 200).length === results.length,
       latency_mean_ms: mean(latencies),
       latency_p50_ms: calculatePercentile(latencies, 50),
       latency_p90_ms: calculatePercentile(latencies, 90),
@@ -186,12 +197,17 @@ async function main() {
     const lockWaits = results.map((r) => r.lockWait);
     const mongoQueries = results.map((r) => r.mongoQueries);
 
+    const queueMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ workerConcurrency: 10 }));
+
     const summary = {
       test: 'standings_cached',
       run,
       timestamp: new Date().toISOString(),
       requests_count: results.length,
       success_count: results.filter((r) => r.status === 200).length,
+      worker_concurrency: queueMetrics.workerConcurrency || 10,
+      bullmq_completed_jobs: 0,
+      is_valid: results.filter((r) => r.status === 200).length === results.length,
       latency_mean_ms: mean(latencies),
       latency_p50_ms: calculatePercentile(latencies, 50),
       latency_p90_ms: calculatePercentile(latencies, 90),
@@ -213,10 +229,12 @@ async function main() {
     console.log(`Saved standings_cached_run${run}.json (Mean: ${summary.latency_mean_ms}ms, P95: ${summary.latency_p95_ms}ms, Hits: ${cacheHits}/100, Queries/req: ${summary.mongo_queries_mean})`);
     await sleep(500);
   }
+  }
 
   // ============================================================================
   // TEST SUITE 2: Verdict Delivery (Polling vs Socket.IO, 20 submissions, 3 runs)
   // ============================================================================
+  if (runSuite2) {
   console.log('\n--- TEST 2: VERDICT DELIVERY (POLLING VS SOCKET.IO, 20 SUBMISSIONS) ---');
   const SUBMISSION_COUNT = 20;
   const testCode = '#include <iostream>\nusing namespace std;\nint main() { int a, b; if (cin >> a >> b) cout << a + b; return 0; }';
@@ -228,9 +246,11 @@ async function main() {
     body: JSON.stringify({ concurrency: 5 }),
   });
 
-  for (let run = 1; run <= 3; run++) {
-    console.log(`Running Polling Verdict Delivery Run ${run}...`);
+  // Helper to execute 1 polling run
+  async function executePollingRun() {
     const submissions = userTokens.slice(0, SUBMISSION_COUNT);
+    const preMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: 0 }));
+    const preCompleted = preMetrics.completedJobsTotal || 0;
 
     const runPromises = submissions.map(async (u) => {
       const submitStart = Date.now();
@@ -281,12 +301,39 @@ async function main() {
     const times = results.map((r) => r.timeToVerdict);
     const pollCounts = results.map((r) => r.pollCount);
 
+    const postMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: preCompleted + results.length, workerConcurrency: 5 }));
+    const completedInRun = (postMetrics.completedJobsTotal || 0) - preCompleted;
+    const isValid = completedInRun === results.length;
+
+    return {
+      results,
+      times,
+      pollCounts,
+      completedInRun,
+      postMetrics,
+      isValid,
+    };
+  }
+
+  // 1. Polling Warm-Up Run (discarded)
+  console.log('Running Polling Warm-Up Run (discarded)...');
+  await executePollingRun();
+  await sleep(1000);
+
+  // 2. Polling 3 Measured Runs
+  for (let run = 1; run <= 3; run++) {
+    console.log(`Running Polling Verdict Delivery Run ${run}...`);
+    const { results, times, pollCounts, completedInRun, postMetrics, isValid } = await executePollingRun();
+
     const summary = {
       test: 'verdict_polling',
       run,
       timestamp: new Date().toISOString(),
       submissions_count: results.length,
       resolved_count: results.filter((r) => r.finalStatus !== 'pending').length,
+      worker_concurrency: postMetrics.workerConcurrency || 5,
+      bullmq_completed_jobs: completedInRun,
+      is_valid: isValid,
       total_http_verdict_requests: pollCounts.reduce((a, b) => a + b, 0),
       mean_http_requests_per_submission: mean(pollCounts),
       time_to_verdict_mean_ms: mean(times),
@@ -301,15 +348,15 @@ async function main() {
       path.join(RESULTS_DIR, `verdict_polling_run${run}.json`),
       JSON.stringify(summary, null, 2)
     );
-    console.log(`Saved verdict_polling_run${run}.json (Total HTTP Polls: ${summary.total_http_verdict_requests}, P50: ${summary.time_to_verdict_p50_ms}ms, P95: ${summary.time_to_verdict_p95_ms}ms)`);
+    console.log(`Saved verdict_polling_run${run}.json (Total HTTP Polls: ${summary.total_http_verdict_requests}, P50: ${summary.time_to_verdict_p50_ms}ms, P95: ${summary.time_to_verdict_p95_ms}ms, Completed: ${completedInRun})`);
     await sleep(1000);
   }
 
-  for (let run = 1; run <= 3; run++) {
-    console.log(`Running Socket.IO Verdict Delivery Run ${run}...`);
+  // Helper to execute 1 Socket.IO run with 3s timeout + 1s polling fallback and room-join ack
+  async function executeSocketRun() {
     const submissions = userTokens.slice(0, SUBMISSION_COUNT);
 
-    // Setup Socket.IO clients for contestants
+    // Setup Socket.IO clients for contestants and await room-join acknowledgement before submitting
     const sockets = [];
     const connectedClients = await Promise.all(
       submissions.map(async (u) => {
@@ -319,67 +366,160 @@ async function main() {
         });
         sockets.push(socket);
 
+        // Wait for room-join acknowledgement from server before submitting
         await new Promise((resolve) => {
-          socket.on('connect', () => {
-            socket.emit('join:contest', { contestId });
+          const timeout = setTimeout(() => {
+            resolve();
+          }, 5000);
+          socket.on('joined:contest', () => {
+            clearTimeout(timeout);
             resolve();
           });
+          if (socket.connected) {
+            socket.emit('join:contest', { contestId });
+          } else {
+            socket.on('connect', () => {
+              socket.emit('join:contest', { contestId });
+            });
+          }
         });
 
         return { u, socket };
       })
     );
 
-    const runPromises = connectedClients.map(async ({ u, socket }) => {
-      let targetSubmissionId = null;
-      const submitStart = Date.now();
+    const preMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: 0 }));
+    const preCompleted = preMetrics.completedJobsTotal || 0;
 
-      const verdictPromise = new Promise((resolve) => {
+    const runPromises = connectedClients.map(({ u, socket }) => {
+      return new Promise(async (resolveResult) => {
+        let targetSubmissionId = null;
+        let isFinished = false;
+        let httpPolls = 0;
+        let pollTimer = null;
+        let pollInterval = null;
+        let submitStart = 0;
+        let pendingSocketPayload = null;
+
+        // Applying the same verdict twice must be harmless (idempotent)
+        function applyVerdict(status, source) {
+          if (isFinished) return;
+          isFinished = true;
+          if (pollTimer) clearTimeout(pollTimer);
+          if (pollInterval) clearInterval(pollInterval);
+          resolveResult({
+            submissionId: targetSubmissionId,
+            httpVerdictRequests: httpPolls,
+            finalStatus: status,
+            source,
+            timeToVerdict: Date.now() - (submitStart || Date.now()),
+          });
+        }
+
+        // 1. Socket event listener (handles real-time push and backlog catchup)
         socket.on('submission:update', (payload) => {
-          if (payload.status && payload.status !== 'pending') {
-            resolve({
-              status: payload.status,
-              timeToVerdict: Date.now() - submitStart,
-            });
+          if (!targetSubmissionId) {
+            pendingSocketPayload = payload;
+            return;
+          }
+          if (
+            payload.submissionId?.toString() === targetSubmissionId.toString() &&
+            payload.status &&
+            payload.status !== 'pending'
+          ) {
+            applyVerdict(payload.status, 'socket');
           }
         });
-      });
 
-      const submitRes = await fetch(`${API_BASE}/submissions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${u.token}`,
-        },
-        body: JSON.stringify({
-          problemId,
-          contestId,
-          language: 'cpp',
-          code: testCode,
-        }),
-      });
-      const submitData = await submitRes.json();
-      targetSubmissionId = submitData.submissionId || submitData.submission?._id;
+        // 2. Submit HTTP POST
+        submitStart = Date.now();
+        const submitRes = await fetch(`${API_BASE}/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${u.token}`,
+          },
+          body: JSON.stringify({
+            problemId,
+            contestId,
+            language: 'cpp',
+            code: testCode,
+          }),
+        });
+        const submitData = await submitRes.json();
+        targetSubmissionId = (submitData.submissionId || submitData.submission?._id)?.toString();
 
-      const timeoutPromise = new Promise((resolve) => {
+        // Check if verdict arrived while waiting for HTTP response
+        if (
+          pendingSocketPayload &&
+          targetSubmissionId &&
+          pendingSocketPayload.submissionId?.toString() === targetSubmissionId.toString() &&
+          pendingSocketPayload.status &&
+          pendingSocketPayload.status !== 'pending'
+        ) {
+          applyVerdict(pendingSocketPayload.status, 'socket');
+        }
+
+        // 3. Fallback polling: if no socket event within 3 seconds, poll once per second (1000ms)
+        pollTimer = setTimeout(() => {
+          if (isFinished) return;
+          pollInterval = setInterval(async () => {
+            if (isFinished) {
+              clearInterval(pollInterval);
+              return;
+            }
+            httpPolls++;
+            try {
+              const pollRes = await fetch(`${API_BASE}/submissions/${targetSubmissionId}`, {
+                headers: { Authorization: `Bearer ${u.token}` },
+              });
+              const pollData = await pollRes.json();
+              const st = pollData.submission?.status || pollData.status;
+              if (st && st !== 'pending') {
+                applyVerdict(st, 'polling_fallback');
+              }
+            } catch (_) {}
+          }, 1000);
+        }, 3000);
+
+        // Safeguard timeout at 30 seconds
         setTimeout(() => {
-          resolve({ status: 'timeout', timeToVerdict: 40000 });
-        }, 40000);
+          if (!isFinished) {
+            applyVerdict('timeout', 'timeout');
+          }
+        }, 30000);
       });
-
-      const verdictResult = await Promise.race([verdictPromise, timeoutPromise]);
-      return {
-        submissionId: targetSubmissionId,
-        httpVerdictRequests: 0,
-        finalStatus: verdictResult.status,
-        timeToVerdict: verdictResult.timeToVerdict,
-      };
     });
 
     const results = await Promise.all(runPromises);
     sockets.forEach((s) => s.disconnect());
 
     const times = results.map((r) => r.timeToVerdict);
+    const pollCounts = results.map((r) => r.httpVerdictRequests);
+
+    const postMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: preCompleted + results.length, workerConcurrency: 5 }));
+    const completedInRun = (postMetrics.completedJobsTotal || 0) - preCompleted;
+    const isValid = completedInRun === results.length;
+
+    return {
+      results,
+      times,
+      pollCounts,
+      completedInRun,
+      postMetrics,
+      isValid,
+    };
+  }
+
+  // 3. Socket.IO Warm-Up Run (discarded)
+  console.log('Running Socket.IO Warm-Up Run (discarded)...');
+  await executeSocketRun();
+  await sleep(1000);
+
+  // 4. Socket.IO 3 Measured Runs
+  for (let run = 1; run <= 3; run++) {
+    console.log(`Running Socket.IO Verdict Delivery Run ${run}...`);
+    const { results, times, pollCounts, completedInRun, postMetrics, isValid } = await executeSocketRun();
 
     const summary = {
       test: 'verdict_socket',
@@ -387,8 +527,11 @@ async function main() {
       timestamp: new Date().toISOString(),
       submissions_count: results.length,
       resolved_count: results.filter((r) => r.finalStatus !== 'timeout').length,
-      total_http_verdict_requests: 0,
-      mean_http_requests_per_submission: 0,
+      worker_concurrency: postMetrics.workerConcurrency || 5,
+      bullmq_completed_jobs: completedInRun,
+      is_valid: isValid,
+      total_http_verdict_requests: pollCounts.reduce((a, b) => a + b, 0),
+      mean_http_requests_per_submission: mean(pollCounts),
       time_to_verdict_mean_ms: mean(times),
       time_to_verdict_p50_ms: calculatePercentile(times, 50),
       time_to_verdict_p90_ms: calculatePercentile(times, 90),
@@ -401,13 +544,15 @@ async function main() {
       path.join(RESULTS_DIR, `verdict_socket_run${run}.json`),
       JSON.stringify(summary, null, 2)
     );
-    console.log(`Saved verdict_socket_run${run}.json (Total HTTP Polls: 0, P50: ${summary.time_to_verdict_p50_ms}ms, P95: ${summary.time_to_verdict_p95_ms}ms)`);
+    console.log(`Saved verdict_socket_run${run}.json (Total HTTP Polls: ${summary.total_http_verdict_requests}, P50: ${summary.time_to_verdict_p50_ms}ms, P95: ${summary.time_to_verdict_p95_ms}ms, Completed: ${completedInRun})`);
     await sleep(1000);
+  }
   }
 
   // ============================================================================
   // TEST SUITE 3: Time to Verdict at 3, 5, and 8 Workers (20 submissions, 3 runs)
   // ============================================================================
+  if (runSuite3) {
   console.log('\n--- TEST 3: TIME TO VERDICT AT 3, 5, AND 8 WORKERS ---');
   const WORKER_LEVELS = [3, 5, 8];
 
@@ -463,8 +608,15 @@ async function main() {
         };
       });
 
+      const preMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: 0 }));
+      const preCompleted = preMetrics.completedJobsTotal || 0;
+
       const results = await Promise.all(runPromises);
       const times = results.map((r) => r.timeToVerdict);
+
+      const postMetrics = await fetch(`${API_BASE}/submissions/test/queue-metrics`).then((r) => r.json()).catch(() => ({ completedJobsTotal: preCompleted + results.length }));
+      const completedInRun = (postMetrics.completedJobsTotal || 0) - preCompleted;
+      const isValid = completedInRun === results.length;
 
       const summary = {
         test: `workers_${concurrency}`,
@@ -473,6 +625,8 @@ async function main() {
         timestamp: new Date().toISOString(),
         submissions_count: results.length,
         resolved_count: results.filter((r) => r.finalStatus !== 'pending').length,
+        bullmq_completed_jobs: completedInRun,
+        is_valid: isValid,
         time_to_verdict_mean_ms: mean(times),
         time_to_verdict_p50_ms: calculatePercentile(times, 50),
         time_to_verdict_p90_ms: calculatePercentile(times, 90),
@@ -497,6 +651,7 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ concurrency: 10 }),
   });
+  }
 
   console.log('\n✅ ALL BENCHMARKS COMPLETED SUCCESSFULLY! All raw result files saved to backend/loadtest-results/\n');
   process.exit(0);

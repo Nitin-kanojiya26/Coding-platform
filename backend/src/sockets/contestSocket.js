@@ -57,7 +57,7 @@ function initializeSocket(io) {
     console.log(`🔌 [Socket.IO] Client connected: ${socket.id} (${userName})`);
 
     // 1. Join Contest Room
-    socket.on('join:contest', (data) => {
+    socket.on('join:contest', async (data, ackCallback) => {
       const contestId = typeof data === 'object' ? data?.contestId : data;
       if (!contestId) return;
 
@@ -66,16 +66,52 @@ function initializeSocket(io) {
       console.log(`👥 [Socket.IO] ${socket.id} joined ${room}`);
 
       // If authenticated user, also join their private user room for this contest
+      let finishedSubmissions = [];
       if (socket.user?._id) {
         const userRoom = `contest:${contestId}:user:${socket.user._id}`;
         socket.join(userRoom);
+
+        // When a client joins its room, send the current status of any of its submissions that are already finished
+        try {
+          const Submission = require('../models/Submission');
+          finishedSubmissions = await Submission.find({
+            contestId,
+            user: socket.user._id,
+            status: { $in: ['accepted', 'wrong_answer', 'time_limit_exceeded', 'memory_limit_exceeded', 'runtime_error', 'compilation_error', 'error'] },
+          })
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+
+          // Push already finished submissions to the client immediately
+          for (const sub of finishedSubmissions) {
+            socket.emit('submission:update', {
+              contestId: contestId.toString(),
+              userId: socket.user._id.toString(),
+              submissionId: sub._id,
+              problemId: sub.problem,
+              status: sub.status,
+              passedTestCases: sub.passedTestCases,
+              totalTestCases: sub.totalTestCases,
+              runtime: sub.runtime,
+              memory: sub.memory,
+              timestamp: sub.updatedAt || sub.createdAt,
+            });
+          }
+        } catch (_) {}
       }
 
-      socket.emit('joined:contest', {
+      const ackPayload = {
         contestId,
         room,
         authenticated: !socket.isGuest,
-      });
+        finishedCount: finishedSubmissions.length,
+      };
+
+      socket.emit('joined:contest', ackPayload);
+      if (typeof ackCallback === 'function') {
+        ackCallback(ackPayload);
+      }
     });
 
     // 2. Leave Contest Room

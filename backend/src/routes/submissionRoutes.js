@@ -25,6 +25,27 @@ router.post('/test/worker-concurrency', (req, res) => {
   return res.json({ success: true, concurrency: getWorkerConcurrency() });
 });
 
+router.get('/test/queue-metrics', async (req, res) => {
+  const { submissionQueue, getWorkerConcurrency, getCompletedJobCount } = require('../queues/submissionQueue');
+  try {
+    const counts = await submissionQueue.getJobCounts('completed', 'failed', 'active', 'waiting');
+    return res.json({
+      success: true,
+      workerConcurrency: getWorkerConcurrency(),
+      completedJobsTotal: getCompletedJobCount(),
+      queueCounts: counts,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/test/reset-queue-metrics', (req, res) => {
+  const { resetCompletedJobCount } = require('../queues/submissionQueue');
+  resetCompletedJobCount();
+  return res.json({ success: true, completedJobsTotal: 0 });
+});
+
 // All routes below require authentication
 router.use(protect);
 

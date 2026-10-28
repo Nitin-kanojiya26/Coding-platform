@@ -12,6 +12,7 @@
 
 All benchmarks were executed concurrently on a **single local machine**. The test load generator, HTTP API server, Redis instance, MongoDB daemon, BullMQ workers, and Judge0 sandboxed execution container ran on the same physical host.
 
+### 1.1 Host Environment & Component Versions
 - **Host Machine:**
   - **CPU:** 12th Gen Intel(R) Core(TM) i5-12450H (8 Cores: 4 Performance + 4 Efficient, 12 Logical Processors)
   - **RAM:** 16.0 GB DDR4
@@ -21,17 +22,31 @@ All benchmarks were executed concurrently on a **single local machine**. The tes
   - **MongoDB:** v8.3.4 (Local instance on port 27017)
   - **Redis:** v7.2.4 (Docker container `app-redis` on port 6380)
   - **Judge0:** v1.13.1 (Sandboxed execution server on port 2358)
-- **Worker Configuration:**
+    - `COUNT`: 24 (Judge0 worker pool size, configured to `nproc * 2` on 12-thread host)
+    - `MAX_QUEUE_SIZE`: 100 (from `GET /config_info`: `"max_queue_size": 100`)
+- **Queueing & Worker Execution:**
   - Background asynchronous task processing powered by **BullMQ** with Redis stream backend.
   - Worker concurrency dynamically evaluated at **3**, **5**, and **8** workers.
+- **Tool Attribution & Instrumentation:**
+  - Benchmarks were executed and instrumented using Node.js native fetch and Socket.IO client runners (`scripts/run-all-benchmarks.js`).
+  - Database query counts were measured per-request via `mongoose.set('debug')` isolated with Node.js `AsyncLocalStorage` context tracking.
+  - Every performance metric in this report corresponds directly to a raw result JSON file in `backend/loadtest-results/`.
+  - For each multi-run test, all 3 individual runs are displayed in full alongside the Typical Run (defined as the median run ranked by mean latency). Percentiles (P50, P90, P95) are calculated strictly from individual run distributions and are never averaged across runs.
+
+### 1.2 System & Benchmark Configuration Parameters (Non-Measured)
+The following parameters represent configured system settings and benchmark harness parameters, rather than measured performance outputs:
 - **Rate Limiter Configuration:**
   - **State:** Enabled and active during all tests (`DISABLE_RATE_LIMIT=false`).
-  - **Mechanism:** Fixed-window counter with expiration using Redis `multi.incr()` and `pexpire()` (window: 60,000ms), falling back to in-memory `MemoryStore` if Redis is unavailable.
-  - **Keying:** Keyed by authenticated user ID (`req.user?._id?.toString() || req.ip`), isolating individual contestant quotas.
-- **Tool Attribution & Instrumentation:**
-  - All benchmarks were executed and instrumented using Node.js native fetch and Socket.IO client runners (`scripts/run-all-benchmarks.js`).
-  - Real database query counts were measured per-request via `mongoose.set('debug')` isolated with Node.js `AsyncLocalStorage` context tracking.
-  - Every number in this report corresponds directly to a raw result JSON file in `backend/loadtest-results/`.
+  - **Algorithm:** Fixed-window counter with expiration using Redis `multi.incr()` and `pexpire()`.
+  - **Window Duration:** 60,000 ms (60 seconds).
+  - **Quota:** 60 requests per window per authenticated user identity (`req.user?._id?.toString() || req.ip`).
+- **Caching Configuration:**
+  - **Standings Cache TTL:** 2,000 ms (2 seconds) stored at key `contest:${contestId}:leaderboard:${page}:${limit}`.
+  - **Concurrency Mutex:** In-memory `Set` (`contestSyncLocks`) within the single Node.js process instance.
+- **Client & Benchmark Runner Configuration:**
+  - **Socket.IO Fallback Polling Trigger:** 3,000 ms timeout with 1,000 ms polling interval.
+  - **Continuous Polling Frequency:** 400 ms interval with 40,000 ms hard safeguard timeout.
+  - **Benchmark Burst Sizes:** 100 concurrent requests for Standings; 20 concurrent C++ submissions for Verdict Delivery and Worker Concurrency suites.
 
 ---
 
@@ -115,7 +130,7 @@ sequenceDiagram
         Worker->>Mongo: Persist submission result & verdict status
         Worker->>Mongo: Recalculate participant contest score & penalty
         Worker->>Sockets: emitSubmissionUpdate(contestId, userId, verdict)
-        Sockets-->>User: Push submission:update event (Zero polling)
+        Sockets-->>User: Push submission:update event (Instant socket push)
     end
 
     rect rgb(20, 35, 25)
@@ -124,7 +139,7 @@ sequenceDiagram
         API->>RedisCache: Check contest:id:leaderboard:1:50
         alt Cache Hit
             RedisCache-->>API: Instant cached JSON payload
-            API-->>User: 200 OK (0 MongoDB queries, sub-100ms)
+            API-->>User: 200 OK (0 MongoDB queries, 75.49ms mean / 85ms P50)
         else Cache Miss
             API->>API: Acquire contestSyncLocks mutex (Process-level Set)
             API->>Mongo: Aggregate standings & calculate ranks (4 queries)
@@ -189,25 +204,29 @@ All before/after comparisons below were performed under **identical experimental
 ### 3.2 Verdict Retrieval: Polling vs. Socket.IO Event Push
 
 - **Conditions:** 20 concurrent C++ submissions processed by BullMQ with worker concurrency set to 5.
+- **Warm-Up:** 1 warm-up run (discarded) followed by 3 measured runs for each architecture.
 - **Polling:** Contestant clients sent `GET /api/submissions/:id` every 400ms until a terminal verdict was returned.
-- **Socket.IO:** Contestant clients joined their contest room (`contest:${contestId}:user:${userId}`) over WebSocket and received verdict updates pushed directly from `processSubmissionDirectly`.
+- **Socket.IO:** Contestant clients connected over WebSocket, awaited the `joined:contest` room acknowledgment before submitting, and received real-time `submission:update` events. If no socket verdict arrived within 3.0s, the client initiated fallback polling at 1 request/second. Both paths handled verdicts idempotently.
 
 #### Raw Run Results (Verdict Endpoint Requests & Latency)
-| Architecture | Metric | Run 1 | Run 2 | Run 3 | Typical Run |
+| Architecture | Metric | Run 1 | Run 2 | Run 3 | Typical Run (Run 2) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **HTTP Polling** | **Total HTTP Verdict Requests** | 137 | 114 | 113 | **114 requests** |
-| | **HTTP Requests / Submission** | 6.85 | 5.7 | 5.65 | **5.7 requests** |
-| | **Time to Verdict (P50)** | 3815 ms | 2500 ms | 3275 ms | **2500 ms** |
-| | **Time to Verdict (P95)** | 4186 ms | 4274 ms | 3473 ms | **4274 ms** |
-| **Socket.IO Push** | **Total HTTP Verdict Requests** | 0 | 0 | 0 | **0 requests** |
-| | **HTTP Requests / Submission** | 0 | 0 | 0 | **0 requests** |
-| | **Time to Verdict (P50)** | 2353 ms | 3376 ms | 3409 ms | **3409 ms** |
-| | **Time to Verdict (P95)** | 40000 ms | 40000 ms | 40000 ms | **40000 ms** |
+| **HTTP Polling** | **Total HTTP Verdict Requests** | 136 | 132 | 132 | **132 requests** |
+| | **HTTP Requests / Submission** | 6.8 | 6.6 | 6.6 | **6.6 req/sub** |
+| | **Time to Verdict (P50)** | 2806 ms | 2757 ms | 2530 ms | **2757 ms** |
+| | **Time to Verdict (P95)** | 5179 ms | 4796 ms | 5034 ms | **4796 ms** |
+| | **Time to Verdict (Max)** | 5180 ms | 5066 ms | 5034 ms | **5066 ms** |
+| **Socket.IO Push** | **Total HTTP Verdict Requests** | 5 | 5 | 5 | **5 requests** |
+| | **HTTP Requests / Submission** | 0.25 | 0.25 | 0.25 | **0.25 req/sub** |
+| | **Time to Verdict (P50)** | 2337 ms | 2373 ms | 2387 ms | **2373 ms** |
+| | **Time to Verdict (P95)** | 4529 ms | 4517 ms | 4554 ms | **4517 ms** |
+| | **Time to Verdict (Max)** | 4536 ms | 4528 ms | 4573 ms | **4528 ms** |
 
-- **Findings:**
-  - Polling 20 submissions generated between 113 and 137 HTTP GET requests (mean 121.33 requests) to the verdict endpoint across the queue drain cycle.
-  - Socket.IO generated **0** HTTP requests to the verdict endpoint. Verdict events were delivered directly over the active WebSocket connection.
-  - In Socket.IO runs, submissions that connected and joined their room before worker completion received verdicts with median latency between 2353 ms and 3409 ms. Connections where room join lagged the worker execution missed the direct in-memory room broadcast and fell back to the client timeout threshold.
+- **Findings & Fallback Analysis:**
+  - Continuous HTTP polling generated between 132 and 136 requests (typical: 132 requests) across the 20-submission drain cycle.
+  - Socket.IO reduced HTTP requests to **5 requests total** (mean: 0.25 requests/submission), representing a **96.2% reduction in HTTP polling volume**.
+  - **Explanation of Fallback Requests:** With 20 simultaneous submissions and 5 workers, the first 15 submissions completed within 3.0 seconds, receiving verdicts exclusively via WebSocket event push with 0 HTTP requests. The final 5 submissions queued behind earlier jobs and completed between 3.1s and 4.5s. As configured, the client fallback timer triggered 1 HTTP poll per second after 3.0s, executing 1 poll per queued submission before resolving.
+  - **Verdict Reliability:** All submissions across all 3 Socket.IO runs resolved successfully (20/20, `is_valid: true`) with zero 40,000ms timeouts (Max latency across all runs: 4573 ms).
 
 ---
 
@@ -218,7 +237,7 @@ All before/after comparisons below were performed under **identical experimental
 - **Measurement:** Time elapsed from HTTP submission creation (`POST /api/submissions`) to verdict resolution.
 
 #### Concurrency Comparison Table
-| Worker Count | Metric | Run 1 | Run 2 | Run 3 | Typical Run (Median) |
+| Worker Count | Metric | Run 1 | Run 2 | Run 3 | Typical Run (Median by Mean) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **3 Workers** | **Mean Time to Verdict** | 3025.65 ms | 3499.05 ms | 3329.45 ms | **3329.45 ms** |
 | | **P50 (Median)** | 2939 ms | 4108 ms | 3812 ms | **3812 ms** |
@@ -237,18 +256,17 @@ All before/after comparisons below were performed under **identical experimental
 | | **Min / Max** | 1463 / 3828 ms | 1555 / 3476 ms | 1525 / 3384 ms | **1555 / 3476 ms** |
 
 - **Observations:**
-  - Increasing worker concurrency from 3 to 5 reduced typical mean queue drain time from **3329.45 ms** to **2690.85 ms** (P50: 3812 ms → 2467 ms).
-  - Increasing worker concurrency from 5 to 8 yielded a smaller improvement (2690.85 ms → 2304.8 ms mean), reflecting host CPU saturation as multiple parallel GCC compilation processes compete for the 8 physical CPU cores.
+  - **3 to 5 Workers:** Increasing concurrency from 3 to 5 workers reduced typical mean queue drain time from **3329.45 ms** to **2690.85 ms** (P50: 3812 ms → 2467 ms).
+  - **5 to 8 Workers:** P50 and P95 latency barely change between 5 workers (P50: 2467 ms, P95: 3386 ms) and 8 workers (P50: 2490 ms, P95: 3378 ms). Host CPU saturation during concurrent GCC compilation is the **likely cause** of this performance plateau on this 8-core CPU (competition for physical core execution slices between compiler processes, Judge0 daemon, Redis, and MongoDB).
   - Run-to-run standard deviations: 3 Workers (`stdDev` = 239.85 ms), 5 Workers (`stdDev` = 20.57 ms), 8 Workers (`stdDev` = 47.21 ms).
 
 ---
 
 ## 5. Architectural Deep Dives
 
-### 5.1 BullMQ & Redis Queues: Preventing Event-Loop Starvation
-- **The Bottleneck:** Sandboxed code compilation (GCC / Clang / Python runtime) consumes substantial CPU and memory. Running code compilation synchronously inside an Express request handler blocks Node's single-threaded event loop for 1,500–2,500ms per contestant. Under high concurrent bursts, event-loop lag causes subsequent HTTP connections to timeout.
-- **The Solution:** Implemented the Producer-Consumer pattern using BullMQ backed by Redis 7. The HTTP layer acts solely as a lightweight producer, validating JWTs and enqueuing jobs in Redis. Background workers consume jobs at controlled concurrency, isolating user-facing API availability from judge compute spikes.
-- **Measured Impact:** Submissions return an immediate `202 Accepted` without awaiting sandboxed compilation, decoupling API availability from backend execution capacity.
+### 5.1 BullMQ & Redis Task Queue: Decoupling Ingestion from Sandboxed Compilation
+- **Design Decision & Rationale:** Sandboxed code compilation and execution (via Judge0 with GCC/Clang/Python) requires non-trivial processing time (typically 1–3 seconds per submission). If handled synchronously in the HTTP request lifecycle, the client connection must remain open waiting for compilation and execution to finish. The queue is an architectural design decision that allows `POST /api/submissions` to return immediately (`202 Accepted`) after enqueuing the job, preventing the HTTP API from waiting on compilation. (Note: Compilation is executed via Judge0 child processes running on OS threads/containers rather than blocking Node's single-threaded event loop; the benefit of the queue is decoupling request-response latency and controlling worker concurrency rather than event-loop unblocking).
+- **Architecture:** Implemented the Producer-Consumer pattern using BullMQ backed by Redis 7. The Express HTTP layer validates JWT credentials, persists an initial `pending` submission document in MongoDB, and enqueues a job to BullMQ (`code-submissions`). Background BullMQ workers pull jobs at a controlled concurrency level, dispatch them to Judge0, and update MongoDB upon completion.
 
 ### 5.2 Redis Micro-Caching & Mutex Lock: Thundering Herd Mitigation
 - **The Bottleneck:** During live contests, all participants query standings simultaneously. Without caching, each query executes multiple separate queries: `Submission.find().distinct('user')`, `ContestParticipant.find().distinct('userId')`, `ContestStanding.find()`, and individual upserts for participants without standing records. Under peak concurrent traffic, this causes a **thundering herd of unindexed queries**, choking MongoDB.
@@ -258,9 +276,9 @@ All before/after comparisons below were performed under **identical experimental
 - **Measured Impact:** Standings latency dropped from **456.27 ms to 75.49 ms** (636 ms to 101 ms P95), and database read load dropped from **4.03 queries/request to 0**.
 
 ### 5.3 Socket.IO Event Push: Polling Storm Elimination
-- **The Bottleneck:** Repetitive polling endpoints (`GET /submissions/:id`) every 400–500ms generates hundreds of redundant HTTP requests, consuming server bandwidth and exhausting HTTP connection slots for redundant "pending" statuses.
-- **The Solution:** Integrated a room-based WebSocket event mesh (`contestSocket.js`). Contestants join contest and user rooms (`contest:${id}` and `contest:${id}:user:${userId}`). When the BullMQ judge worker marks a submission `accepted` or `wrong_answer`, it triggers an internal event that broadcasts the verdict directly to the client.
-- **Measured Impact:** Eliminated **100% of repetitive HTTP GET verdict polling requests** for active socket connections.
+- **The Bottleneck:** Repetitive polling endpoints (`GET /submissions/:id`) every 400ms generated 132 HTTP requests across 20 submissions, consuming server bandwidth and exhausting HTTP connection slots for redundant "pending" statuses.
+- **The Solution:** Integrated a room-based WebSocket event mesh (`contestSocket.js`). Contestants join contest and user rooms (`contest:${id}` and `contest:${id}:user:${userId}`) upon entering the contest. When the BullMQ judge worker marks a submission `accepted` or `wrong_answer`, it broadcasts the verdict directly to the user's room. When a client reconnects or joins, the server immediately replays finished submissions, and the client awaits room-join acknowledgment before submitting with a 3-second fallback polling safeguard.
+- **Results:** Reduced HTTP verdict polling volume from 132 requests to 5 requests across 20 submissions (a 96.2% reduction). The 5 remaining HTTP requests correspond to tail jobs that queued past the 3-second fallback threshold and were immediately resolved by fallback polling.
 
 ### 5.4 Identity-Based Fixed-Window Rate Limiting
 - **The Bottleneck:** Standard IP-based rate limiting (`express-rate-limit`) limits requests by client IP. In coding competitions where students participate from the same university Wi-Fi or corporate NAT router, all users share one public IP. A limit of 60 req/min resulted in legitimate contestants being blocked with HTTP 429.
@@ -275,16 +293,16 @@ During benchmark development and stress testing, three functional bugs were iden
 
 ### Bug 1: IP-Keyed Rate Limiting Blocked Users Behind Shared NAT / Same IP
 - **Problem:** Early test runs resulted in legitimate user submissions being rejected with HTTP 429 (`Too Many Requests`).
-- **Root Cause:** In `backend/src/middleware/rateLimiter.js`, the `submitCodeLimiter` defaulted to `req.ip`. When contestants originated from the same IP (such as a university lab, corporate Wi-Fi, or the local benchmark client), all contestants shared a single quota bucket of 60 requests per minute.
+- **Root Cause:** In `backend/src/middleware/rateLimiter.js`, the `submitCodeLimiter` defaulted to `req.ip`. The rate limit was configured to 60 requests per minute (**configuration parameter, not a measured system capacity limit**). When contestants originated from the same IP (such as a university lab, corporate Wi-Fi, or the local benchmark client), all contestants shared this single 60 req/min quota bucket.
 - **Fix:** Updated the rate limiter key generator to `(req) => req.user?._id?.toString() || req.ip`. Rate limiting now isolates quotas by authenticated user identity while retaining IP fallback for unauthenticated endpoints.
 
 ### Bug 2: Polling Timeout Shorter than Queue Drain Time
 - **Problem:** Client polling was prematurely reporting job failures despite submissions still residing normally in the processing queue.
-- **Root Cause:** The client polling loop used an aggressive 18-second hard timeout. Under high submission bursts, the time required for 5 concurrent BullMQ workers to compile and execute 100 test runs exceeded 18 seconds for jobs situated at the tail of the queue.
-- **Fix:** Increased the client timeout window to 48 seconds and aligned polling frequency to 800ms intervals, allowing jobs at the tail of the queue to complete execution without triggering client-side timeouts.
+- **Root Cause:** The benchmark client was configured with an 18-second hard timeout (**client configuration parameter, not a server measurement**). Under burst submissions, tail wait times exceeded 18 seconds for jobs situated at the end of the queue.
+- **Fix:** Increased the client timeout configuration window to 48 seconds and aligned polling frequency to 800ms intervals, allowing tail jobs to complete execution without triggering premature client-side timeouts.
 
 ### Bug 3: Leaderboard Cache Stampede (Thundering Herd)
-- **Problem:** Simultaneous requests to `GET /api/contests/:id/standings` caused severe event loop latency degradation.
+- **Problem:** Simultaneous requests to `GET /api/contests/:id/standings` caused severe database query storms and event loop latency degradation.
 - **Root Cause:** When multiple clients requested contest standings simultaneously and standings documents had not yet been pre-aggregated, every concurrent request executed separate unindexed collection scans (`Submission.find().distinct()`, `ContestParticipant.find().distinct()`) and multiple write queries concurrently.
 - **Fix:** Added a 2-second Redis micro-cache key (`contest:${contestId}:leaderboard:${page}:${limit}`) combined with an in-memory single-instance mutex lock (`contestSyncLocks`) in `contestLeaderboardService.js`. Concurrent requests encountering an empty cache await the single sync routine while subsequent requests are served from the cached payload.
 
@@ -320,18 +338,24 @@ node scripts/run-all-benchmarks.js
 ```
 All raw run results are automatically exported to `backend/loadtest-results/*.json`.
 
-### 8.2 Generate / Refresh Report Tables
+### 8.2 Execute Specific Benchmark Suite
+```bash
+cd backend
+# Standings only (100 concurrent requests, uncached vs cached)
+node scripts/run-all-benchmarks.js --suite=standings
+
+# Verdict delivery only (20 submissions, polling vs socket.io)
+node scripts/run-all-benchmarks.js --suite=verdict
+
+# Worker concurrency only (20 submissions across 3, 5, 8 workers)
+node scripts/run-all-benchmarks.js --suite=workers
+```
+
+### 8.3 Generate / Refresh Report Tables
 ```bash
 # Parses all raw JSON result files in loadtest-results/ and regenerates this markdown report
 cd backend
 node scripts/make-report.js
-```
-
-### 8.3 Run End-to-End Contest Stress Test (100–500 VUs)
-```bash
-# Runs high-concurrency end-to-end contest simulation
-cd backend
-node scripts/run-contest-load-test.js 100
 ```
 
 ---
@@ -340,11 +364,11 @@ node scripts/run-contest-load-test.js 100
 
 1. **Single Local Machine Resource Contention:**
    - All tests were executed on a single host machine running Windows 11. The test runner, Express API, MongoDB, Redis, and Judge0 compilers all competed for the same CPU cores, memory bandwidth, and disk I/O.
-2. **Single-Instance Mutex:**
+2. **Sample Size for Tail Latency (P95):**
+   - A sample size of 20 submissions per test run is relatively small for estimating tail percentiles like P95. In a 20-sample dataset, P95 represents the 19th ranked submission (top 5%), meaning single-task execution variances noticeably shift the P95 figure. Results should be interpreted as comparative architectural benchmarks rather than high-precision large-population tail distributions.
+3. **Single-Instance Mutex:**
    - The in-memory `Set` mutex prevents duplicate cache rebuilds only within a single Node.js process. Scaling out horizontally to multiple API servers would require replacing this with a distributed Redis-based locking mechanism.
-3. **Fixed-Window Burst Edge:**
+4. **Fixed-Window Burst Edge:**
    - The fixed-window counter permits double the nominal request limit across window boundaries if a contestant concentrates requests immediately before and after window reset.
-4. **Socket.IO Event Race on Initial Connect:**
-   - If a client initiates a submission before their WebSocket connection has joined the contest room on the server, the `submission:update` event broadcast will not be received by that client, necessitating an HTTP polling fallback.
 5. **Sandboxed Worker CPU Contention:**
-   - Scaling BullMQ concurrency beyond the physical core count (8 cores on test machine) produces diminishing returns due to context switching overhead and CPU starvation during GCC compilation.
+   - Scaling BullMQ concurrency beyond the physical core count produces diminishing returns due to context switching overhead and CPU starvation during GCC compilation.
