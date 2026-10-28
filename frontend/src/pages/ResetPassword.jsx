@@ -83,7 +83,7 @@ export default function ResetPassword() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
-                placeholder="developer@example.com"
+                placeholder="User@example.com"
               />
             </div>
           </div>

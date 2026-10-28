@@ -96,7 +96,7 @@ export default function Register() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
-                  placeholder="Your"
+                  placeholder="Username"
                 />
               </div>
             </div>
@@ -113,7 +113,7 @@ export default function Register() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
-                  placeholder="developer@example.com"
+                  placeholder="Email"
                 />
               </div>
             </div>
