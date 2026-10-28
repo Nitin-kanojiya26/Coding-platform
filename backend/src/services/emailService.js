@@ -61,8 +61,35 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
 </html>
   `;
 
-  // 1. If RESEND_API_KEY is configured, dispatch live email via HTTPS Port 443
-  if (process.env.RESEND_API_KEY) {
+  // 1. Priority: Brevo REST API (HTTPS Port 443 - Sends to ANY recipient without domain verification)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const senderEmail = process.env.BREVO_SENDER_EMAIL || 'nitin261177@gmail.com';
+      const senderName = process.env.BREVO_SENDER_NAME || 'Codexium';
+      const res = await axios.post(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email }],
+          subject,
+          htmlContent,
+        },
+        {
+          headers: {
+            'api-key': process.env.BREVO_API_KEY,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          timeout: 7000,
+        }
+      );
+      console.log(`✅ [EmailService] Email delivered to ${email} via Brevo API (MessageId: ${res.data?.messageId})`);
+      return res.data;
+    } catch (apiErr) {
+      console.error(`⚠️ [EmailService] Brevo API error:`, apiErr.response?.data || apiErr.message);
+    }
+  } else if (process.env.RESEND_API_KEY) {
+    // 2. Resend REST API fallback (Port 443)
     try {
       const fromSender = process.env.EMAIL_FROM || 'Codexium <onboarding@resend.dev>';
       const res = await axios.post(
@@ -87,10 +114,10 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
       console.error(`⚠️ [EmailService] Resend API error:`, apiErr.response?.data || apiErr.message);
     }
   } else {
-    console.log(`ℹ️ [EmailService] Resend API key not configured. OTP logged to console above.`);
+    console.log(`ℹ️ [EmailService] No email API key (BREVO_API_KEY or RESEND_API_KEY) set. OTP logged to console above.`);
   }
 
-  // 2. Safe fallback: OTP is saved in Redis and visible in terminal
+  // 3. Safe fallback: OTP is saved in Redis and visible in terminal
   return { success: true, localOnly: true };
 };
 

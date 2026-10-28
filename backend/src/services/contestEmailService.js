@@ -44,7 +44,33 @@ async function sendMailSafe(options) {
     attachments,
   };
 
-  // 1. Priority: Resend REST API (HTTPS Port 443 - Never blocked)
+  // 1. Priority: Brevo REST API (HTTPS Port 443)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const senderEmail = process.env.BREVO_SENDER_EMAIL || 'nitin261177@gmail.com';
+      const senderName = process.env.BREVO_SENDER_NAME || 'Codexium';
+      const res = await axios.post('https://api.brevo.com/v3/smtp/email', {
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html,
+      }, {
+        headers: {
+          'api-key': process.env.BREVO_API_KEY,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 8000,
+      });
+      console.log(`📧 [ContestEmail] Dispatched via Brevo API to ${options.to} (MessageId: ${res.data?.messageId})`);
+      return { success: true, messageId: res.data?.messageId };
+    } catch (apiErr) {
+      console.warn(`⚠️ [ContestEmail] Brevo API error (${apiErr.message}). Mocking delivery.`);
+      return { success: true, mocked: true, reason: apiErr.message };
+    }
+  }
+
+  // 2. Priority: Resend REST API (HTTPS Port 443 - Never blocked)
   if (process.env.RESEND_API_KEY) {
     try {
       const fromSender = process.env.EMAIL_FROM || 'Codexium <onboarding@resend.dev>';
