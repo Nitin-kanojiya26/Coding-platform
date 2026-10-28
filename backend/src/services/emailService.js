@@ -1,50 +1,15 @@
 // backend/src/services/emailService.js
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
 
-// Primary Nodemailer transporter fallback for environments where SMTP is allowed
-let transporter = null;
-try {
-  const nodemailer = require('nodemailer');
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      connectionTimeout: 8000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '',
-      },
-      tls: { rejectUnauthorized: false },
-    });
-  }
-} catch (_) {}
-
+/**
+ * Dispatches verification OTP code over HTTPS Port 443 via Resend REST API.
+ * Never connects to blocked SMTP ports (25, 465, 587).
+ */
 const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification Code') => {
-  // Always log OTP in terminal/Render logs for instant fallback
+  // 1. Always log OTP to terminal / Render logs for instant access
   console.log(`🔑 [Auth OTP] Code for ${email}: ${otp}`);
-  const logoPath = path.join(__dirname, '../assets/Codexium.png');
-  const attachments = [];
 
-  if (fs.existsSync(logoPath)) {
-    attachments.push({
-      filename: 'Codexium.png',
-      path: logoPath,
-      cid: 'codexium-logo',
-    });
-  }
-
-  const mailOptions = {
-    from: `"Codexium" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject,
-    attachments,
-    html: `
+  const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -60,10 +25,7 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
             <td style="padding: 24px 32px; border-bottom: 1px solid #1a1a1a;">
               <table border="0" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="width: 32px; height: 32px; vertical-align: middle;">
-                    <img src="cid:codexium-logo" alt="Codexium" width="32" height="32" style="border-radius: 6px; display: block; border: 0;" />
-                  </td>
-                  <td style="padding-left: 10px; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; color: #ffffff;">
+                  <td style="padding-left: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; color: #ffffff;">
                     CODEXIUM
                   </td>
                 </tr>
@@ -82,7 +44,7 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
                 </span>
               </div>
               <p style="margin: 24px 0 0 0; font-size: 12px; color: #666666; line-height: 1.5;">
-                This code expires in 10 minutes. If you did not request this verification, you can safely ignore this email.
+                This code expires in 5 minutes. If you did not request this verification, you can safely ignore this email.
               </p>
             </td>
           </tr>
@@ -97,10 +59,9 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
   </table>
 </body>
 </html>
-    `,
-  };
+  `;
 
-  // 1. Priority: Resend REST API (HTTPS Port 443 - Never blocked by firewalls)
+  // 2. If RESEND_API_KEY is configured, dispatch live email via HTTPS Port 443
   if (process.env.RESEND_API_KEY) {
     try {
       const fromSender = process.env.EMAIL_FROM || 'Codexium <onboarding@resend.dev>';
@@ -110,30 +71,26 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
           from: fromSender,
           to: [email],
           subject,
-          html: mailOptions.html,
+          html: htmlContent,
         },
         {
           headers: {
             Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
             'Content-Type': 'application/json',
           },
-          timeout: 8000,
+          timeout: 6000,
         }
       );
-      console.log(`✅ [EmailService] Dispatched OTP via Resend HTTPS API (ID: ${res.data?.id})`);
+      console.log(`✅ [EmailService] Email delivered via Resend API (ID: ${res.data?.id})`);
       return res.data;
     } catch (apiErr) {
       console.error(`⚠️ [EmailService] Resend API error:`, apiErr.response?.data || apiErr.message);
-      throw apiErr;
+      return { success: false, error: apiErr.message };
     }
   }
 
-  // 2. Fallback: Nodemailer SMTP
-  if (transporter) {
-    return await transporter.sendMail(mailOptions);
-  }
-
-  console.log(`ℹ️ [EmailService] Ready via local OTP console fallback.`);
+  // 3. Fallback when no API key: instant local success without hanging
+  console.log(`ℹ️ [EmailService] Resend API key not configured. OTP logged to console above.`);
   return { success: true, localOnly: true };
 };
 

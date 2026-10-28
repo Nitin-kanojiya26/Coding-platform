@@ -1,21 +1,8 @@
-const nodemailer = require('nodemailer');
 const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const User = require('../models/Users');
-
-// Primary Nodemailer transporter
-let transporter = null;
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-}
 
 /**
  * Ensures a user has an unsubscribeToken generated and persisted.
@@ -85,19 +72,8 @@ async function sendMailSafe(options) {
     }
   }
 
-  if (transporter) {
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      console.log(`📧 [ContestEmail] Dispatched email to ${options.to} (Message ID: ${info.messageId})`);
-      return { success: true, messageId: info.messageId };
-    } catch (err) {
-      console.warn(`⚠️ [ContestEmail] SMTP delivery failed (${err.message}). Logging mock delivery for ${options.to}`);
-      return { success: true, mocked: true, reason: err.message };
-    }
-  } else {
-    console.log(`ℹ️ [ContestEmail] SMTP not configured. Mock delivery to ${options.to}: "${options.subject}"`);
-    return { success: true, mocked: true, reason: 'SMTP unconfigured' };
-  }
+  console.log(`ℹ️ [ContestEmail] RESEND_API_KEY not configured. Mock delivery to ${options.to}: "${options.subject}"`);
+  return { success: true, mocked: true, reason: 'Resend unconfigured' };
 }
 
 /**
