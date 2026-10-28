@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User, Loader2, AlertCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import Logo from '../components/Logo';
 
 export default function Register() {
@@ -10,6 +10,9 @@ export default function Register() {
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,13 +21,19 @@ export default function Register() {
   const handleRequestOTP = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (formData.password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
     setLoading(true);
     try {
       await registerRequestOTP(formData.email, formData.name, formData.password);
       setInfoMessage(`Verification OTP sent to ${formData.email}`);
       setStep(2);
     } catch (err) {
-      setError(err || 'Registration initialization failed.');
+      setError(err || 'Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -87,7 +96,7 @@ export default function Register() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
-                  placeholder="John Doe"
+                  placeholder="Your"
                 />
               </div>
             </div>
@@ -116,14 +125,58 @@ export default function Register() {
               <div className="relative">
                 <Lock className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   minLength="6"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
+                  className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-8 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 text-text-muted hover:text-text transition-colors p-0.5 focus:outline-none cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1 font-medium">
+                Re-enter Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  minLength="6"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-8 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 text-text-muted hover:text-text transition-colors p-0.5 focus:outline-none cursor-pointer"
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
             </div>
 

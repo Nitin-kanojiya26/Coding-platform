@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Logo from '../components/Logo';
 
 export default function Login() {
@@ -9,6 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +35,6 @@ export default function Login() {
         <div className="flex flex-col items-center text-center space-y-2 pb-2">
           <Logo stacked={true} />
           <h1 className="text-base font-semibold text-text">Sign in to your account</h1>
-          <p className="text-xs text-text-muted">Enter your credentials to access the coding workspace.</p>
         </div>
 
         {/* Error notification */}
@@ -59,7 +59,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
-                placeholder="developer@example.com"
+                placeholder="Your Email"
               />
             </div>
           </div>
@@ -79,13 +79,26 @@ export default function Login() {
             <div className="relative">
               <Lock className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-3 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
+                className="w-full rounded border border-border/40 bg-surface-raised/40 py-1.5 pr-8 pl-8 text-xs text-text placeholder-text-muted focus:outline-none focus:border-border"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute top-1/2 right-2.5 -translate-y-1/2 text-text-muted hover:text-text transition-colors p-0.5 focus:outline-none cursor-pointer"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )}
+              </button>
             </div>
           </div>
 
