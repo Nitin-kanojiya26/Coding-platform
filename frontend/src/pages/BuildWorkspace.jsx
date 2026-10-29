@@ -41,6 +41,7 @@ import {
   X,
   FilePlus,
   FolderPlus,
+  Pencil,
   ChevronsDownUp,
   GripVertical,
   GripHorizontal,
@@ -119,6 +120,10 @@ export default function BuildWorkspace() {
   const [newFileName, setNewFileName] = useState('');
   const [fileExplorerOpen, setFileExplorerOpen] = useState(true);
   const [collapsedFolders, setCollapsedFolders] = useState({});
+  const [renamingPath, setRenamingPath] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renamingFolder, setRenamingFolder] = useState(null);
+  const [renameFolderValue, setRenameFolderValue] = useState('');
 
   // ─── LeetCode-Style Resizable Panel Dimensions ───
   const [leftWidth, setLeftWidth] = useState(() => {
@@ -368,9 +373,22 @@ export default function BuildWorkspace() {
     }
 
     if (newFileType === 'folder') {
-      const folderFilePath = `${raw}/index.js`;
+      let folderName = raw;
+      let initialFile = 'index.js';
+
+      if (raw.includes('/')) {
+        const parts = raw.split('/');
+        folderName = parts[0];
+        initialFile = parts.slice(1).join('/') || 'index.js';
+      }
+
+      if (!initialFile.includes('.')) {
+        initialFile += '.js';
+      }
+
+      const folderFilePath = `${folderName}/${initialFile}`;
       if (files.some((f) => f.path.toLowerCase() === folderFilePath.toLowerCase())) {
-        toast.error(`Folder "${raw}" already exists.`);
+        toast.error(`A file at "${folderFilePath}" already exists.`);
         return;
       }
       if (files.length >= 20) {
@@ -379,7 +397,7 @@ export default function BuildWorkspace() {
       }
       const newFileList = [
         ...files,
-        { path: folderFilePath, content: `// ${raw}/index.js\n\nmodule.exports = {};\n` },
+        { path: folderFilePath, content: `// ${folderFilePath}\n\nmodule.exports = {};\n` },
       ];
       setFiles(newFileList);
       if (!openTabs.includes(folderFilePath)) {
@@ -391,7 +409,7 @@ export default function BuildWorkspace() {
       if (slug) {
         localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
       }
-      toast.success(`Created folder "${raw}/"`);
+      toast.success(`Created folder "${folderName}/" with "${initialFile}"`);
       return;
     }
 
@@ -430,6 +448,153 @@ export default function BuildWorkspace() {
       localStorage.setItem(`build_files_${slug}`, JSON.stringify(newFileList));
     }
     toast.success(`Created "${raw}"`);
+  };
+
+  // Rename file (VS Code style inline rename)
+  const handleRenameFile = (oldPath, newSubOrFull) => {
+    let cleaned = (newSubOrFull || '').trim().replace(/\\/g, '/');
+    if (cleaned.startsWith('/')) cleaned = cleaned.slice(1);
+    if (cleaned.endsWith('/')) cleaned = cleaned.slice(0, -1);
+
+    if (!cleaned) {
+      toast.error('Filename cannot be empty.');
+      setRenamingPath(null);
+      return;
+    }
+    if (cleaned.includes('..')) {
+      toast.error('Directory traversal (..) is not allowed.');
+      return;
+    }
+
+    // If file was inside a folder and user only typed a new filename (e.g. auth.js)
+    let targetPath = cleaned;
+    if (!cleaned.includes('/') && oldPath.includes('/')) {
+      const folder = oldPath.substring(0, oldPath.lastIndexOf('/'));
+      targetPath = `${folder}/${cleaned}`;
+    }
+
+    if (!targetPath.includes('.')) {
+      targetPath += '.js';
+    }
+
+    if (targetPath.toLowerCase() === oldPath.toLowerCase()) {
+      setRenamingPath(null);
+      return;
+    }
+
+    if (files.some((f) => f.path.toLowerCase() === targetPath.toLowerCase())) {
+      toast.error(`A file with path "${targetPath}" already exists.`);
+      return;
+    }
+
+    if (oldPath === 'server.js') {
+      toast.error('Cannot rename the main "server.js" entry file.');
+      setRenamingPath(null);
+      return;
+    }
+
+    const updatedFiles = files.map((f) =>
+      f.path === oldPath ? { ...f, path: targetPath } : f
+    );
+    const updatedTabs = openTabs.map((t) => (t === oldPath ? targetPath : t));
+
+    setFiles(updatedFiles);
+    setOpenTabs(updatedTabs);
+    if (activeFilePath === oldPath) {
+      setActiveFilePath(targetPath);
+    }
+
+    setRenamingPath(null);
+    if (slug) {
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(updatedFiles));
+    }
+    toast.success(`Renamed to "${targetPath}"`);
+  };
+
+  // Rename folder (updates all files inside this folder)
+  const handleRenameFolder = (oldFolder, newFolderRaw) => {
+    let cleaned = (newFolderRaw || '').trim().replace(/\\/g, '/');
+    if (cleaned.startsWith('/')) cleaned = cleaned.slice(1);
+    if (cleaned.endsWith('/')) cleaned = cleaned.slice(0, -1);
+
+    if (!cleaned) {
+      toast.error('Folder name cannot be empty.');
+      setRenamingFolder(null);
+      return;
+    }
+    if (cleaned.includes('/') || cleaned.includes('..')) {
+      toast.error('Invalid folder name (cannot contain sub-slashes or ..).');
+      return;
+    }
+
+    if (cleaned.toLowerCase() === oldFolder.toLowerCase()) {
+      setRenamingFolder(null);
+      return;
+    }
+
+    const targetPrefix = `${cleaned.toLowerCase()}/`;
+    const oldPrefix = `${oldFolder}/`;
+
+    if (files.some((f) => f.path.toLowerCase().startsWith(targetPrefix))) {
+      toast.error(`A folder named "${cleaned}" already exists.`);
+      return;
+    }
+
+    const updatedFiles = files.map((f) => {
+      if (f.path.startsWith(oldPrefix)) {
+        const rest = f.path.slice(oldPrefix.length);
+        return { ...f, path: `${cleaned}/${rest}` };
+      }
+      return f;
+    });
+
+    const updatedTabs = openTabs.map((t) => {
+      if (t.startsWith(oldPrefix)) {
+        const rest = t.slice(oldPrefix.length);
+        return `${cleaned}/${rest}`;
+      }
+      return t;
+    });
+
+    setFiles(updatedFiles);
+    setOpenTabs(updatedTabs);
+
+    if (activeFilePath.startsWith(oldPrefix)) {
+      const rest = activeFilePath.slice(oldPrefix.length);
+      setActiveFilePath(`${cleaned}/${rest}`);
+    }
+
+    setRenamingFolder(null);
+    if (slug) {
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(updatedFiles));
+    }
+    toast.success(`Renamed folder to "${cleaned}/"`);
+  };
+
+  // Delete folder (removes all files in that folder)
+  const handleDeleteFolder = (folderName, e) => {
+    if (e) e.stopPropagation();
+    const folderPrefix = `${folderName}/`;
+
+    const filesInFolder = files.filter((f) => f.path.startsWith(folderPrefix));
+    if (filesInFolder.length === 0) return;
+
+    const updatedFiles = files.filter((f) => !f.path.startsWith(folderPrefix));
+    const finalFiles = updatedFiles.length > 0 ? updatedFiles : [{ path: 'server.js', content: '' }];
+    const updatedTabs = openTabs.filter((t) => !t.startsWith(folderPrefix));
+    const finalTabs = updatedTabs.length > 0 ? updatedTabs : ['server.js'];
+
+    setFiles(finalFiles);
+    setOpenTabs(finalTabs);
+
+    if (activeFilePath.startsWith(folderPrefix)) {
+      setActiveFilePath(finalTabs[0] || 'server.js');
+    }
+
+    if (slug) {
+      localStorage.setItem(`build_files_${slug}`, JSON.stringify(finalFiles));
+    }
+    toast.success(`Deleted folder "${folderName}/" (${filesInFolder.length} file(s))`);
   };
 
   // Delete file
@@ -1599,19 +1764,77 @@ export default function BuildWorkspace() {
                   {/* Folders */}
                   {Object.entries(fileTree.folders).map(([folderName, folderFiles]) => {
                     const isCollapsed = collapsedFolders[folderName];
+                    const isFolderRenaming = renamingFolder === folderName;
                     return (
                       <div key={folderName} className="space-y-0.5">
                         <div
                           onClick={() => toggleFolderCollapse(folderName)}
-                          className="flex items-center gap-1.5 px-1.5 py-1 rounded text-text-muted hover:text-text hover:bg-surface-raised/40 cursor-pointer text-xs"
+                          className="group flex items-center justify-between px-1.5 py-1 rounded text-text-muted hover:text-text hover:bg-surface-raised/40 cursor-pointer text-xs"
                         >
-                          <ChevronRight className={`w-3 h-3 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} />
-                          {isCollapsed ? (
-                            <Folder className="w-3.5 h-3.5 text-accent-build/80" />
-                          ) : (
-                            <FolderOpen className="w-3.5 h-3.5 text-accent-build" />
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <ChevronRight className={`w-3 h-3 transition-transform shrink-0 ${!isCollapsed ? 'rotate-90' : ''}`} />
+                            {isCollapsed ? (
+                              <Folder className="w-3.5 h-3.5 text-accent-build/80 shrink-0" />
+                            ) : (
+                              <FolderOpen className="w-3.5 h-3.5 text-accent-build shrink-0" />
+                            )}
+                            {isFolderRenaming ? (
+                              <input
+                                type="text"
+                                value={renameFolderValue}
+                                onChange={(e) => setRenameFolderValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  e.stopPropagation();
+                                  if (e.key === 'Enter') handleRenameFolder(folderName, renameFolderValue);
+                                  if (e.key === 'Escape') setRenamingFolder(null);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                onBlur={() => handleRenameFolder(folderName, renameFolderValue)}
+                                className="bg-surface px-1 py-0.5 text-xs font-mono text-text rounded border border-accent-build focus:outline-none w-24"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="font-semibold text-xs truncate">{folderName}</span>
+                            )}
+                          </div>
+
+                          {!isFolderRenaming && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowNewFileInput(true);
+                                  setNewFileType('file');
+                                  setNewFileName(`${folderName}/`);
+                                }}
+                                className="p-0.5 hover:text-accent-build rounded"
+                                title="New File in this folder"
+                              >
+                                <FilePlus className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRenamingFolder(folderName);
+                                  setRenameFolderValue(folderName);
+                                }}
+                                className="p-0.5 hover:text-amber-400 rounded"
+                                title="Rename folder"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteFolder(folderName, e)}
+                                className="p-0.5 hover:text-rose-400 rounded"
+                                title="Delete folder"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           )}
-                          <span className="font-semibold text-xs truncate">{folderName}</span>
                         </div>
 
                         {/* Indented folder files */}
@@ -1619,6 +1842,7 @@ export default function BuildWorkspace() {
                           <div className="pl-4 space-y-0.5 border-l border-border/30 ml-2">
                             {folderFiles.map((file) => {
                               const isActive = activeFilePath === file.path;
+                              const isRenaming = renamingPath === file.path;
                               return (
                                 <div
                                   key={file.path}
@@ -1634,19 +1858,52 @@ export default function BuildWorkspace() {
                                       : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                                   }`}
                                 >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <FileIcon path={file.subPath} className="w-3.5 h-3.5" />
-                                    <span className="truncate text-xs">{file.subPath}</span>
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <FileIcon path={file.subPath} className="w-3.5 h-3.5 shrink-0" />
+                                    {isRenaming ? (
+                                      <input
+                                        type="text"
+                                        value={renameValue}
+                                        onChange={(e) => setRenameValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          e.stopPropagation();
+                                          if (e.key === 'Enter') handleRenameFile(file.path, renameValue);
+                                          if (e.key === 'Escape') setRenamingPath(null);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onBlur={() => handleRenameFile(file.path, renameValue)}
+                                        className="bg-surface px-1 py-0.5 text-xs font-mono text-text rounded border border-accent-build focus:outline-none w-24"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="truncate text-xs">{file.subPath}</span>
+                                    )}
                                   </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleDeleteFile(file.path, e)}
-                                    className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
-                                    title="Delete file"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
+                                  {!isRenaming && (
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRenamingPath(file.path);
+                                          setRenameValue(file.subPath);
+                                        }}
+                                        className="hover:text-amber-400 p-0.5 rounded"
+                                        title="Rename file"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleDeleteFile(file.path, e)}
+                                        className="hover:text-rose-400 p-0.5 rounded"
+                                        title="Delete file"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -1660,6 +1917,7 @@ export default function BuildWorkspace() {
                   {fileTree.rootFiles.map((file) => {
                     const isActive = activeFilePath === file.path;
                     const isEntry = file.path === 'server.js' || file.path === 'index.js';
+                    const isRenaming = renamingPath === file.path;
                     return (
                       <div
                         key={file.path}
@@ -1675,25 +1933,58 @@ export default function BuildWorkspace() {
                             : 'text-text-muted hover:text-text hover:bg-surface-raised/40'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <FileIcon path={file.path} className="w-3.5 h-3.5" />
-                          <span className="truncate text-xs">{file.path}</span>
-                          {isEntry && (
-                            <span className="text-[9px] font-mono px-1 rounded bg-accent-build/20 text-accent-build uppercase font-semibold">
-                              main
-                            </span>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <FileIcon path={file.path} className="w-3.5 h-3.5 shrink-0" />
+                          {isRenaming ? (
+                            <input
+                              type="text"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === 'Enter') handleRenameFile(file.path, renameValue);
+                                if (e.key === 'Escape') setRenamingPath(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={() => handleRenameFile(file.path, renameValue)}
+                              className="bg-surface px-1 py-0.5 text-xs font-mono text-text rounded border border-accent-build focus:outline-none w-24"
+                              autoFocus
+                            />
+                          ) : (
+                            <>
+                              <span className="truncate text-xs">{file.path}</span>
+                              {isEntry && (
+                                <span className="text-[9px] font-mono px-1 rounded bg-accent-build/20 text-accent-build uppercase font-semibold">
+                                  main
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
 
-                        {!isEntry && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteFile(file.path, e)}
-                            className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity"
-                            title="Delete file"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                        {!isEntry && !isRenaming && (
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingPath(file.path);
+                                setRenameValue(file.path);
+                              }}
+                              className="hover:text-amber-400 p-0.5 rounded"
+                              title="Rename file"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteFile(file.path, e)}
+                              className="hover:text-rose-400 p-0.5 rounded"
+                              title="Delete file"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
