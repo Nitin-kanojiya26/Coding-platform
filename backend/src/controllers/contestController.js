@@ -696,7 +696,25 @@ exports.getContestProblems = async (req, res) => {
     }
 
     if (!isParticipant && !isAdmin && !isCreator) {
-      return res.status(403).json({ message: 'Only contest participants can access contest problems.' });
+      if (status === 'running' && contest.kind === 'public') {
+        // Auto-join public live contest so user can immediately view challenges and compete
+        try {
+          await ContestParticipant.create({
+            contestId: contest._id,
+            userId: user._id,
+            joinedAt: new Date(),
+          });
+          await Contest.findByIdAndUpdate(contest._id, { $inc: { participantsCount: 1 } });
+          isParticipant = true;
+        } catch (_) {
+          isParticipant = true;
+        }
+      } else if (status === 'ended') {
+        // Anyone can view problems and practice after contest ends
+        isParticipant = true;
+      } else {
+        return res.status(403).json({ message: 'Only contest participants can access contest problems.' });
+      }
     }
 
     // 3. Ensure problems are selected if random mode and problems array is empty

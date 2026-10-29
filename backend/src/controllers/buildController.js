@@ -240,14 +240,24 @@ const submitBuildSolution = async (req, res) => {
 
       // Check participant (only enforced during live contest; after contest, any user can practice submit)
       if (!isContestEnded) {
-        const isParticipant = await ContestParticipant.findOne({
+        let isParticipant = await ContestParticipant.findOne({
           contestId: validatedContest._id,
           userId: req.user._id,
         });
         if (!isParticipant) {
-          return res.status(403).json({
-            message: 'You are not a registered participant in this contest.',
-          });
+          if (validatedContest.kind === 'public' || validatedContest.createdBy?.toString() === req.user._id.toString() || req.user.role === 'admin') {
+            try {
+              await ContestParticipant.create({
+                contestId: validatedContest._id,
+                userId: req.user._id,
+              });
+              await Contest.findByIdAndUpdate(validatedContest._id, { $inc: { participantsCount: 1 } });
+            } catch (_) {}
+          } else {
+            return res.status(403).json({
+              message: 'You are not a registered participant in this contest.',
+            });
+          }
         }
       }
 
