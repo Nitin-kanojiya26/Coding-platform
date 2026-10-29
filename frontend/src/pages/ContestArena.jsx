@@ -93,6 +93,7 @@ export default function ContestArena() {
 
   // Panel state
   const [leftTab, setLeftTab] = useState('statement'); // 'statement' | 'submissions'
+  const [mobileTab, setMobileTab] = useState('statement'); // 'statement' | 'code' | 'console'
   const [userSubmissions, setUserSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
@@ -310,6 +311,7 @@ export default function ContestArena() {
     setJudgingVerdict(verdict);
     setConsoleTab('result');
     setConsoleOpen(true);
+    setMobileTab('console');
 
     const isAccepted =
       verdict.status?.toLowerCase() === 'accepted' || verdict.status?.toLowerCase() === 'ac';
@@ -461,6 +463,7 @@ export default function ContestArena() {
     setActiveTestTab(0);
     setConsoleTab('result');
     setConsoleOpen(true);
+    setMobileTab('console');
 
     try {
       const res = await API.post(`/problems/${currentProblemId}/run`, {
@@ -733,13 +736,66 @@ export default function ContestArena() {
         </div>
       </header>
 
+      {/* ─── Mobile Navigation Tabs (< 1024px) ─── */}
+      <div className="lg:hidden flex items-center justify-between border-b border-border/30 bg-bg px-2 py-1.5 shrink-0 z-30 select-none">
+        <div className="flex items-center gap-1 flex-1">
+          <button
+            type="button"
+            onClick={() => setMobileTab('statement')}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors ${
+              mobileTab === 'statement'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Statement
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('code')}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors ${
+              mobileTab === 'code'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Code
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileTab('console');
+              setConsoleOpen(true);
+            }}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors flex items-center justify-center gap-1.5 ${
+              mobileTab === 'console'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            <span>Console</span>
+            {(runResults || judgingVerdict) && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  (runResults?.overallStatus?.toLowerCase() === 'accepted' || judgingVerdict?.status?.toLowerCase() === 'accepted')
+                    ? 'bg-emerald-400'
+                    : 'bg-rose-500'
+                }`}
+              />
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* ─── Main Workspace: Split Pane (Left Statement / Right Editor) ─ */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative bg-bg">
         
         {/* ─── LEFT PANEL: Problem Statement & Submissions ─── */}
         <div
           style={{ width: window.innerWidth >= 1024 ? `${splitPercent}%` : '100%' }}
-          className="w-full flex flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/30 bg-bg shrink-0"
+          className={`w-full flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/30 bg-bg shrink-0 pb-16 lg:pb-0 ${
+            window.innerWidth >= 1024 ? 'flex' : mobileTab === 'statement' ? 'flex flex-1 min-h-0' : 'hidden'
+          }`}
         >
           {/* Left Panel Tabs (Description | My Submissions) */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30 bg-bg shrink-0 text-xs select-none">
@@ -988,7 +1044,7 @@ export default function ContestArena() {
         />
 
         {/* ─── RIGHT PANEL: Code Workspace & Action Bar ─── */}
-        <div className="flex-1 flex flex-col bg-bg overflow-hidden min-w-0">
+        <div className={`flex-1 flex-col bg-bg overflow-hidden min-w-0 pb-14 lg:pb-0 ${window.innerWidth >= 1024 ? 'flex' : mobileTab !== 'statement' ? 'flex' : 'hidden'}`}>
           
           {/* Editor Top Toolbar */}
           <div className="h-9 bg-bg border-b border-border/30 px-3 flex items-center justify-between shrink-0 text-xs select-none">
@@ -1026,7 +1082,7 @@ export default function ContestArena() {
           </div>
 
           {/* Code Editor or API input */}
-          <div className="flex-1 relative overflow-hidden bg-[#1e1e1e]">
+          <div className={`relative overflow-hidden bg-[#1e1e1e] ${window.innerWidth < 1024 && mobileTab === 'console' ? 'hidden' : 'flex-1'}`}>
             {contest.type === 'dsa' ? (
               <Editor
                 height="100%"
@@ -1036,10 +1092,22 @@ export default function ContestArena() {
                 }
                 value={activeCode}
                 onChange={(newVal) => handleCodeChange(newVal || '')}
+                onMount={(editor, monaco) => {
+                  if (typeof document !== 'undefined' && document.fonts) {
+                    document.fonts.ready.then(() => {
+                      monaco.editor.remeasureFonts();
+                    });
+                  }
+                }}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13,
-                  fontFamily: `'JetBrains Mono', Consolas, monospace`,
+                  fontFamily: `'JetBrains Mono', Menlo, Monaco, Consolas, 'Courier New', monospace`,
+                  letterSpacing: 0,
+                  fontLigatures: false,
+                  cursorStyle: 'line',
+                  cursorWidth: 2,
+                  cursorBlinking: 'smooth',
                   lineNumbers: 'on',
                   scrollBeyondLastLine: false,
                   tabSize: 2,
@@ -1089,10 +1157,10 @@ export default function ContestArena() {
           )}
 
           {/* ─── LeetCode-style Console Drawer ─── */}
-          {consoleOpen && (
+          {consoleOpen && (window.innerWidth >= 1024 || mobileTab === 'console') && (
             <div
-              style={{ height: `${consoleHeight}px` }}
-              className="flex flex-col shrink-0 bg-bg border-t border-border/30 overflow-hidden select-text"
+              style={{ height: (window.innerWidth < 1024 && mobileTab === 'console') ? '100%' : `${consoleHeight}px` }}
+              className={`flex flex-col bg-bg border-t border-border/30 overflow-hidden select-text ${window.innerWidth < 1024 && mobileTab === 'console' ? 'flex-1' : 'shrink-0'}`}
             >
               <div
                 ref={terminalRef}
@@ -1433,7 +1501,7 @@ export default function ContestArena() {
             </div>
 
             {/* Right: Run and Vibrant Green Submit buttons */}
-            <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
               {contest.type === 'dsa' && (
                 <button
                   type="button"
@@ -1611,6 +1679,78 @@ export default function ContestArena() {
           </aside>
         )}
 
+      </div>
+
+      {/* ─── Persistent Mobile Bottom Action Bar (< 1024px) ─── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border/50 px-3 py-2 flex items-center justify-between shadow-2xl">
+        <div className="flex items-center gap-2">
+          {contest?.type === 'dsa' && (
+            <select
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className="bg-surface-raised border border-border/50 rounded px-2 py-1 text-xs font-mono text-text outline-none cursor-pointer"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.id} value={lang.id} className="bg-[#121212] text-white">
+                  {lang.label.split(' ')[0]}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (mobileTab === 'code') {
+                setMobileTab('console');
+                setConsoleOpen(true);
+              } else {
+                setMobileTab('code');
+              }
+            }}
+            className="px-2 py-1 rounded text-xs text-text-muted hover:text-text bg-surface-raised/40 border border-border/40 font-mono flex items-center gap-1 cursor-pointer"
+          >
+            <Terminal className="h-3 w-3 text-accent" />
+            <span>{mobileTab === 'code' ? 'Console' : 'Editor'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {contest?.type === 'dsa' && (
+            <button
+              type="button"
+              onClick={handleRunCode}
+              disabled={runningCode || submitting}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors border border-border/50 disabled:opacity-50 active:scale-95 cursor-pointer"
+            >
+              {runningCode ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+              ) : (
+                <Play className="w-3.5 h-3.5 text-accent fill-accent/20" />
+              )}
+              <span>Run</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white transition-all shadow-sm disabled:opacity-50 active:scale-95 cursor-pointer"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Evaluating...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-3.5 h-3.5" />
+                <span>Submit</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

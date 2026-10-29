@@ -943,7 +943,7 @@ export default function BuildWorkspace() {
             type="button"
             onClick={handleRunCode}
             disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running'}
-            className={`px-3 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all border ${
+            className={`hidden sm:flex px-3 py-1.5 text-xs font-semibold rounded items-center gap-1.5 transition-all border ${
               runLoading
                 ? 'bg-surface-raised text-text-muted border-border cursor-not-allowed'
                 : 'bg-surface-raised/60 hover:bg-surface-raised text-text hover:text-white border-border/60 hover:border-text-muted active:scale-95'
@@ -969,7 +969,7 @@ export default function BuildWorkspace() {
             type="button"
             onClick={handleSubmit}
             disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running' || rateLimitWait > 0}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded flex items-center gap-1.5 transition-all shadow-sm ${
+            className={`hidden sm:flex px-3.5 py-1.5 text-xs font-semibold rounded items-center gap-1.5 transition-all shadow-sm ${
               submissionStatus === 'queued' || submissionStatus === 'running'
                 ? 'bg-accent-build/50 text-black cursor-not-allowed'
                 : rateLimitWait > 0
@@ -2110,6 +2110,73 @@ export default function BuildWorkspace() {
           </div>
         </div>
       )}
+
+      {/* ─── Persistent Mobile Bottom Action Bar (< 1024px) ─── */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border/50 px-3 py-2 flex items-center justify-between shadow-2xl">
+        <button
+          type="button"
+          onClick={() => {
+            if (mobileTab === 'code') {
+              setMobileTab('results');
+              setChecklistOpen(true);
+            } else {
+              setMobileTab('code');
+              setChecklistOpen(false);
+            }
+          }}
+          className="px-2.5 py-1 rounded text-xs text-text-muted hover:text-text bg-surface-raised/40 border border-border/40 font-mono flex items-center gap-1 cursor-pointer"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-accent-build" />
+          <span>{mobileTab === 'code' ? 'Checklist' : 'Editor'}</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile Run Button */}
+          <button
+            type="button"
+            onClick={handleRunCode}
+            disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running'}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors border border-border/50 disabled:opacity-50 active:scale-95 cursor-pointer"
+          >
+            {runLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-build" />
+                <span>Running...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5 fill-current text-accent-build" />
+                <span>Run</span>
+              </>
+            )}
+          </button>
+
+          {/* Mobile Submit Button */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={runLoading || submissionStatus === 'queued' || submissionStatus === 'running' || rateLimitWait > 0}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-accent-build hover:bg-accent-build-hover text-black transition-all shadow-sm disabled:opacity-50 active:scale-95 cursor-pointer"
+          >
+            {submissionStatus === 'queued' || submissionStatus === 'running' ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Submitting...</span>
+              </>
+            ) : rateLimitWait > 0 ? (
+              <>
+                <Clock className="w-3.5 h-3.5 text-amber-900" />
+                <span>Wait {rateLimitWait}s</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-3.5 h-3.5" />
+                <span>Submit</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

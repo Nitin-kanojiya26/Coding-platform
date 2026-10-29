@@ -136,7 +136,27 @@ const runBuildSolution = async (req, res) => {
     };
 
     const startTime = Date.now();
-    const evalResult = await executeDockerFlow(submission, problem, { isRun: true });
+    let evalResult;
+
+    // Check if Docker daemon is available locally on this machine
+    const { checkDockerHealth } = require('../workers/buildWorker');
+    const dockerStatus = await checkDockerHealth();
+
+    if (dockerStatus.ok) {
+      // Local Docker is available -> execute directly in-process
+      evalResult = await executeDockerFlow(submission, problem, { isRun: true });
+    } else {
+      // Local Docker is NOT available (e.g. on Render) -> delegate to remote worker via BullMQ queue
+      const { executeBuildRunViaQueue } = require('../queues/buildQueue');
+      const { isBullMQAvailable } = require('../config/bullmqRedis');
+
+      if (isBullMQAvailable()) {
+        evalResult = await executeBuildRunViaQueue(submission, problem, 35000);
+      } else {
+        throw new Error('Docker daemon is offline and cloud execution queue is unavailable.');
+      }
+    }
+
     const timeTakenMs = Date.now() - startTime;
 
     return res.status(200).json({
@@ -155,11 +175,13 @@ const runBuildSolution = async (req, res) => {
     const isOffline =
       err.message?.toLowerCase().includes('docker') ||
       err.message?.toLowerCase().includes('sandbox') ||
+      err.message?.toLowerCase().includes('queue unavailable') ||
+      err.message?.toLowerCase().includes('timeout') ||
       err.message?.includes('ECONNREFUSED') ||
       err.code === 'ECONNREFUSED';
     const statusCode = isOffline ? 503 : 500;
     const message = isOffline
-      ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+      ? 'The project execution sandbox is temporarily offline or initializing. Please ensure Docker or the build worker is running.'
       : 'Error executing test run: ' + err.message;
     return res.status(statusCode).json({ message, isServiceUnavailable: isOffline });
   }

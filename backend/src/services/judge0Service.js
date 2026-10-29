@@ -51,6 +51,144 @@ function isJudge0OfflineError(err) {
 const encodeBase64 = (str) => Buffer.from(str || '').toString('base64');
 const decodeBase64 = (str) => Buffer.from(str || '', 'base64').toString('utf-8');
 
+// Mapping Judge0 language IDs to OnlineCompiler.io compiler identifiers
+const ONLINE_COMPILER_MAP = {
+  54: 'g++-15',      // C++ (GCC)
+  52: 'g++-15',
+  53: 'g++-15',
+  76: 'g++-15',
+  62: 'openjdk-25',  // Java (OpenJDK)
+  71: 'python-3.14', // Python 3
+  70: 'python-3.14',
+  63: 'nodejs-24',   // JavaScript (Node.js)
+  50: 'gcc-15',      // C (GCC)
+  48: 'gcc-15',
+  49: 'gcc-15',
+  75: 'gcc-15',
+};
+
+/**
+ * Fallback execution via OnlineCompiler.io REST API
+ * Used automatically whenever local Judge0 is offline or unreachable.
+ */
+async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 2000) {
+  const compiler = ONLINE_COMPILER_MAP[Number(languageId)] || 'g++-15';
+  const apiKey = (process.env.ONLINECOMPILER_API_KEY || '').trim();
+
+  if (!apiKey) {
+    throw new ExecutionUnavailableError(
+      'The code execution engine is temporarily offline and ONLINECOMPILER_API_KEY is not configured.'
+    );
+  }
+
+  const detailed = [];
+  let passed = 0;
+  let maxRuntime = 0;
+  let maxMemory = 0;
+
+  for (const tc of testCases) {
+    try {
+      const res = await axios.post(
+        'https://api.onlinecompiler.io/api/run-code-sync/',
+        {
+          compiler,
+          code,
+          input: tc.input || '',
+          time_limit: Math.min(Math.max(Math.round(timeLimit / 1000), 1), 15),
+        },
+        {
+          headers: {
+            Authorization: apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 25000,
+        }
+      );
+
+      const data = res.data || {};
+      const stdout = (data.output || '').trim();
+      const expectedOutput = (tc.output || '').trim();
+      const stderr = (data.error || '').trim();
+      const exitCode = data.exit_code ?? 0;
+      const isSuccess = data.status === 'success' && exitCode === 0;
+
+      const runtimeSec = parseFloat(data.time) || 0;
+      const runtimeMs = Math.round(runtimeSec * 1000);
+      const memoryKB = parseFloat(data.memory) || 0;
+      const memoryMB = parseFloat((memoryKB / 1024).toFixed(2));
+
+      maxRuntime = Math.max(maxRuntime, runtimeMs);
+      maxMemory = Math.max(maxMemory, memoryMB);
+
+      let status = 'wrong_answer';
+      if (data.status === 'timeout' || data.signal === 'SIGXCPU') {
+        status = 'time_limit_exceeded';
+      } else if (!isSuccess || exitCode !== 0) {
+        if (
+          stderr.toLowerCase().includes('error:') ||
+          stderr.toLowerCase().includes('compilat') ||
+          stderr.toLowerCase().includes('syntaxerror')
+        ) {
+          status = 'compilation_error';
+        } else {
+          status = 'runtime_error';
+        }
+      } else if (stdout === expectedOutput) {
+        status = 'accepted';
+        passed++;
+      } else {
+        status = 'wrong_answer';
+      }
+
+      detailed.push({
+        status,
+        runtime: runtimeMs,
+        memory: memoryMB,
+        input: tc.input,
+        expectedOutput: tc.output,
+        actualOutput: stdout,
+        stderr,
+        compile_output: status === 'compilation_error' ? stderr : '',
+      });
+    } catch (apiErr) {
+      console.error('[OnlineCompiler] API error on testcase:', apiErr.response?.data || apiErr.message);
+      detailed.push({
+        status: 'runtime_error',
+        runtime: 0,
+        memory: 0,
+        input: tc.input,
+        expectedOutput: tc.output,
+        actualOutput: '',
+        stderr: apiErr.response?.data?.error || apiErr.message,
+        compile_output: '',
+      });
+    }
+  }
+
+  const overallStatus =
+    passed === testCases.length
+      ? 'accepted'
+      : detailed.find((d) => d.status === 'compilation_error')
+      ? 'compilation_error'
+      : detailed.find((d) => d.status === 'runtime_error')
+      ? 'runtime_error'
+      : detailed.find((d) => d.status === 'time_limit_exceeded')
+      ? 'time_limit_exceeded'
+      : 'wrong_answer';
+
+  console.log(`[ExecutionEngine] OnlineCompiler.io evaluated ${testCases.length} testcase(s) (Overall: ${overallStatus.toUpperCase()}, Passed: ${passed}/${testCases.length}).`);
+
+  return {
+    status: overallStatus,
+    runtime: maxRuntime,
+    memory: maxMemory,
+    passed,
+    total: testCases.length,
+    compile_output: detailed.find((d) => d.compile_output)?.compile_output || '',
+    results: detailed,
+  };
+}
+
 exports.runAllTestCases = async (code, languageId, testCases, timeLimit = 2000) => {
   if (!testCases || testCases.length === 0) {
     throw new Error('No test cases provided');
@@ -70,11 +208,16 @@ exports.runAllTestCases = async (code, languageId, testCases, timeLimit = 2000) 
 
   let batchResponse;
   try {
+    console.log(`[ExecutionEngine] Active Engine: Local Judge0 (${JUDGE0_API_URL}) -> Dispatching ${testCases.length} testcase(s)...`);
     // Send with base64_encoded=true
     batchResponse = await judge0.post('/submissions/batch?base64_encoded=true', { submissions });
   } catch (err) {
     if (isJudge0OfflineError(err)) {
-      console.warn('⚠️ [Judge0] Service offline or unreachable:', err.message);
+      if (process.env.ONLINECOMPILER_API_KEY) {
+        console.log(`[ExecutionEngine] Local Judge0 is OFFLINE. Seamlessly switching to OnlineCompiler.io Cloud API...`);
+        return await runWithOnlineCompiler(cleanCode, languageId, testCases, timeLimit);
+      }
+      console.warn('⚠️ [ExecutionEngine] Local Judge0 is OFFLINE and ONLINECOMPILER_API_KEY is not configured:', err.message);
       throw new ExecutionUnavailableError(
         'The code execution engine is temporarily offline. Please try again shortly.'
       );
@@ -89,6 +232,7 @@ exports.runAllTestCases = async (code, languageId, testCases, timeLimit = 2000) 
   }
 
   const results = await pollBatchResults(tokens);
+  console.log(`[ExecutionEngine] Local Judge0 evaluated ${results.length} testcase(s) successfully.`);
   return aggregateResults(results, testCases);
 };
 

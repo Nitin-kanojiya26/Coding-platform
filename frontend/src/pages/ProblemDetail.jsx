@@ -102,6 +102,7 @@ export default function ProblemDetail() {
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
+  const [mobileTab, setMobileTab] = useState('description'); // 'description' | 'code' | 'console'
 
   // Vertical testcases / console height state (LeetCode style)
   const [consoleHeight, setConsoleHeight] = useState(() => {
@@ -274,11 +275,18 @@ export default function ProblemDetail() {
     }
   }, [terminalLogs]);
 
-  const activeCode = codeByLang[language] ?? '';
+  const activeCode = (codeByLang[language] !== undefined && codeByLang[language] !== '')
+    ? codeByLang[language]
+    : (defaultTemplates[language] || '');
 
   const handleCodeChange = (val) => {
     const text = val || '';
     setCodeByLang((prev) => ({ ...prev, [language]: text }));
+  };
+
+  const handleResetCode = () => {
+    const template = defaultTemplates[language] || '';
+    setCodeByLang((prev) => ({ ...prev, [language]: template }));
   };
 
   const triggerSandboxRun = async () => {
@@ -287,6 +295,7 @@ export default function ProblemDetail() {
     setActiveTestTab(0);
     setConsoleTab('result');
     setConsoleOpen(true);
+    setMobileTab('console');
     try {
       const res = await API.post(`/problems/${problem._id}/run`, {
         language,
@@ -315,6 +324,7 @@ export default function ProblemDetail() {
     setTerminalLogs(null);
     setConsoleTab('result');
     setConsoleOpen(true);
+    setMobileTab('console');
     try {
       const res = await API.post('/submissions', {
         problemId: problem._id,
@@ -422,10 +432,65 @@ export default function ProblemDetail() {
         isDragging ? 'cursor-col-resize select-none' : isDraggingConsole ? 'cursor-row-resize select-none' : ''
       }`}
     >
+      {/* ─── Mobile Navigation Tabs (< 1024px) ─── */}
+      <div className="lg:hidden flex items-center justify-between border-b border-border/30 bg-bg px-2 py-1.5 shrink-0 z-30 select-none">
+        <div className="flex items-center gap-1 flex-1">
+          <button
+            type="button"
+            onClick={() => setMobileTab('description')}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors ${
+              mobileTab === 'description'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Description
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('code')}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors ${
+              mobileTab === 'code'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            Code Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileTab('console');
+              setConsoleOpen(true);
+            }}
+            className={`flex-1 py-1.5 px-2 text-xs font-medium rounded text-center transition-colors flex items-center justify-center gap-1.5 ${
+              mobileTab === 'console'
+                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            <span>Console</span>
+            {terminalLogs && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  terminalLogs.mode === 'error'
+                    ? 'bg-rose-500'
+                    : terminalLogs.data?.overallStatus?.toLowerCase() === 'accepted' || terminalLogs.data?.status?.toLowerCase() === 'accepted'
+                    ? 'bg-emerald-400'
+                    : 'bg-amber-400'
+                }`}
+              />
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* ─── LEFT PANEL: Problem Workspace & Submissions ─── */}
       <div
         style={{ width: isDesktop ? `${splitPercent}%` : '100%' }}
-        className="w-full flex flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/30 bg-bg shrink-0"
+        className={`w-full flex-col overflow-y-auto border-b lg:border-b-0 lg:border-r border-border/30 bg-bg shrink-0 pb-16 lg:pb-0 ${
+          isDesktop ? 'flex' : mobileTab === 'description' ? 'flex flex-1 min-h-0' : 'hidden'
+        }`}
       >
         {/* Left Panel Tabs Toolbar (LeetCode Style: Description, Submissions, Discussion) */}
         <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30 bg-bg shrink-0 text-xs select-none">
@@ -1019,9 +1084,9 @@ export default function ProblemDetail() {
       {/* ─── RIGHT PANEL: Editor & Terminal ─── */}
       <div
         style={{ width: isDesktop ? `calc(100% - ${splitPercent}% - 0.625rem)` : '100%' }}
-        className={`w-full flex flex-col h-full bg-bg relative flex-1 min-w-0 ${
+        className={`w-full flex-col h-full bg-bg relative flex-1 min-w-0 pb-14 lg:pb-0 ${
           isDragging || isDraggingConsole ? 'pointer-events-none select-none' : ''
-        }`}
+        } ${isDesktop ? 'flex' : mobileTab !== 'description' ? 'flex' : 'hidden'}`}
       >
         {/* Editor Top Toolbar */}
         <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/30 bg-bg shrink-0">
@@ -1042,8 +1107,18 @@ export default function ProblemDetail() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleResetCode}
+              className="p-1 rounded text-text-muted hover:text-text transition-colors flex items-center gap-1 text-xs cursor-pointer"
+              title="Reset code to standard template"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline text-[11px]">Reset</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleCopyCode}
-              className="p-1 rounded text-text-muted hover:text-text transition-colors"
+              className="p-1 rounded text-text-muted hover:text-text transition-colors cursor-pointer"
               title="Copy code"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
@@ -1052,16 +1127,28 @@ export default function ProblemDetail() {
         </div>
 
         {/* Monaco Code Editor */}
-        <div className="flex-1 min-h-[140px] bg-[#1e1e1e]">
+        <div className={`min-h-[140px] bg-[#1e1e1e] ${!isDesktop && mobileTab === 'console' ? 'hidden' : 'flex-1'}`}>
           <Editor
             height="100%"
             theme="vs-dark"
             language={LANGUAGES.find((l) => l.id === language)?.monaco || 'cpp'}
             value={activeCode}
             onChange={handleCodeChange}
+            onMount={(editor, monaco) => {
+              if (typeof document !== 'undefined' && document.fonts) {
+                document.fonts.ready.then(() => {
+                  monaco.editor.remeasureFonts();
+                });
+              }
+            }}
             options={{
               fontSize: 13,
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: `'JetBrains Mono', Menlo, Monaco, Consolas, 'Courier New', monospace`,
+              letterSpacing: 0,
+              fontLigatures: false,
+              cursorStyle: 'line',
+              cursorWidth: 2,
+              cursorBlinking: 'smooth',
               minimap: { enabled: false },
               scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
               padding: { top: 10 },
@@ -1092,10 +1179,10 @@ export default function ProblemDetail() {
         )}
 
         {/* ─── Drawer Content (Completely hidden when consoleOpen is false) ─── */}
-        {consoleOpen && (
+        {consoleOpen && (isDesktop || mobileTab === 'console') && (
           <div
-            style={{ height: `${consoleHeight}px` }}
-            className="flex flex-col shrink-0 bg-bg overflow-hidden select-text"
+            style={{ height: (!isDesktop && mobileTab === 'console') ? '100%' : `${consoleHeight}px` }}
+            className={`flex flex-col bg-bg overflow-hidden select-text ${!isDesktop && mobileTab === 'console' ? 'flex-1' : 'shrink-0'}`}
           >
             <div
               ref={terminalRef}
@@ -1262,6 +1349,15 @@ export default function ProblemDetail() {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {(terminalLogs.data.results[activeTestTab].compile_output || terminalLogs.data.results[activeTestTab].stderr) && (
+                                    <div className="space-y-1 pt-1">
+                                      <span className="text-[11px] text-amber-400 font-sans font-medium">Compiler / Diagnostic Output =</span>
+                                      <pre className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-2.5 rounded-lg font-mono text-xs whitespace-pre-wrap select-text leading-relaxed">
+                                        {terminalLogs.data.results[activeTestTab].compile_output || terminalLogs.data.results[activeTestTab].stderr}
+                                      </pre>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1420,7 +1516,7 @@ export default function ProblemDetail() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             <button
               type="button"
               onClick={triggerSandboxRun}
@@ -1441,6 +1537,65 @@ export default function ProblemDetail() {
               <span>Submit</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ─── Persistent Mobile Bottom Action Bar (< 1024px) ─── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border/50 px-3 py-2 flex items-center justify-between shadow-2xl">
+        <div className="flex items-center gap-2">
+          {/* Language selector */}
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="bg-surface-raised border border-border/50 rounded px-2 py-1 text-xs font-mono text-text outline-none cursor-pointer"
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.id} value={lang.id} className="bg-[#121212] text-white">
+                {lang.label.split(' ')[0]}
+              </option>
+            ))}
+          </select>
+
+          {/* Quick tab switch between Editor & Console */}
+          <button
+            type="button"
+            onClick={() => {
+              if (mobileTab === 'code') {
+                setMobileTab('console');
+                setConsoleOpen(true);
+              } else {
+                setMobileTab('code');
+              }
+            }}
+            className="px-2 py-1 rounded text-xs text-text-muted hover:text-text bg-surface-raised/40 border border-border/40 font-mono flex items-center gap-1 cursor-pointer"
+          >
+            <Terminal className="h-3 w-3 text-accent" />
+            <span>{mobileTab === 'code' ? 'Console' : 'Editor'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile Run Button */}
+          <button
+            type="button"
+            onClick={triggerSandboxRun}
+            disabled={running || submitting}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text transition-colors border border-border/50 disabled:opacity-50 active:scale-95 cursor-pointer"
+          >
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" /> : <Play className="h-3.5 w-3.5 text-accent fill-accent/20" />}
+            <span>Run</span>
+          </button>
+
+          {/* Mobile Submit Button */}
+          <button
+            type="button"
+            onClick={triggerProductionTransmit}
+            disabled={running || submitting}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white transition-all shadow-sm disabled:opacity-50 active:scale-95 cursor-pointer"
+          >
+            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            <span>Submit</span>
+          </button>
         </div>
       </div>
     </div>

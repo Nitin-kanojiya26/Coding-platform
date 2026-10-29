@@ -43,7 +43,7 @@ exports.registerUser = async (req, res) => {
         try {
             await sendOTPEmail(email, generatedOtp, 'Codexium - Verify Your Email Account');
         } catch (emailError) {
-            console.error(`⚠️ [EmailService] Could not send email to ${email}:`, emailError.message);
+            console.error(`[EmailService] Could not send email to ${email}:`, emailError.message);
         }
 
         res.status(200).json({

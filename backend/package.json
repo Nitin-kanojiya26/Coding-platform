@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "worker:build": "node src/workers/buildWorker.js",
     "seed-build-problems": "node scripts/seed-build-problems.js",
     "verify-build-problems": "node scripts/verify-build-problems.js",
     "verify-safety": "node ../scripts/verify-safety-checks.js"

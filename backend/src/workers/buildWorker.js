@@ -29,9 +29,18 @@ function isDockerOfflineError(str) {
 // Helper to spawn a command with args array (NEVER shell string)
 function spawnCommand(cmd, args, options = {}) {
   return new Promise((resolve) => {
+    const timeout = options.timeout || 0;
     const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options });
     let stdout = '';
     let stderr = '';
+    let timer = null;
+
+    if (timeout > 0) {
+      timer = setTimeout(() => {
+        try { proc.kill(); } catch (_) {}
+        resolve({ code: -1, stdout, stderr, error: new Error('Command timed out') });
+      }, timeout);
+    }
 
     proc.stdout.on('data', (chunk) => {
       if (stdout.length < 64 * 1024) {
@@ -52,10 +61,12 @@ function spawnCommand(cmd, args, options = {}) {
     });
 
     proc.on('close', (code) => {
+      if (timer) clearTimeout(timer);
       resolve({ code, stdout, stderr, killed: proc.killed });
     });
 
     proc.on('error', (err) => {
+      if (timer) clearTimeout(timer);
       resolve({ code: -1, stdout, stderr, error: err });
     });
   });
@@ -532,34 +543,85 @@ async function processBuildSubmissionDirectly(submissionId) {
   return evalResult;
 }
 
-// Build Mode Worker
-const buildWorker = new Worker(
-  'api-judge',
-  async (job) => {
-    return await processBuildSubmissionDirectly(job.data.submissionId);
-  },
-  {
-    connection: bullmqConnection.duplicate(),
-    concurrency: BM_CONCURRENCY,
-  }
-);
+// Build Mode Worker Configuration
+const isStandalone = require.main === module;
+const isWorkerDisabled = !isStandalone && (process.env.ENABLE_BUILD_WORKER === 'false' || process.env.ENABLE_BUILD_WORKER === '0');
 
-buildWorker.on('completed', (job) => {
-  console.log(`🎉 [BuildWorker] Job ${job.id} completed successfully.`);
-});
+let buildWorker = null;
 
-buildWorker.on('failed', (job, err) => {
-  console.error(`❌ [BuildWorker] Job ${job?.id} failed:`, err.message);
-});
+if (!isWorkerDisabled) {
+  buildWorker = new Worker(
+    'api-judge',
+    async (job) => {
+      if (job.name === 'evaluate-run') {
+        console.log(`⚡ [BuildWorker] Processing remote Run Code request for problem: ${job.data?.problem?.slug || 'unknown'}`);
+        return await executeDockerFlow(job.data.submission, job.data.problem, { isRun: true });
+      }
+      return await processBuildSubmissionDirectly(job.data.submissionId);
+    },
+    {
+      connection: bullmqConnection.duplicate(),
+      concurrency: BM_CONCURRENCY,
+    }
+  );
 
-buildWorker.on('error', (err) => {
-  if (isBullMQAvailable()) {
-    console.error('⚠️ [BuildWorker] Worker connection error:', err.message);
-  }
-});
+  buildWorker.on('completed', (job) => {
+    console.log(`🎉 [BuildWorker] Job ${job.id} (${job.name}) completed successfully.`);
+  });
 
-// Run cleanup immediately on worker load
-performStartupCleanup();
+  buildWorker.on('failed', (job, err) => {
+    console.error(`❌ [BuildWorker] Job ${job?.id} (${job?.name}) failed:`, err.message);
+  });
+
+  buildWorker.on('error', (err) => {
+    if (isBullMQAvailable()) {
+      console.error('⚠️ [BuildWorker] Worker connection error:', err.message);
+    }
+  });
+
+  // Run cleanup immediately on worker load
+  performStartupCleanup();
+} else {
+  console.log('ℹ️ [BuildWorker] Build worker disabled via ENABLE_BUILD_WORKER=false (Cloud Gateway / Producer mode).');
+}
+
+// Standalone runner execution (e.g. npm run worker:build)
+if (isStandalone) {
+  require('dotenv').config();
+  const connectDB = require('../config/db');
+
+  console.log('🚀 [BuildWorker] Starting standalone Build Mode runner...');
+  connectDB().then(async () => {
+    const health = await module.exports.checkDockerHealth();
+    if (health.ok) {
+      console.log(`🐳 [BuildWorker] Docker daemon connected (v${health.version}).`);
+      console.log('⚡ [BuildWorker] Connected to MongoDB and waiting for jobs on Redis queue [api-judge]...');
+    } else {
+      console.warn(`⚠️ [BuildWorker] WARNING: Docker daemon is not running (${health.error}). Submissions will fail until Docker Desktop is started.`);
+    }
+  }).catch((err) => {
+    console.error('❌ [BuildWorker] Failed to connect to database:', err.message);
+    process.exit(1);
+  });
+
+  const shutdown = async (sig) => {
+    console.log(`\n🛑 [BuildWorker] Received ${sig}. Shutting down worker...`);
+    if (buildWorker) {
+      try {
+        await buildWorker.close();
+      } catch (_) {}
+    }
+    const mongoose = require('mongoose');
+    try {
+      await mongoose.connection.close(false);
+    } catch (_) {}
+    console.log('👋 [BuildWorker] Worker stopped cleanly.');
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
 
 module.exports = {
   buildWorker,
@@ -569,7 +631,7 @@ module.exports = {
   isDockerOfflineError,
   checkDockerHealth: async () => {
     try {
-      const res = await spawnCommand('docker', ['version', '--format', '{{.Server.Version}}']);
+      const res = await spawnCommand('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 3000 });
       if (res.code === 0 && res.stdout.trim()) {
         return { ok: true, version: res.stdout.trim() };
       }

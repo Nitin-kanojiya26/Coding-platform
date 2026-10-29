@@ -40,9 +40,9 @@ try {
   });
   const { initializeSocket } = require('./sockets/contestSocket');
   initializeSocket(io);
-  console.log('⚡ [Socket.IO] Real-time engine initialized.');
+  console.log('[Socket.IO] Real-time engine initialized.');
 } catch (err) {
-  console.warn('⚠️ [Socket.IO] Real-time engine failed to initialize:', err.message);
+  console.warn('[Socket.IO] Real-time engine failed to initialize:', err.message);
 }
 
 const { queryLocalStorage } = require('./config/db');
@@ -144,7 +144,7 @@ const gracefulShutdown = async (signal) => {
       const mongoose = require('mongoose');
       await mongoose.connection.close(false);
       console.log('🍃 [MongoDB] Connection closed cleanly.');
-    } catch (_) {}
+    } catch (_) { }
     process.exit(0);
   });
 
@@ -167,7 +167,18 @@ if (require.main === module) {
     });
 
     server.listen(PORT, () => {
-      console.log(`🚀 Server spinning up on port ${PORT} [Host-Ready]`);
+      console.log(`[Server] Listening on port ${PORT} [Host-Ready]`);
+      const judge0Service = require('./services/judge0Service');
+      judge0Service.checkHealth().then((health) => {
+        if (health.ok) {
+          console.log(`[ExecutionEngine] Local Judge0: ONLINE (${process.env.JUDGE0_API_URL || 'http://localhost:2358'}) [Active: Primary Engine]`);
+        } else {
+          const hasOnlineKey = Boolean(process.env.ONLINECOMPILER_API_KEY);
+          console.log(
+            `[ExecutionEngine] Local Judge0: OFFLINE (${hasOnlineKey ? 'Active: OnlineCompiler.io Cloud API Fallback' : 'No Fallback: Please set ONLINECOMPILER_API_KEY in .env'})`
+          );
+        }
+      }).catch(() => {});
     });
   });
 }

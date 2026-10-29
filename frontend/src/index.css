@@ -148,4 +148,16 @@ html:not(.dark) {
 
 .animate-build-indeterminate {
   animation: build-indeterminate 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
+}
+
+/* ─── Monaco Editor Monospace Precision & Cursor Alignment Fix ─ */
+.monaco-editor,
+.monaco-editor .view-lines,
+.monaco-editor .view-line,
+.monaco-editor span,
+.monaco-editor textarea {
+  font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+  letter-spacing: 0 !important;
+  font-feature-settings: 'liga' 0, 'calt' 0 !important;
+  font-variant-ligatures: none !important;
+}
