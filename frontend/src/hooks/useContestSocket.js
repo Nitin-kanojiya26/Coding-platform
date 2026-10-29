@@ -25,6 +25,8 @@ export function useContestSocket(contestId) {
       socketHost = window.location.origin;
     }
 
+    const token = localStorage.getItem('token') || '';
+
     const socket = io(socketHost, {
       auth: { token },
       transports: ['websocket', 'polling'],
