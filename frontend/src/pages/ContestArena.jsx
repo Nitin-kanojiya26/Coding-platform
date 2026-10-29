@@ -183,6 +183,16 @@ export default function ContestArena() {
         setSolvedProblemIds(solvedSet);
       }
 
+      const isPart = contestRes.data?.isParticipant;
+      const isAdmin = user?.role === 'admin';
+      const isCreator = user && (cData?.createdBy === user?.id || cData?.createdBy?._id === user?.id);
+
+      if (cData?.status === 'running' && !isPart && !isAdmin && !isCreator && !cData?.allowLateJoin) {
+        toast.error('Registration has closed for this live contest. You can enter and practice once it ends.', { id: 'reg-closed' });
+        navigate(`/contests/${id}`);
+        return;
+      }
+
       if (cData?.status === 'ended') {
         setIsEnded(true);
       }

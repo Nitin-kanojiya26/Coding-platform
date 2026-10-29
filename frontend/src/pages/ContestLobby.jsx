@@ -259,15 +259,26 @@ export default function ContestLobby() {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success"></span>
               </span>
               <span className="font-semibold text-success">Contest is live!</span>
-              <span className="text-text-muted">Challenges are unlocked.</span>
+              <span className="text-text-muted">
+                {isRegistered || user?.role === 'admin' || contest.createdBy === user?.id || contest.createdBy?._id === user?.id || contest.allowLateJoin
+                  ? 'Challenges are unlocked.'
+                  : 'Registration has closed. You can view problems and practice once the contest ends.'}
+              </span>
             </div>
 
-            <Link
-              to={`/contests/${contest._id}/arena`}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white font-semibold text-xs transition-colors self-start sm:self-center shadow-xs"
-            >
-              Enter Contest <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            {isRegistered || user?.role === 'admin' || contest.createdBy === user?.id || contest.createdBy?._id === user?.id || contest.allowLateJoin ? (
+              <Link
+                to={`/contests/${contest._id}/arena`}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white font-semibold text-xs transition-colors self-start sm:self-center shadow-xs"
+              >
+                Enter Contest <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-raised border border-border text-text-muted text-xs font-medium">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Entry opens when contest ends</span>
+              </div>
+            )}
           </div>
         ) : isEnded ? (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-2 text-xs">

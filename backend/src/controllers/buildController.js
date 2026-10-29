@@ -245,7 +245,8 @@ const submitBuildSolution = async (req, res) => {
           userId: req.user._id,
         });
         if (!isParticipant) {
-          if (validatedContest.kind === 'public' || validatedContest.createdBy?.toString() === req.user._id.toString() || req.user.role === 'admin') {
+          const isPrivileged = validatedContest.createdBy?.toString() === req.user._id.toString() || req.user.role === 'admin';
+          if (isPrivileged || validatedContest.allowLateJoin) {
             try {
               await ContestParticipant.create({
                 contestId: validatedContest._id,
@@ -255,7 +256,7 @@ const submitBuildSolution = async (req, res) => {
             } catch (_) {}
           } else {
             return res.status(403).json({
-              message: 'You are not a registered participant in this contest.',
+              message: 'Registration has closed for this live contest. You can submit solutions once the contest ends.',
             });
           }
         }

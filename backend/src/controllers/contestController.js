@@ -305,7 +305,7 @@ exports.createContest = async (req, res) => {
       ? limits.defaultMaxParticipantsDSA
       : limits.defaultMaxParticipantsAPI;
 
-    const resolvedAllowLateJoin = allowLateJoin !== undefined ? Boolean(allowLateJoin) : kind === 'public';
+    const resolvedAllowLateJoin = allowLateJoin !== undefined ? Boolean(allowLateJoin) : false;
     const resolvedPenalty = penaltyMinutes !== undefined ? Math.max(0, parseInt(penaltyMinutes, 10)) : limits.defaultPenaltyMinutes;
 
     // 10. Generate unique joinCode for private contests
@@ -696,8 +696,11 @@ exports.getContestProblems = async (req, res) => {
     }
 
     if (!isParticipant && !isAdmin && !isCreator) {
-      if (status === 'running' && contest.kind === 'public') {
-        // Auto-join public live contest so user can immediately view challenges and compete
+      if (status === 'ended') {
+        // Anyone can view problems and practice after contest ends
+        isParticipant = true;
+      } else if (status === 'running' && contest.allowLateJoin) {
+        // Only auto-join if contest explicitly has allowLateJoin enabled
         try {
           await ContestParticipant.create({
             contestId: contest._id,
@@ -709,11 +712,13 @@ exports.getContestProblems = async (req, res) => {
         } catch (_) {
           isParticipant = true;
         }
-      } else if (status === 'ended') {
-        // Anyone can view problems and practice after contest ends
-        isParticipant = true;
       } else {
-        return res.status(403).json({ message: 'Only contest participants can access contest problems.' });
+        return res.status(403).json({
+          message:
+            status === 'running'
+              ? 'Registration has closed for this live contest. You can view problems and practice once the contest concludes.'
+              : 'Only registered participants can access contest problems.',
+        });
       }
     }
 
@@ -837,7 +842,7 @@ exports.joinContest = async (req, res) => {
     }
 
     if (['running', 'active'].includes(status) && !contest.allowLateJoin) {
-      return res.status(400).json({ message: 'Late joins are not allowed for this contest.' });
+      return res.status(400).json({ message: 'Registration has closed for this live contest. You can view problems and practice once it ends.' });
     }
 
     // If private contest, require join-by-code unless admin or creator
@@ -924,7 +929,7 @@ exports.joinContestByCode = async (req, res) => {
     }
 
     if (['running', 'active'].includes(status) && !contest.allowLateJoin) {
-      return res.status(400).json({ message: 'Late joins are not allowed for this contest.' });
+      return res.status(400).json({ message: 'Registration has closed for this live contest. You can view problems and practice once it ends.' });
     }
 
     // Check if user already joined

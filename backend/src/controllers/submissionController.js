@@ -101,7 +101,8 @@ exports.createSubmission = async (req, res) => {
           userId: req.user._id,
         });
         if (!isParticipant) {
-          if (validatedContest.kind === 'public' || validatedContest.creatorId?.toString() === req.user._id.toString() || req.user.role === 'admin') {
+          const isPrivileged = validatedContest.creatorId?.toString() === req.user._id.toString() || req.user.role === 'admin';
+          if (isPrivileged || validatedContest.allowLateJoin) {
             isParticipant = await ContestParticipant.create({
               contestId: validatedContest._id,
               userId: req.user._id,
@@ -109,7 +110,7 @@ exports.createSubmission = async (req, res) => {
             await Contest.findByIdAndUpdate(validatedContest._id, { $inc: { participantsCount: 1 } });
           } else {
             return res.status(403).json({
-              message: 'You are not a registered participant in this contest.',
+              message: 'Registration has closed for this live contest. You can submit solutions once the contest ends.',
             });
           }
         }

@@ -496,12 +496,21 @@ export default function Contests() {
                     {/* Action Button */}
                     <td className="py-3 px-3 text-right pr-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {isRunning ? (
-                        <Link
-                          to={`/contests/${contest._id}/arena`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white font-medium text-xs transition-colors shadow-xs"
-                        >
-                          Enter <ArrowRight className="w-3 h-3" />
-                        </Link>
+                        isRegistered || contest.allowLateJoin || user?.role === 'admin' ? (
+                          <Link
+                            to={`/contests/${contest._id}/arena`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#2cbb5d] hover:bg-[#2cbb5d]/90 text-white font-medium text-xs transition-colors shadow-xs"
+                          >
+                            Enter <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        ) : (
+                          <Link
+                            to={`/contests/${contest._id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-surface-raised border border-border text-text-muted text-xs hover:border-border/80 transition-colors"
+                          >
+                            <Lock className="w-2.5 h-2.5 text-amber-400" /> Lobby
+                          </Link>
+                        )
                       ) : isScheduled ? (
                         isRegistered ? (
                           <Link
