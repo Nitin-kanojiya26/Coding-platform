@@ -63,7 +63,7 @@ export default function Contests() {
     startTime: '',
     durationMinutes: 90,
     maxParticipants: 50,
-    allowLateJoin: true,
+    allowLateJoin: false,
     easyCount: 1,
     mediumCount: 2,
     hardCount: 1,
@@ -689,6 +689,22 @@ export default function Contests() {
                   </select>
                 </div>
               )}
+
+              {/* Late Join Policy */}
+              <div className="flex items-center justify-between p-2.5 rounded bg-surface-raised/40 border border-border/40">
+                <div className="pr-4">
+                  <span className="text-[11px] font-medium text-text block">Allow Late Join</span>
+                  <span className="text-[10px] text-text-muted">
+                    If unchecked (default), only users who registered before the contest started can enter and submit while live.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={createForm.allowLateJoin}
+                  onChange={(e) => setCreateForm({ ...createForm, allowLateJoin: e.target.checked })}
+                  className="h-4 w-4 rounded accent-accent cursor-pointer"
+                />
+              </div>
 
               {/* Timing Options: Start Now vs Schedule for Later */}
               <div className="p-3 rounded bg-surface-raised/40 border border-border/40 space-y-2.5">
