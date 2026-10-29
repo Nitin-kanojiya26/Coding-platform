@@ -37,6 +37,7 @@ function isJudge0OfflineError(err) {
     code === 'ENOTFOUND' ||
     code === 'ECONNABORTED' ||
     code === 'EHOSTUNREACH' ||
+    status === 404 ||
     status === 502 ||
     status === 503 ||
     status === 504 ||
@@ -68,11 +69,10 @@ const ONLINE_COMPILER_MAP = {
 };
 
 /**
- * Fallback execution via OnlineCompiler.io REST API
+ * Fallback execution via OnlineCompiler.io Judge0-compatible REST API
  * Used automatically whenever local Judge0 is offline or unreachable.
  */
 async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 2000) {
-  const compiler = ONLINE_COMPILER_MAP[Number(languageId)] || 'g++-15';
   const apiKey = (process.env.ONLINECOMPILER_API_KEY || '').trim();
 
   if (!apiKey) {
@@ -86,18 +86,29 @@ async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 20
   let maxRuntime = 0;
   let maxMemory = 0;
 
+  const statusPriority = {
+    compilation_error: 5,
+    runtime_error: 4,
+    time_limit_exceeded: 3,
+    wrong_answer: 2,
+    accepted: 1,
+  };
+  let overallStatus = 'accepted';
+
   for (const tc of testCases) {
     try {
       const res = await axios.post(
-        'https://api.onlinecompiler.io/api/run-code-sync/',
+        'https://api.onlinecompiler.io/api/judge0/submissions?wait=true',
         {
-          compiler,
-          code,
-          input: tc.input || '',
-          time_limit: Math.min(Math.max(Math.round(timeLimit / 1000), 1), 15),
+          language_id: Number(languageId),
+          source_code: code,
+          stdin: tc.input || '',
+          expected_output: tc.output || '',
+          cpu_time_limit: Math.min(Math.max(Math.round(timeLimit / 1000), 1), 15),
         },
         {
           headers: {
+            'X-Auth-Token': apiKey,
             Authorization: apiKey,
             'Content-Type': 'application/json',
           },
@@ -106,11 +117,10 @@ async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 20
       );
 
       const data = res.data || {};
-      const stdout = (data.output || '').trim();
-      const expectedOutput = (tc.output || '').trim();
-      const stderr = (data.error || '').trim();
-      const exitCode = data.exit_code ?? 0;
-      const isSuccess = data.status === 'success' && exitCode === 0;
+      const statusId = data.status?.id;
+      const stdout = (data.stdout || '').trim();
+      const stderr = (data.stderr || '').trim();
+      const compileOutput = (data.compile_output || '').trim();
 
       const runtimeSec = parseFloat(data.time) || 0;
       const runtimeMs = Math.round(runtimeSec * 1000);
@@ -120,38 +130,50 @@ async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 20
       maxRuntime = Math.max(maxRuntime, runtimeMs);
       maxMemory = Math.max(maxMemory, memoryMB);
 
-      let status = 'wrong_answer';
-      if (data.status === 'timeout' || data.signal === 'SIGXCPU') {
-        status = 'time_limit_exceeded';
-      } else if (!isSuccess || exitCode !== 0) {
-        if (
-          stderr.toLowerCase().includes('error:') ||
-          stderr.toLowerCase().includes('compilat') ||
-          stderr.toLowerCase().includes('syntaxerror')
-        ) {
-          status = 'compilation_error';
-        } else {
-          status = 'runtime_error';
-        }
-      } else if (stdout === expectedOutput) {
-        status = 'accepted';
-        passed++;
-      } else {
-        status = 'wrong_answer';
+      let verdict = 'runtime_error';
+      switch (statusId) {
+        case 3:
+          verdict = 'accepted';
+          passed++;
+          break;
+        case 4:
+          verdict = 'wrong_answer';
+          break;
+        case 5:
+          verdict = 'time_limit_exceeded';
+          break;
+        case 6:
+          verdict = 'compilation_error';
+          break;
+        default:
+          verdict = 'runtime_error';
+          break;
       }
 
+      if (statusPriority[verdict] > statusPriority[overallStatus]) {
+        overallStatus = verdict;
+      }
+
+      const errorDetails = compileOutput || stderr || '';
+
       detailed.push({
-        status,
+        status: verdict,
         runtime: runtimeMs,
         memory: memoryMB,
         input: tc.input,
         expectedOutput: tc.output,
         actualOutput: stdout,
-        stderr,
-        compile_output: status === 'compilation_error' ? stderr : '',
+        stderr: errorDetails,
+        compile_output: compileOutput,
       });
+
+      // If compilation error, skip remaining test cases
+      if (verdict === 'compilation_error') {
+        break;
+      }
     } catch (apiErr) {
       console.error('[OnlineCompiler] API error on testcase:', apiErr.response?.data || apiErr.message);
+      const errMsg = apiErr.response?.data?.message || apiErr.response?.data?.error || apiErr.message;
       detailed.push({
         status: 'runtime_error',
         runtime: 0,
@@ -159,24 +181,32 @@ async function runWithOnlineCompiler(code, languageId, testCases, timeLimit = 20
         input: tc.input,
         expectedOutput: tc.output,
         actualOutput: '',
-        stderr: apiErr.response?.data?.error || apiErr.message,
+        stderr: errMsg,
         compile_output: '',
       });
+      overallStatus = 'runtime_error';
     }
   }
 
-  const overallStatus =
-    passed === testCases.length
-      ? 'accepted'
-      : detailed.find((d) => d.status === 'compilation_error')
-      ? 'compilation_error'
-      : detailed.find((d) => d.status === 'runtime_error')
-      ? 'runtime_error'
-      : detailed.find((d) => d.status === 'time_limit_exceeded')
-      ? 'time_limit_exceeded'
-      : 'wrong_answer';
+  // If compilation error occurred early, populate remaining test cases
+  while (detailed.length < testCases.length) {
+    const tc = testCases[detailed.length];
+    const firstError = detailed.find((d) => d.compile_output) || detailed[0];
+    detailed.push({
+      status: 'compilation_error',
+      runtime: 0,
+      memory: 0,
+      input: tc.input,
+      expectedOutput: tc.output,
+      actualOutput: '',
+      stderr: firstError?.stderr || '',
+      compile_output: firstError?.compile_output || '',
+    });
+  }
 
-  console.log(`[ExecutionEngine] OnlineCompiler.io evaluated ${testCases.length} testcase(s) (Overall: ${overallStatus.toUpperCase()}, Passed: ${passed}/${testCases.length}).`);
+  console.log(
+    `[ExecutionEngine] OnlineCompiler.io evaluated ${testCases.length} testcase(s) (Overall: ${overallStatus.toUpperCase()}, Passed: ${passed}/${testCases.length}).`
+  );
 
   return {
     status: overallStatus,
@@ -365,6 +395,7 @@ const aggregateResults = (judgeResults, originalTestCases) => {
 };
 
 exports.runTestCasesDetailed = exports.runAllTestCases;
+exports.runWithOnlineCompiler = runWithOnlineCompiler;
 exports.ExecutionUnavailableError = ExecutionUnavailableError;
 exports.isJudge0OfflineError = isJudge0OfflineError;
 
