@@ -32,3 +32,4 @@ seedAll().catch((err) => {
   console.error('\n❌ Master seeding error:', err.message);
   process.exit(1);
 });
+
