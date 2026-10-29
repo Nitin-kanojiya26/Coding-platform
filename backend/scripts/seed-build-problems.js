@@ -236,11 +236,252 @@ app.listen(PORT, '0.0.0.0', () => {
       totalTimeoutMs: 20000,
     },
   },
+  {
+    slug: 'url-shortener-api',
+    title: 'URL Shortener API',
+    difficulty: 'Medium',
+    statement: `### Problem Description
+Build an in-memory URL Shortener REST API with Express listening on \`0.0.0.0:3000\`.
+
+#### Requirements:
+1. \`POST /shorten\` - Create short URL:
+   - Body: \`{ "url": string }\`
+   - If \`url\` is missing or empty, returns \`400 Bad Request\`.
+   - Generates a unique string \`code\` (e.g. \`"lnk1"\`, \`"lnk2"\` or random alphanumeric).
+   - Saves mapping in memory.
+   - Returns \`201 Created\` with \`{ "code": string, "url": string, "clicks": 0 }\`.
+2. \`GET /:code\` - Resolve & track URL:
+   - Increments \`clicks\` count by 1.
+   - Returns \`200 OK\` with \`{ "url": string, "clicks": number }\`.
+   - If \`code\` does not exist, returns \`404 Not Found\`.
+3. \`GET /analytics/:code\` - View stats:
+   - Returns \`200 OK\` with \`{ "code": string, "url": string, "clicks": number }\`.
+   - If \`code\` does not exist, returns \`404 Not Found\`.`,
+    runtime: 'node-express',
+    starterFiles: [
+      {
+        path: 'server.js',
+        content: `const express = require('express');
+const app = express();
+
+app.use(express.json());
+
+// In-memory store
+const urlStore = new Map();
+let counter = 1;
+
+// TODO: Implement /shorten, /:code, and /analytics/:code
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(\`URL Shortener listening on 0.0.0.0:\${PORT}\`);
+});
+`,
+      },
+    ],
+    visibleTests: [
+      {
+        name: 'shorten new url',
+        request: {
+          method: 'POST',
+          path: '/shorten',
+          body: { url: 'https://example.com/welcome' },
+        },
+        expect: {
+          status: 201,
+          bodyContains: { url: 'https://example.com/welcome' },
+          bodyHasKeys: ['code', 'url', 'clicks'],
+        },
+        save: { shortCode: 'code' },
+      },
+      {
+        name: 'resolve short code',
+        request: {
+          method: 'GET',
+          path: '/{{shortCode}}',
+        },
+        expect: {
+          status: 200,
+          bodyContains: { url: 'https://example.com/welcome' },
+        },
+      },
+      {
+        name: 'get click analytics',
+        request: {
+          method: 'GET',
+          path: '/analytics/{{shortCode}}',
+        },
+        expect: {
+          status: 200,
+          bodyContains: { clicks: 1 },
+        },
+      },
+    ],
+    hiddenTests: [
+      {
+        name: '400 missing url',
+        request: {
+          method: 'POST',
+          path: '/shorten',
+          body: {},
+        },
+        expect: {
+          status: 400,
+        },
+      },
+      {
+        name: '404 unknown code',
+        request: {
+          method: 'GET',
+          path: '/nonexistent404',
+        },
+        expect: {
+          status: 404,
+        },
+      },
+      {
+        name: '404 analytics for unknown code',
+        request: {
+          method: 'GET',
+          path: '/analytics/nonexistent404',
+        },
+        expect: {
+          status: 404,
+        },
+      },
+    ],
+    limits: {
+      startTimeoutMs: 3000,
+      totalTimeoutMs: 20000,
+    },
+  },
+  {
+    slug: 'notes-api',
+    title: 'Notes REST API with Search',
+    difficulty: 'Medium',
+    statement: `### Problem Description
+Build an in-memory Notes Management REST API with Express listening on \`0.0.0.0:3000\`.
+
+#### Requirements:
+1. \`POST /notes\` - Create Note:
+   - Body: \`{ "title": string, "content": string, "tag"?: string }\`
+   - If \`title\` or \`content\` is missing, returns \`400 Bad Request\`.
+   - Default \`tag\` to \`"general"\` if not provided.
+   - Assigns an integer \`id\`.
+   - Returns \`201 Created\` with \`{ "id": number, "title": string, "content": string, "tag": string }\`.
+2. \`GET /notes\` - List Notes:
+   - Optional query parameter \`tag\`: If provided (e.g. \`GET /notes?tag=work\`), returns only notes matching that tag.
+   - Returns \`200 OK\` with array of note objects.
+3. \`GET /notes/search\` - Search Notes:
+   - Query parameter \`q\` (e.g. \`GET /notes/search?q=roadmap\`): Case-insensitive match in \`title\` or \`content\`.
+   - Returns \`200 OK\` with array of matching notes.
+4. \`DELETE /notes/:id\` - Delete Note:
+   - Deletes note by \`id\`. Returns \`200 OK\`.
+   - If \`id\` is not found, returns \`404 Not Found\`.`,
+    runtime: 'node-express',
+    starterFiles: [
+      {
+        path: 'server.js',
+        content: `const express = require('express');
+const app = express();
+
+app.use(express.json());
+
+// In-memory notes state
+let notes = [];
+let nextId = 1;
+
+// TODO: Implement Notes endpoints
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(\`Notes API listening on 0.0.0.0:\${PORT}\`);
+});
+`,
+      },
+    ],
+    visibleTests: [
+      {
+        name: 'create note',
+        request: {
+          method: 'POST',
+          path: '/notes',
+          body: { title: 'Team Meeting', content: 'Discuss sprint roadmap', tag: 'work' },
+        },
+        expect: {
+          status: 201,
+          bodyContains: { title: 'Team Meeting', tag: 'work' },
+          bodyHasKeys: ['id', 'title', 'content', 'tag'],
+        },
+        save: { noteId: 'id' },
+      },
+      {
+        name: 'filter notes by tag',
+        request: {
+          method: 'GET',
+          path: '/notes?tag=work',
+        },
+        expect: {
+          status: 200,
+        },
+      },
+      {
+        name: 'search notes by keyword',
+        request: {
+          method: 'GET',
+          path: '/notes/search?q=roadmap',
+        },
+        expect: {
+          status: 200,
+        },
+      },
+      {
+        name: 'delete note by id',
+        request: {
+          method: 'DELETE',
+          path: '/notes/{{noteId}}',
+        },
+        expect: {
+          status: 200,
+        },
+      },
+    ],
+    hiddenTests: [
+      {
+        name: '400 missing title or content',
+        request: {
+          method: 'POST',
+          path: '/notes',
+          body: { tag: 'invalid' },
+        },
+        expect: {
+          status: 400,
+        },
+      },
+      {
+        name: '404 delete non-existent note',
+        request: {
+          method: 'DELETE',
+          path: '/notes/99999',
+        },
+        expect: {
+          status: 404,
+        },
+      },
+    ],
+    limits: {
+      startTimeoutMs: 3000,
+      totalTimeoutMs: 20000,
+    },
+  },
 ];
 
 async function seed() {
-  console.log('🌱 Connecting to database to seed Build Mode problems...');
+  console.log('🌱 Connecting to MongoDB Atlas to seed Build Mode problems...');
   await connectDB();
+
+  let insertedCount = 0;
+  let updatedCount = 0;
 
   for (const prob of seedProblems) {
     // Validate test cases format
@@ -250,20 +491,28 @@ async function seed() {
     const hErr = validateTestCases(prob.hiddenTests, `${prob.slug} hiddenTests`);
     if (hErr) throw new Error(hErr);
 
+    const existing = await BuildProblem.findOne({ slug: prob.slug });
     await BuildProblem.findOneAndUpdate(
       { slug: prob.slug },
       prob,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    console.log(`✅ Seeded problem: [${prob.slug}] "${prob.title}"`);
+
+    if (existing) {
+      updatedCount++;
+      console.log(`🔄 Updated existing problem: [${prob.slug}] "${prob.title}" (${prob.difficulty})`);
+    } else {
+      insertedCount++;
+      console.log(`✅ Seeded new problem: [${prob.slug}] "${prob.title}" (${prob.difficulty})`);
+    }
   }
 
-  console.log('\n✨ All Build Mode problems seeded successfully!\n');
+  console.log(`\n✨ Finished seeding Build Mode problems: ${insertedCount} created, ${updatedCount} updated.\n`);
   await mongoose.connection.close();
   process.exit(0);
 }
 
 seed().catch((err) => {
-  console.error('❌ Seeding failed:', err);
+  console.error('❌ Build Mode Seeding failed:', err.message);
   process.exit(1);
 });

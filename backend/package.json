@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "worker:build": "node src/workers/buildWorker.js",
+    "seed-dsa-problems": "node scripts/seed-dsa-problems.js",
     "seed-build-problems": "node scripts/seed-build-problems.js",
+    "seed-all": "node scripts/seed-all.js",
     "verify-build-problems": "node scripts/verify-build-problems.js",
     "verify-safety": "node ../scripts/verify-safety-checks.js"
   },
