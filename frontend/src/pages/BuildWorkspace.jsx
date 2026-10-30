@@ -73,6 +73,26 @@ export default function BuildWorkspace() {
   const [leftTab, setLeftTab] = useState('brief'); // 'brief' | 'endpoints' | 'contract' | 'history'
   const [mobileTab, setMobileTab] = useState('code'); // 'brief' | 'code' | 'results' (for < 1024px)
   const [showResetModal, setShowResetModal] = useState(false);
+  const [engineStatus, setEngineStatus] = useState('checking'); // 'online' | 'offline' | 'checking'
+  const [showEngineModal, setShowEngineModal] = useState(false);
+
+  const checkEngineStatus = async () => {
+    try {
+      const res = await API.get('/build/engine-status');
+      const isOnline = Boolean(res.data?.available);
+      setEngineStatus(isOnline ? 'online' : 'offline');
+      return isOnline;
+    } catch (_) {
+      setEngineStatus('offline');
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    checkEngineStatus();
+    const interval = setInterval(checkEngineStatus, 25000);
+    return () => clearInterval(interval);
+  }, []);
   const [checklistOpen, setChecklistOpen] = useState(() => {
     const saved = localStorage.getItem('build_checklist_open');
     return saved !== null ? saved === 'true' : true;
@@ -678,6 +698,21 @@ export default function BuildWorkspace() {
       return;
     }
 
+    if (engineStatus === 'offline') {
+      toast.error('Build execution engine is offline. Start Docker & run worker.', { id: 'engine-offline' });
+      setConsoleOpen(true);
+      setChecklistOpen(true);
+      if (window.innerWidth < 1024) setMobileTab('results');
+      setSubmissionStatus('error');
+      setSubmissionResult({
+        status: 'Execution Engine Offline',
+        verdict: 'Execution Engine Offline',
+        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+        isRun: true,
+      });
+      return;
+    }
+
     try {
       setRunLoading(true);
       setSubmissionResult(null);
@@ -694,6 +729,7 @@ export default function BuildWorkspace() {
 
       const res = await API.post('/build/run', payload);
       const data = res.data;
+      setEngineStatus('online');
 
       setSubmissionResult({
         status: data.verdict,
@@ -716,15 +752,19 @@ export default function BuildWorkspace() {
     } catch (err) {
       console.error('Run failed:', err);
       const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
+      if (isOffline) {
+        setEngineStatus('offline');
+        toast.error('Build execution engine is offline. Start Docker & run worker.', { id: 'engine-offline' });
+      }
       const message =
         err.response?.data?.message ||
         (isOffline
-          ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+          ? 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.'
           : 'Could not execute test run. Check your server code.');
       setSubmissionStatus('error');
       setSubmissionResult({
-        status: isOffline ? 'Service Unavailable' : 'Run Error',
-        verdict: isOffline ? 'Service Unavailable' : 'Run Error',
+        status: isOffline ? 'Execution Engine Offline' : 'Run Error',
+        verdict: isOffline ? 'Execution Engine Offline' : 'Run Error',
         message,
         isRun: true,
       });
@@ -753,6 +793,20 @@ export default function BuildWorkspace() {
       return;
     }
 
+    if (engineStatus === 'offline') {
+      toast.error('Build execution engine is offline. Start Docker & run worker.', { id: 'engine-offline' });
+      setConsoleOpen(true);
+      setChecklistOpen(true);
+      if (window.innerWidth < 1024) setMobileTab('results');
+      setSubmissionStatus('error');
+      setSubmissionResult({
+        status: 'Execution Engine Offline',
+        verdict: 'Execution Engine Offline',
+        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+      });
+      return;
+    }
+
     try {
       setSubmissionStatus('queued');
       setSubmissionResult(null);
@@ -768,6 +822,7 @@ export default function BuildWorkspace() {
       };
 
       const res = await API.post('/build/submit', payload);
+      setEngineStatus('online');
       const newSubId = res.data?.submissionId;
       setSubmissionId(newSubId);
 
@@ -785,14 +840,18 @@ export default function BuildWorkspace() {
         });
       } else {
         const isOffline = err.response?.status === 503 || err.response?.data?.isServiceUnavailable;
+        if (isOffline) {
+          setEngineStatus('offline');
+          toast.error('Build execution engine is offline. Start Docker & run worker.', { id: 'engine-offline' });
+        }
         setSubmissionStatus('error');
         setSubmissionResult({
-          status: isOffline ? 'Service Unavailable' : 'Submission Error',
-          verdict: isOffline ? 'Service Unavailable' : 'Submission Error',
+          status: isOffline ? 'Execution Engine Offline' : 'Submission Error',
+          verdict: isOffline ? 'Execution Engine Offline' : 'Submission Error',
           message:
             err.response?.data?.message ||
             (isOffline
-              ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+              ? 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.'
               : 'Could not queue your submission. Check your network.'),
         });
       }
@@ -1063,6 +1122,25 @@ export default function BuildWorkspace() {
               <Server className="w-2.5 h-2.5" />
               Node.js
             </span>
+            {engineStatus === 'online' ? (
+              <span
+                className="hidden md:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded shrink-0 select-none"
+                title="BuildMode execution engine is online and ready to run Docker tests."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Engine Online</span>
+              </span>
+            ) : engineStatus === 'offline' ? (
+              <button
+                type="button"
+                onClick={() => setShowEngineModal(true)}
+                className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+                title="Execution engine is offline. Click for instructions."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Engine Offline</span>
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -2055,6 +2133,8 @@ export default function BuildWorkspace() {
                     className={`font-mono text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
                       isAccepted
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable'
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                         : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                     }`}
                   >
@@ -2082,39 +2162,77 @@ export default function BuildWorkspace() {
                   <div className="space-y-2">
                     {/* Verdict Banner */}
                     <div
-                      className={`p-2.5 rounded border flex items-start gap-2.5 ${
+                      className={`p-3 rounded border flex flex-col gap-2.5 ${
                         isAccepted
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          : verdict === 'Start Timeout' || verdict === 'Service Unavailable'
+                          : verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable'
                           ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                           : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                       }`}
                     >
-                      {isAccepted ? (
-                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-                      ) : (
-                        <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
-                          verdict === 'Start Timeout' || verdict === 'Service Unavailable'
-                            ? 'text-amber-400'
-                            : 'text-rose-400'
-                        }`} />
-                      )}
-                      <div className="space-y-1">
-                        <span className="font-bold text-xs uppercase tracking-wide block">
-                          {submissionResult.isRun ? 'Run: ' : ''}{isAccepted ? 'All Tests Passed' : verdict} ({passedCount}/{totalCount} Passed)
-                        </span>
-                        <p className="text-[11px] font-sans leading-relaxed">
-                          {verdict === 'Start Timeout'
-                            ? "Server did not respond on port 3000 in time. Verify app.listen(3000, '0.0.0.0') is in server.js."
-                            : verdict === 'Service Unavailable'
-                            ? (submissionResult.message || 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.')
-                            : verdict === 'Internal Error'
-                            ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
-                            : isAccepted
-                            ? (submissionResult.isRun ? 'All visible requirements passed! Ready to submit solution.' : 'All requirements met!')
-                            : submissionResult.message || 'Some test cases did not pass. Check the checklist for details.'}
-                        </p>
+                      <div className="flex items-start gap-2.5">
+                        {isAccepted ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                        ) : (
+                          <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                            verdict === 'Start Timeout' || verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`} />
+                        )}
+                        <div className="space-y-1">
+                          <span className="font-bold text-xs uppercase tracking-wide block">
+                            {verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable'
+                              ? 'Execution Engine Offline'
+                              : `${submissionResult.isRun ? 'Run: ' : ''}${isAccepted ? 'All Tests Passed' : verdict} (${passedCount}/${totalCount} Passed)`}
+                          </span>
+                          <p className="text-[11px] font-sans leading-relaxed text-text-muted">
+                            {verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable'
+                              ? 'The BuildMode execution engine is offline. Build Mode requires a running Docker sandbox on your worker machine.'
+                              : verdict === 'Start Timeout'
+                              ? "Server did not respond on port 3000 in time. Verify app.listen(3000, '0.0.0.0') is in server.js."
+                              : verdict === 'Internal Error'
+                              ? 'The project execution sandbox is temporarily offline or initializing. Please try again shortly.'
+                              : isAccepted
+                              ? (submissionResult.isRun ? 'All visible requirements passed! Ready to submit solution.' : 'All requirements met!')
+                              : submissionResult.message || 'Some test cases did not pass. Check the checklist for details.'}
+                          </p>
+                        </div>
                       </div>
+
+                      {(verdict === 'Execution Engine Offline' || verdict === 'Service Unavailable') && (
+                        <div className="pt-2 border-t border-amber-500/20 space-y-2">
+                          <div className="text-[11px] font-mono bg-surface-inset p-2.5 rounded border border-border/60 text-text space-y-1.5">
+                            <div className="text-amber-400 font-semibold">How to start the execution engine:</div>
+                            <div className="flex items-center gap-1.5 text-text-muted">
+                              <span className="text-accent-build font-bold">1.</span>
+                              <span>Open <strong>Docker Desktop</strong> on your machine.</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-text-muted">
+                              <span className="text-accent-build font-bold">2.</span>
+                              <span>Open terminal in the project backend folder and run:</span>
+                            </div>
+                            <div className="mt-1 px-2.5 py-1.5 rounded bg-black/60 text-emerald-400 select-all font-bold">
+                              npm run worker:build
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const online = await checkEngineStatus();
+                              if (online) {
+                                toast.success('Execution engine is now online!');
+                              } else {
+                                toast.error('Execution engine is still offline. Is Docker and worker running?');
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold transition-colors flex items-center gap-1.5 self-start cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Recheck Engine Status</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Execution Time */}
@@ -2396,6 +2514,75 @@ export default function BuildWorkspace() {
                 className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded transition-colors"
               >
                 Reset Code
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Engine Offline Instruction Modal ─────────────────────────────── */}
+      {showEngineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs select-none">
+          <div className="w-full max-w-md bg-surface border border-border rounded-xl p-5 sm:p-6 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border/40">
+              <div className="flex items-center gap-2.5 text-amber-400 font-bold text-sm">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <span>Execution Engine is Offline</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEngineModal(false)}
+                className="text-text-muted hover:text-text p-1 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text-muted leading-relaxed">
+              Build Mode evaluates your backend API code inside isolated Docker containers on your machine.
+            </p>
+
+            <div className="p-3.5 rounded-lg bg-surface-inset border border-border/60 text-xs font-mono space-y-2.5">
+              <div className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">
+                Steps to start the execution engine:
+              </div>
+              <div className="flex items-start gap-2 text-text">
+                <span className="w-4 h-4 rounded-full bg-accent-build/20 text-accent-build flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                <span>Open <strong>Docker Desktop</strong> on your machine.</span>
+              </div>
+              <div className="flex items-start gap-2 text-text">
+                <span className="w-4 h-4 rounded-full bg-accent-build/20 text-accent-build flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                <span>Open a terminal in the project backend folder and run:</span>
+              </div>
+              <div className="mt-1 p-2.5 rounded bg-black/60 border border-border/40 text-emerald-400 font-bold select-all flex items-center justify-between">
+                <span>npm run worker:build</span>
+                <span className="text-[10px] text-text-muted font-sans font-normal">Terminal</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const online = await checkEngineStatus();
+                  if (online) {
+                    toast.success('Execution engine is now online!');
+                    setShowEngineModal(false);
+                  } else {
+                    toast.error('Execution engine is still offline. Please check Docker and terminal.');
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded bg-surface-raised border border-border hover:border-accent text-text text-xs font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Recheck Status</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEngineModal(false)}
+                className="px-4 py-1.5 rounded bg-accent-build text-black text-xs font-semibold hover:bg-accent-build-hover transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

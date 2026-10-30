@@ -8,6 +8,61 @@ const { validateSubmissionFiles, validateTestCases } = require('../utils/buildVa
 const { executeDockerFlow } = require('../workers/buildWorker');
 
 /**
+ * Check if the BuildMode execution engine is online:
+ * 1. Docker daemon available locally on this server instance (local mode).
+ * 2. Remote runner active with a live heartbeat in Redis (npm run worker:build).
+ */
+const isBuildEngineAvailable = async () => {
+  // 1. Check local Docker daemon
+  try {
+    const { checkDockerHealth } = require('../workers/buildWorker');
+    const dockerStatus = await checkDockerHealth();
+    if (dockerStatus.ok) {
+      return { available: true, mode: 'local', dockerVersion: dockerStatus.version };
+    }
+  } catch (_) {}
+
+  // 2. Check remote worker heartbeat in Redis
+  try {
+    const redis = require('../config/redis');
+    if (redis.isConnected) {
+      const beatRaw = await redis.get('build:worker:heartbeat');
+      if (beatRaw) {
+        const beat = JSON.parse(beatRaw);
+        return { available: true, mode: 'remote', details: beat };
+      }
+    }
+  } catch (_) {}
+
+  return {
+    available: false,
+    mode: 'offline',
+    reason: 'Neither local Docker nor remote worker (npm run worker:build) is active.',
+  };
+};
+
+/**
+ * GET /api/build/engine-status
+ * Check BuildMode execution engine health
+ */
+const checkBuildEngineStatus = async (req, res) => {
+  try {
+    const engine = await isBuildEngineAvailable();
+    return res.status(200).json({
+      status: 'success',
+      ...engine,
+    });
+  } catch (err) {
+    return res.status(200).json({
+      status: 'success',
+      available: false,
+      mode: 'offline',
+      error: err.message,
+    });
+  }
+};
+
+/**
  * GET /api/build/problems
  * List problems without test cases
  */
@@ -125,6 +180,16 @@ const runBuildSolution = async (req, res) => {
       return res.status(400).json({ message: 'This problem has no visible test cases to run.' });
     }
 
+    // 2b. Pre-flight check: Is the execution engine online?
+    const engineStatus = await isBuildEngineAvailable();
+    if (!engineStatus.available) {
+      return res.status(503).json({
+        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+        isServiceUnavailable: true,
+        engineStatus: 'offline',
+      });
+    }
+
     // 3. Ephemeral submission object with valid ObjectId for Docker network/container naming
     const ephemeralId = new mongoose.Types.ObjectId();
     const submission = {
@@ -210,6 +275,16 @@ const submitBuildSolution = async (req, res) => {
     const problem = await BuildProblem.findOne({ slug: slug.toLowerCase() });
     if (!problem) {
       return res.status(404).json({ message: `Problem with slug "${slug}" not found.` });
+    }
+
+    // 2a. Pre-flight check: Is the execution engine online?
+    const engineStatus = await isBuildEngineAvailable();
+    if (!engineStatus.available) {
+      return res.status(503).json({
+        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+        isServiceUnavailable: true,
+        engineStatus: 'offline',
+      });
     }
 
     // 2b. Contest validation (if contestId is provided)
@@ -528,5 +603,6 @@ module.exports = {
   createBuildProblem,
   updateBuildProblem,
   deleteBuildProblem,
+  checkBuildEngineStatus,
 };
 

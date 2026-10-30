@@ -137,19 +137,19 @@ const { reconcileContestLifecycle } = require('./workers/contestLifecycleWorker'
 
 // 8. Graceful Shutdown Handlers
 const gracefulShutdown = async (signal) => {
-  console.log(`\n🛑 [Server] Received ${signal}. Starting graceful shutdown...`);
+  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
   server.close(async () => {
-    console.log('🚪 [Server] HTTP and Socket server closed.');
+    console.log('[Server] HTTP and Socket server closed.');
     try {
       const mongoose = require('mongoose');
       await mongoose.connection.close(false);
-      console.log('🍃 [MongoDB] Connection closed cleanly.');
+      console.log('[MongoDB] Connection closed cleanly.');
     } catch (_) { }
     process.exit(0);
   });
 
   setTimeout(() => {
-    console.error('⚠️ [Server] Forcefully shutting down after timeout.');
+    console.error('[Server] Forcefully shutting down after timeout.');
     process.exit(1);
   }, 10000);
 };
@@ -163,7 +163,7 @@ if (require.main === module) {
   connectDB().then(() => {
     // Startup reconciliation for scheduled contests
     reconcileContestLifecycle().catch((err) => {
-      console.warn('⚠️ Contest reconciliation warning:', err.message);
+      console.warn('Contest reconciliation warning:', err.message);
     });
 
     server.listen(PORT, () => {

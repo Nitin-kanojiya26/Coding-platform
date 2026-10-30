@@ -37,7 +37,7 @@ function spawnCommand(cmd, args, options = {}) {
 
     if (timeout > 0) {
       timer = setTimeout(() => {
-        try { proc.kill(); } catch (_) {}
+        try { proc.kill(); } catch (_) { }
         resolve({ code: -1, stdout, stderr, error: new Error('Command timed out') });
       }, timeout);
     }
@@ -479,7 +479,7 @@ async function executeDockerFlow(submission, problem, options = {}) {
  * Used both by the BullMQ worker and directly when Redis is offline.
  */
 async function processBuildSubmissionDirectly(submissionId) {
-  console.log(`🔨 [BuildRunner] Processing submission ${submissionId}`);
+  console.log(`[BuildRunner] Processing submission ${submissionId}`);
 
   // Atomically set status to Running
   const submission = await BuildSubmission.findOneAndUpdate(
@@ -489,14 +489,14 @@ async function processBuildSubmissionDirectly(submissionId) {
   );
 
   if (!submission) {
-    console.warn(`⚠️ [BuildRunner] Submission ${submissionId} not found or already started.`);
+    console.warn(`[BuildRunner] Submission ${submissionId} not found or already started.`);
     return;
   }
 
   // Fetch problem with hiddenTests
   const problem = await BuildProblem.findById(submission.problemId).select('+hiddenTests');
   if (!problem) {
-    console.error(`❌ [BuildRunner] Problem ${submission.problemId} not found.`);
+    console.error(`[BuildRunner] Problem ${submission.problemId} not found.`);
     await BuildSubmission.updateOne(
       { _id: submissionId },
       { status: 'Internal Error', message: 'Referenced problem does not exist.' }
@@ -536,10 +536,10 @@ async function processBuildSubmissionDirectly(submissionId) {
         total: evalResult.total,
         score: evalResult.score,
       });
-    } catch (_) {}
+    } catch (_) { }
   }
 
-  console.log(`✅ [BuildRunner] Submission ${submissionId} finished with verdict: ${evalResult.verdict} (${evalResult.score}%)`);
+  console.log(`[BuildRunner] Submission ${submissionId} finished with verdict: ${evalResult.verdict} (${evalResult.score}%)`);
   return evalResult;
 }
 
@@ -566,26 +566,73 @@ if (!isWorkerDisabled) {
   );
 
   buildWorker.on('completed', (job) => {
-    console.log(`🎉 [BuildWorker] Job ${job.id} (${job.name}) completed successfully.`);
+    console.log(`[BuildWorker] Job ${job.id} (${job.name}) completed successfully.`);
   });
 
   buildWorker.on('failed', (job, err) => {
-    console.error(`❌ [BuildWorker] Job ${job?.id} (${job?.name}) failed:`, err.message);
+    console.error(`[BuildWorker] Job ${job?.id} (${job?.name}) failed:`, err.message);
   });
 
   buildWorker.on('error', (err) => {
     if (isBullMQAvailable()) {
-      console.error('⚠️ [BuildWorker] Worker connection error:', err.message);
+      console.error('[BuildWorker] Worker connection error:', err.message);
     }
   });
 
   // Run cleanup immediately on worker load
   performStartupCleanup();
 } else {
-  console.log('ℹ️ [BuildWorker] Build worker disabled via ENABLE_BUILD_WORKER=false (Cloud Gateway / Producer mode).');
+  console.log('[BuildWorker] Build worker disabled via ENABLE_BUILD_WORKER=false (Cloud Gateway / Producer mode).');
 }
 
 // Standalone runner execution (e.g. npm run worker:build)
+let heartbeatInterval = null;
+
+function startHeartbeat() {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  const redis = require('../config/redis');
+
+  const pulse = async () => {
+    try {
+      const health = await module.exports.checkDockerHealth();
+      if (health.ok) {
+        if (redis.isConnected) {
+          await redis.set(
+            'build:worker:heartbeat',
+            JSON.stringify({
+              status: 'online',
+              dockerVersion: health.version,
+              updatedAt: Date.now(),
+            }),
+            'EX',
+            15 // 15 seconds auto-expiry
+          );
+        }
+      } else {
+        if (redis.isConnected) {
+          await redis.del('build:worker:heartbeat');
+        }
+      }
+    } catch (_) {}
+  };
+
+  pulse();
+  heartbeatInterval = setInterval(pulse, 6000); // Pulse every 6 seconds
+}
+
+function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  try {
+    const redis = require('../config/redis');
+    if (redis.isConnected) {
+      redis.del('build:worker:heartbeat').catch(() => {});
+    }
+  } catch (_) {}
+}
+
 if (isStandalone) {
   require('dotenv').config();
   const connectDB = require('../config/db');
@@ -596,6 +643,8 @@ if (isStandalone) {
     if (health.ok) {
       console.log(`🐳 [BuildWorker] Docker daemon connected (v${health.version}).`);
       console.log('⚡ [BuildWorker] Connected to MongoDB and waiting for jobs on Redis queue [api-judge]...');
+      startHeartbeat();
+      console.log('💓 [BuildWorker] Execution engine heartbeat active (cloud can now dispatch jobs).');
     } else {
       console.warn(`⚠️ [BuildWorker] WARNING: Docker daemon is not running (${health.error}). Submissions will fail until Docker Desktop is started.`);
     }
@@ -606,6 +655,7 @@ if (isStandalone) {
 
   const shutdown = async (sig) => {
     console.log(`\n🛑 [BuildWorker] Received ${sig}. Shutting down worker...`);
+    stopHeartbeat();
     if (buildWorker) {
       try {
         await buildWorker.close();

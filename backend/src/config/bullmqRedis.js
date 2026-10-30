@@ -15,7 +15,7 @@ const connectionOptions = {
   retryStrategy(times) {
     if (times > 2) {
       if (!hasLoggedOfflineWarning) {
-        console.warn('⚠️ [BullMQ] Redis is offline. Backend is operating with automatic in-process fallback mode (zero downtime).');
+        console.warn('[BullMQ] Redis is offline. Backend is operating with automatic in-process fallback mode (zero downtime).');
         hasLoggedOfflineWarning = true;
       }
       return 10000; // Quietly retry every 10 seconds
@@ -36,7 +36,7 @@ const bullmqConnection = new Redis(redisUrl || 'redis://127.0.0.1:6380', connect
 bullmqConnection.on('connect', () => {
   isBullMQConnected = true;
   hasLoggedOfflineWarning = false;
-  console.log('⚡ BullMQ Redis Connection Established');
+  console.log('BullMQ Redis Connection Established');
 });
 
 bullmqConnection.on('ready', () => {
@@ -50,7 +50,7 @@ bullmqConnection.on('close', () => {
 bullmqConnection.on('error', (err) => {
   isBullMQConnected = false;
   if (!hasLoggedOfflineWarning) {
-    console.warn(`⚠️ [BullMQ] Redis is offline (${err.message}). In-process fallback is active.`);
+    console.warn(`[BullMQ] Redis is offline (${err.message}). In-process fallback is active.`);
     hasLoggedOfflineWarning = true;
   }
 });

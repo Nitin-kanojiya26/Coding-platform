@@ -10,32 +10,32 @@ const { scheduleContestLifecycleJobs } = require('../queues/contestLifecycleQueu
 async function processLifecycleJob(job) {
   const { contestId } = job.data;
   const name = job.name;
-  console.log(`⏱️ [ContestLifecycleWorker] Processing job "${name}" for contest ${contestId}`);
+  console.log(` [ContestLifecycleWorker] Processing job "${name}" for contest ${contestId}`);
 
   const contest = await Contest.findById(contestId);
   if (!contest) {
-    console.warn(`⚠️ [ContestLifecycleWorker] Contest ${contestId} not found, skipping.`);
+    console.warn(`[ContestLifecycleWorker] Contest ${contestId} not found, skipping.`);
     return;
   }
 
   if (contest.isCancelled) {
-    console.log(`ℹ️ [ContestLifecycleWorker] Contest ${contestId} is cancelled, ignoring job.`);
+    console.log(`[ContestLifecycleWorker] Contest ${contestId} is cancelled, ignoring job.`);
     return;
   }
 
   if (name === 'contest-start') {
     // 1. If random mode, pick problems now
     if (contest.selection?.mode === 'random' && (!contest.problems || contest.problems.length === 0)) {
-      console.log(`🎲 [ContestLifecycleWorker] Executing random problem selection for contest ${contestId}...`);
+      console.log(`[ContestLifecycleWorker] Executing random problem selection for contest ${contestId}...`);
       await executeProblemSelection(contestId);
     }
-    console.log(`🚀 [ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has officially started.`);
+    console.log(`[ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has officially started.`);
     try {
       const { emitContestStarted } = require('../sockets/contestSocket');
       emitContestStarted(contestId);
     } catch (_) {}
   } else if (name === 'contest-end') {
-    console.log(`🏁 [ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has ended.`);
+    console.log(`[ContestLifecycleWorker] Contest "${contest.title}" (${contestId}) has ended.`);
     try {
       const { emitContestEnded } = require('../sockets/contestSocket');
       emitContestEnded(contestId);
@@ -44,19 +44,19 @@ async function processLifecycleJob(job) {
     // Milestone 6: Automatically compute LeetCode-style ratings upon contest conclusion
     try {
       const { applyContestRatings } = require('../services/contestRatingService');
-      console.log(`🏆 [ContestLifecycleWorker] Computing post-contest ratings for contest ${contestId}...`);
+      console.log(`[ContestLifecycleWorker] Computing post-contest ratings for contest ${contestId}...`);
       await applyContestRatings(contestId);
-      console.log(`✅ [ContestLifecycleWorker] Ratings successfully calculated for contest ${contestId}.`);
+      console.log(`[ContestLifecycleWorker] Ratings successfully calculated for contest ${contestId}.`);
     } catch (ratingErr) {
-      console.error(`⚠️ [ContestLifecycleWorker] Error computing ratings for contest ${contestId}:`, ratingErr.message);
+      console.error(`[ContestLifecycleWorker] Error computing ratings for contest ${contestId}:`, ratingErr.message);
     }
   } else if (name === 'contest-reminder') {
-    console.log(`⏰ [ContestLifecycleWorker] 1-hour reminder triggered for contest "${contest.title}" (${contestId}).`);
+    console.log(`[ContestLifecycleWorker] 1-hour reminder triggered for contest "${contest.title}" (${contestId}).`);
     try {
       const { addEmailJob } = require('../queues/emailQueue');
       await addEmailJob('reminder-contest', { contestId }, { priority: 2 });
     } catch (err) {
-      console.warn(`⚠️ [ContestLifecycleWorker] Failed to dispatch reminder job:`, err.message);
+      console.warn(`[ContestLifecycleWorker] Failed to dispatch reminder job:`, err.message);
     }
   }
 }
@@ -74,16 +74,16 @@ const contestLifecycleWorker = new Worker(
 );
 
 contestLifecycleWorker.on('completed', (job) => {
-  console.log(`✅ [ContestLifecycleWorker] Job ${job.name} for contest ${job.data?.contestId} completed.`);
+  console.log(`[ContestLifecycleWorker] Job ${job.name} for contest ${job.data?.contestId} completed.`);
 });
 
 contestLifecycleWorker.on('failed', (job, err) => {
-  console.error(`❌ [ContestLifecycleWorker] Job ${job?.name} failed:`, err.message);
+  console.error(`[ContestLifecycleWorker] Job ${job?.name} failed:`, err.message);
 });
 
 contestLifecycleWorker.on('error', (err) => {
   if (isBullMQAvailable()) {
-    console.error(`⚠️ [ContestLifecycleWorker] Worker connection error:`, err.message);
+    console.error(`[ContestLifecycleWorker] Worker connection error:`, err.message);
   }
 });
 
@@ -106,7 +106,7 @@ async function reconcileContestLifecycle() {
     });
 
     for (const c of unpickedContests) {
-      console.log(`🔄 [ContestReconciler] Catching up random problem selection for contest ${c._id}`);
+      console.log(`[ContestReconciler] Catching up random problem selection for contest ${c._id}`);
       await executeProblemSelection(c._id);
     }
 
@@ -128,16 +128,16 @@ async function reconcileContestLifecycle() {
     }).limit(10);
 
     for (const c of uncalculatedEnded) {
-      console.log(`🔄 [ContestReconciler] Catching up ratings for concluded contest ${c._id}...`);
+      console.log(`[ContestReconciler] Catching up ratings for concluded contest ${c._id}...`);
       try {
         const { applyContestRatings } = require('../services/contestRatingService');
         await applyContestRatings(c._id);
       } catch (err) {
-        console.warn(`⚠️ [ContestReconciler] Error calculating ratings for ${c._id}:`, err.message);
+        console.warn(`[ContestReconciler] Error calculating ratings for ${c._id}:`, err.message);
       }
     }
   } catch (err) {
-    console.warn(`⚠️ [ContestReconciler] Reconciliation sweep error:`, err.message);
+    console.warn(`[ContestReconciler] Reconciliation sweep error:`, err.message);
   }
 }
 

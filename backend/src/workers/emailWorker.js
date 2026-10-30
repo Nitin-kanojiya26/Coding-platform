@@ -15,7 +15,7 @@ const {
  */
 async function processEmailJob(job) {
   const { name, data } = job;
-  console.log(`📨 [EmailWorker] Processing job "${name}"...`, data);
+  console.log(`[EmailWorker] Processing job "${name}"...`, data);
 
   if (name === 'announce-contest') {
     const { contestId } = data;
@@ -28,7 +28,7 @@ async function processEmailJob(job) {
       isBanned: { $ne: true },
     }).select('name email unsubscribeToken');
 
-    console.log(`📢 [EmailWorker] Broadcasting announcement for "${contest.title}" to ${eligibleUsers.length} users.`);
+    console.log(` [EmailWorker] Broadcasting announcement for "${contest.title}" to ${eligibleUsers.length} users.`);
 
     for (const user of eligibleUsers) {
       try {
@@ -55,7 +55,7 @@ async function processEmailJob(job) {
         notif.sentAt = new Date();
         await notif.save();
       } catch (err) {
-        console.warn(`⚠️ [EmailWorker] Failed announcement to ${user.email}:`, err.message);
+        console.warn(`[EmailWorker] Failed announcement to ${user.email}:`, err.message);
       }
     }
   } else if (name === 'reminder-contest') {
@@ -72,7 +72,7 @@ async function processEmailJob(job) {
       emailNotifications: { $ne: false },
     }).select('name email unsubscribeToken');
 
-    console.log(`⏰ [EmailWorker] Sending 1-hour reminders for "${contest.title}" to ${eligibleUsers.length} participants.`);
+    console.log(`[EmailWorker] Sending 1-hour reminders for "${contest.title}" to ${eligibleUsers.length} participants.`);
 
     for (const user of eligibleUsers) {
       try {
@@ -111,7 +111,7 @@ async function processEmailJob(job) {
 
     // Respect opt-out preference
     if (user.emailNotifications === false) {
-      console.log(`ℹ️ [EmailWorker] Skipping invitation email to ${user.email} (opted out).`);
+      console.log(`[EmailWorker] Skipping invitation email to ${user.email} (opted out).`);
       return;
     }
 
@@ -123,7 +123,7 @@ async function processEmailJob(job) {
         { upsert: true }
       );
     } catch (err) {
-      console.warn(`⚠️ [EmailWorker] Failed invitation email to ${user.email}:`, err.message);
+      console.warn(`[EmailWorker] Failed invitation email to ${user.email}:`, err.message);
     }
   }
 }
@@ -141,16 +141,16 @@ const emailWorker = new Worker(
 );
 
 emailWorker.on('completed', (job) => {
-  console.log(`✅ [EmailWorker] Finished email job "${job.name}".`);
+  console.log(`[EmailWorker] Finished email job "${job.name}".`);
 });
 
 emailWorker.on('failed', (job, err) => {
-  console.error(`❌ [EmailWorker] Job "${job?.name}" failed:`, err.message);
+  console.error(`[EmailWorker] Job "${job?.name}" failed:`, err.message);
 });
 
 emailWorker.on('error', (err) => {
   if (isBullMQAvailable()) {
-    console.error(`⚠️ [EmailWorker] Worker connection error:`, err.message);
+    console.error(`[EmailWorker] Worker connection error:`, err.message);
   }
 });
 

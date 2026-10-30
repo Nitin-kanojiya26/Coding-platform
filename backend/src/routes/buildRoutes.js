@@ -11,13 +11,17 @@ const {
   createBuildProblem,
   updateBuildProblem,
   deleteBuildProblem,
+  checkBuildEngineStatus,
 } = require('../controllers/buildController');
 
-const { protect } = require('../middleware/authMiddleware');
+const { protect, optionalAuth } = require('../middleware/authMiddleware');
 const { isAdmin } = require('../middleware/roleMiddleware');
 const { buildSubmitLimiter, buildRunLimiter } = require('../middleware/rateLimiter');
 
 // --- Problem Routes ---
+// Engine status health check
+router.get('/engine-status', optionalAuth, checkBuildEngineStatus);
+
 // List problems (no tests)
 router.get('/problems', getBuildProblems);
 

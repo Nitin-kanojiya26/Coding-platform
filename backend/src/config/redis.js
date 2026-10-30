@@ -42,7 +42,7 @@ const redisClient = new Redis(process.env.REDIS_CACHE_URL || process.env.REDIS_U
   retryStrategy(times) {
     if (times > 2) {
       if (!hasLoggedFailure) {
-        console.warn('⚠️ [Redis] Redis server not reachable on port 6380. Backend running in in-memory fallback mode.');
+        console.warn('[Redis] Redis server not reachable on port 6380. Backend running in in-memory fallback mode.');
         hasLoggedFailure = true;
       }
       return 10000; // Retry quietly every 10 seconds
@@ -54,7 +54,7 @@ const redisClient = new Redis(process.env.REDIS_CACHE_URL || process.env.REDIS_U
 redisClient.on('connect', () => {
   isRedisConnected = true;
   hasLoggedFailure = false;
-  console.log('⚡ Redis Client Connected successfully');
+  console.log('Redis Client Connected successfully');
 });
 
 redisClient.on('ready', () => {
@@ -64,7 +64,7 @@ redisClient.on('ready', () => {
 redisClient.on('error', (err) => {
   isRedisConnected = false;
   if (!hasLoggedFailure) {
-    console.warn(`⚠️ [Redis] Connection failed: ${err.message}. Backend will run with in-memory fallback.`);
+    console.warn(`[Redis] Connection failed: ${err.message}. Backend will run with in-memory fallback.`);
     hasLoggedFailure = true;
   }
 });

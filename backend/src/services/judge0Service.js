@@ -4,7 +4,7 @@ const axios = require('axios');
 const JUDGE0_API_URL = process.env.JUDGE0_API_URL || 'http://localhost:2358';
 
 if (!process.env.JUDGE0_API_URL) {
-  console.warn('⚠️ [Judge0] JUDGE0_API_URL not specified in .env, falling back to http://localhost:2358');
+  console.warn('[Judge0] JUDGE0_API_URL not specified in .env, falling back to http://localhost:2358');
 }
 
 const judge0 = axios.create({
@@ -247,12 +247,12 @@ exports.runAllTestCases = async (code, languageId, testCases, timeLimit = 2000) 
         console.log(`[ExecutionEngine] Local Judge0 is OFFLINE. Seamlessly switching to OnlineCompiler.io Cloud API...`);
         return await runWithOnlineCompiler(cleanCode, languageId, testCases, timeLimit);
       }
-      console.warn('⚠️ [ExecutionEngine] Local Judge0 is OFFLINE and ONLINECOMPILER_API_KEY is not configured:', err.message);
+      console.warn('[ExecutionEngine] Local Judge0 is OFFLINE and ONLINECOMPILER_API_KEY is not configured:', err.message);
       throw new ExecutionUnavailableError(
         'The code execution engine is temporarily offline. Please try again shortly.'
       );
     }
-    console.error('❌ Judge0 error:', err.response?.data || err.message);
+    console.error('Judge0 error:', err.response?.data || err.message);
     throw new Error(`Execution error: ${err.response?.data?.message || err.message}`);
   }
 
@@ -281,7 +281,7 @@ const pollBatchResults = async (tokens, maxAttempts = 30, delayMs = 1000) => {
       );
     } catch (err) {
       if (isJudge0OfflineError(err)) {
-        console.warn('⚠️ [Judge0] Polling lost connection:', err.message);
+        console.warn('[Judge0] Polling lost connection:', err.message);
         throw new ExecutionUnavailableError(
           'The code execution engine is temporarily offline. Please try again shortly.'
         );
