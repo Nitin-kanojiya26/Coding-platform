@@ -367,7 +367,7 @@ exports.runSampleTestCases = async (req, res) => {
       });
     }
 
-    console.log(`📥 Processing execution for lang '${language}' (Judge0 ID: ${languageId})`);
+ console.log(` Processing execution for lang '${language}' (Judge0 ID: ${languageId})`);
 
     // ✅ Execute via Judge0 Service
     let executionResult;
@@ -379,7 +379,7 @@ exports.runSampleTestCases = async (req, res) => {
         2000
       );
     } catch (serviceError) {
-      console.error('❌ Judge0 service error:', serviceError.message);
+ console.error(' Judge0 service error:', serviceError.message);
       const isUnavailable =
         serviceError.isServiceUnavailable ||
         serviceError.code === 'ECONNREFUSED' ||
@@ -399,7 +399,7 @@ exports.runSampleTestCases = async (req, res) => {
 
     // ✅ Guard against undefined or broken service return
     if (!executionResult || !executionResult.results) {
-      console.error('❌ Judge0 returned invalid response:', executionResult);
+ console.error(' Judge0 returned invalid response:', executionResult);
       return res.status(500).json({ message: 'Invalid response from execution engine' });
     }
 
@@ -423,7 +423,7 @@ exports.runSampleTestCases = async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('🔥 Run error:', error.message);
+ console.error(' Run error:', error.message);
     res.status(500).json({ message: error.message });
   }
 };

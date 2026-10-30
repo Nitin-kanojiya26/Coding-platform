@@ -7,7 +7,7 @@ const axios = require('axios');
  */
 const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification Code') => {
   // Always log OTP in terminal / logs for instant verification
-  console.log(`🔑 [Auth OTP] Code for ${email}: ${otp}`);
+ console.log(` [Auth OTP] Code for ${email}: ${otp}`);
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -83,10 +83,10 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
           timeout: 7000,
         }
       );
-      console.log(`✅ [EmailService] Email delivered to ${email} via Brevo API (MessageId: ${res.data?.messageId})`);
+ console.log(` [EmailService] Email delivered to ${email} via Brevo API (MessageId: ${res.data?.messageId})`);
       return res.data;
     } catch (apiErr) {
-      console.error(`⚠️ [EmailService] Brevo API error:`, apiErr.response?.data || apiErr.message);
+ console.error(` [EmailService] Brevo API error:`, apiErr.response?.data || apiErr.message);
     }
   } else if (process.env.RESEND_API_KEY) {
     // 2. Resend REST API fallback (Port 443)
@@ -108,13 +108,13 @@ const sendOTPEmail = async (email, otp, subject = 'Codexium - Your Verification 
           timeout: 6000,
         }
       );
-      console.log(`✅ [EmailService] Email dispatched via Resend API (ID: ${res.data?.id})`);
+ console.log(` [EmailService] Email dispatched via Resend API (ID: ${res.data?.id})`);
       return res.data;
     } catch (apiErr) {
-      console.error(`⚠️ [EmailService] Resend API error:`, apiErr.response?.data || apiErr.message);
+ console.error(` [EmailService] Resend API error:`, apiErr.response?.data || apiErr.message);
     }
   } else {
-    console.log(`ℹ️ [EmailService] No email API key (BREVO_API_KEY or RESEND_API_KEY) set. OTP logged to console above.`);
+ console.log(`ℹ [EmailService] No email API key (BREVO_API_KEY or RESEND_API_KEY) set. OTP logged to console above.`);
   }
 
   // 3. Safe fallback: OTP is saved in Redis and visible in terminal

@@ -8,10 +8,10 @@ const http = require('http');
 
 // Global process error guards to prevent unexpected background disconnects (like Redis) from crashing the server
 process.on('unhandledRejection', (reason) => {
-  console.warn('⚠️ [Process] Intercepted unhandled rejection:', reason?.message || reason);
+ console.warn(' [Process] Intercepted unhandled rejection:', reason?.message || reason);
 });
 process.on('uncaughtException', (err) => {
-  console.warn('⚠️ [Process] Intercepted uncaught exception:', err?.message || err);
+ console.warn(' [Process] Intercepted uncaught exception:', err?.message || err);
 });
 
 const app = express();
@@ -113,7 +113,7 @@ const shouldServeFrontend =
   (process.env.NODE_ENV === 'production' && fs.existsSync(frontendDistPath));
 
 if (shouldServeFrontend && fs.existsSync(frontendDistPath)) {
-  console.log(`📦 [HostReady] Serving production frontend from: ${frontendDistPath}`);
+ console.log(` [HostReady] Serving production frontend from: ${frontendDistPath}`);
   app.use(express.static(frontendDistPath));
   // Client-side SPA routing fallback (excludes /api, /uploads, /health, /socket.io)
   app.get('*', (req, res, next) => {

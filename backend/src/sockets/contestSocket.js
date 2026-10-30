@@ -54,7 +54,7 @@ function initializeSocket(io) {
 
   io.on('connection', (socket) => {
     const userName = socket.user?.name || 'Guest';
-    console.log(`🔌 [Socket.IO] Client connected: ${socket.id} (${userName})`);
+ console.log(` [Socket.IO] Client connected: ${socket.id} (${userName})`);
 
     // 1. Join Contest Room
     socket.on('join:contest', async (data, ackCallback) => {
@@ -63,7 +63,7 @@ function initializeSocket(io) {
 
       const room = `contest:${contestId}`;
       socket.join(room);
-      console.log(`👥 [Socket.IO] ${socket.id} joined ${room}`);
+ console.log(` [Socket.IO] ${socket.id} joined ${room}`);
 
       // If authenticated user, also join their private user room for this contest
       let finishedSubmissions = [];
@@ -124,11 +124,11 @@ function initializeSocket(io) {
       if (socket.user?._id) {
         socket.leave(`contest:${contestId}:user:${socket.user._id}`);
       }
-      console.log(`👋 [Socket.IO] ${socket.id} left ${room}`);
+ console.log(` [Socket.IO] ${socket.id} left ${room}`);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 [Socket.IO] Client disconnected: ${socket.id} (${reason})`);
+ console.log(` [Socket.IO] Client disconnected: ${socket.id} (${reason})`);
     });
   });
 

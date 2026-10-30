@@ -63,7 +63,7 @@ async function updateUserContestStanding(contestId, userId) {
       multi.expire(userKey, SEVEN_DAYS_SECONDS);
       await multi.exec();
     } catch (err) {
-      console.warn(`⚠️ [RedisLeaderboard] Failed to update Redis cache:`, err.message);
+ console.warn(` [RedisLeaderboard] Failed to update Redis cache:`, err.message);
     }
   }
 
@@ -101,7 +101,7 @@ async function rebuildLeaderboard(contestId) {
       multi.expire(lbKey, SEVEN_DAYS_SECONDS);
       await multi.exec();
     } catch (err) {
-      console.warn(`⚠️ [RedisLeaderboard] Error rebuilding leaderboard in Redis:`, err.message);
+ console.warn(` [RedisLeaderboard] Error rebuilding leaderboard in Redis:`, err.message);
     }
   }
 
@@ -141,7 +141,7 @@ async function syncMissingStandings(contest) {
       }
     }
   } catch (syncErr) {
-    console.warn(`⚠️ [LeaderboardSync] Error during standing verification:`, syncErr.message);
+ console.warn(` [LeaderboardSync] Error during standing verification:`, syncErr.message);
   } finally {
     contestSyncLocks.delete(cId);
   }

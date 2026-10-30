@@ -207,7 +207,7 @@ async function recomputeGlobalRanks() {
 
     await User.bulkWrite(bulkOps);
   } catch (err) {
-    console.warn('⚠️ [RatingService] Error recomputing global contest ranks:', err.message);
+ console.warn(' [RatingService] Error recomputing global contest ranks:', err.message);
   }
 }
 

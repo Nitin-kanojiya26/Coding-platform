@@ -22,7 +22,7 @@ const workerConcurrency = Math.max(1, parseInt(process.env.WORKER_CONCURRENCY, 1
  */
 async function processSubmissionDirectly(jobData) {
     const { submissionId, code, languageId, testCases, timeLimit, userId, problemId } = jobData;
-    console.log(`🚀 [SubmissionRunner] Processing submission ${submissionId}`);
+ console.log(` [SubmissionRunner] Processing submission ${submissionId}`);
 
     try {
         // Run code through Judge0
@@ -60,7 +60,7 @@ async function processSubmissionDirectly(jobData) {
                 try {
                     const { updateUserContestStanding } = require('../services/contestLeaderboardService');
                     updateUserContestStanding(submission.contestId, userId).catch((stErr) => {
-                        console.warn(`⚠️ Error updating contest standing for user ${userId}:`, stErr.message);
+ console.warn(` Error updating contest standing for user ${userId}:`, stErr.message);
                     });
 
                     const { emitSubmissionUpdate } = require('../sockets/contestSocket');
@@ -79,7 +79,7 @@ async function processSubmissionDirectly(jobData) {
 
         return result;
     } catch (err) {
-        console.error(`❌ [SubmissionRunner] Error processing ${submissionId}:`, err.message);
+ console.error(` [SubmissionRunner] Error processing ${submissionId}:`, err.message);
         const isUnavailable =
             err.isServiceUnavailable ||
             err.code === 'ECONNREFUSED' ||
@@ -136,7 +136,7 @@ let completedJobsCount = 0;
 
 submissionWorker.on('completed', (job) => {
     completedJobsCount++;
-    console.log(`✅ [BullMQ] Submission ${job.data?.submissionId} finished with status: ${job.returnvalue?.status}`);
+ console.log(` [BullMQ] Submission ${job.data?.submissionId} finished with status: ${job.returnvalue?.status}`);
 });
 
 function getCompletedJobCount() {
@@ -149,20 +149,20 @@ function resetCompletedJobCount() {
 }
 
 submissionWorker.on('failed', (job, err) => {
-    console.error(`❌ [BullMQ] Submission ${job?.data?.submissionId} failed:`, err.message);
+ console.error(` [BullMQ] Submission ${job?.data?.submissionId} failed:`, err.message);
 });
 
 submissionWorker.on('error', (err) => {
     // Quietly log worker connection errors without throwing
     if (isBullMQAvailable()) {
-        console.error(`⚠️ [BullMQ] Worker connection error:`, err.message);
+ console.error(` [BullMQ] Worker connection error:`, err.message);
     }
 });
 
 submissionQueue.on('error', (err) => {
     // Quietly log queue connection errors without throwing
     if (isBullMQAvailable()) {
-        console.error(`⚠️ [BullMQ] Queue connection error:`, err.message);
+ console.error(` [BullMQ] Queue connection error:`, err.message);
     }
 });
 
@@ -181,7 +181,7 @@ async function addSubmissionJob(jobData, options = {}) {
             );
             return await Promise.race([jobPromise, timeoutPromise]);
         } catch (err) {
-            console.warn(`⚠️ [SubmissionQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
+ console.warn(` [SubmissionQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
         }
     }
 

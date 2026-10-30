@@ -360,13 +360,13 @@ exports.createContest = async (req, res) => {
           contest.problems = selected;
         }
       } catch (selErr) {
-        console.warn('⚠️ Problem selection notice on creation:', selErr.message);
+ console.warn(' Problem selection notice on creation:', selErr.message);
       }
     }
 
     // Schedule BullMQ lifecycle jobs (start, end, reminder)
     scheduleContestLifecycleJobs(contest).catch((err) => {
-      console.warn('⚠️ Lifecycle job schedule warning:', err.message);
+ console.warn(' Lifecycle job schedule warning:', err.message);
     });
 
     // If public contest, queue announcement broadcast to opted-in users
@@ -374,7 +374,7 @@ exports.createContest = async (req, res) => {
       try {
         const { addEmailJob } = require('../queues/emailQueue');
         addEmailJob('announce-contest', { contestId: contest._id }, { priority: 5 }).catch((err) => {
-          console.warn('⚠️ Announcement email queue warning:', err.message);
+ console.warn(' Announcement email queue warning:', err.message);
         });
       } catch (_) {}
     }
@@ -590,7 +590,7 @@ exports.updateContest = async (req, res) => {
 
     // Reschedule lifecycle jobs with updated timing
     scheduleContestLifecycleJobs(contest).catch((err) => {
-      console.warn('⚠️ Lifecycle job reschedule warning:', err.message);
+ console.warn(' Lifecycle job reschedule warning:', err.message);
     });
 
     return res.status(200).json({
@@ -646,7 +646,7 @@ exports.cancelContest = async (req, res) => {
 
     // Cancel delayed BullMQ lifecycle jobs
     cancelContestLifecycleJobs(contest._id).catch((err) => {
-      console.warn('⚠️ Lifecycle job cancellation warning:', err.message);
+ console.warn(' Lifecycle job cancellation warning:', err.message);
     });
 
     return res.status(200).json({
@@ -727,7 +727,7 @@ exports.getContestProblems = async (req, res) => {
       try {
         contest.problems = await executeProblemSelection(contest._id);
       } catch (selErr) {
-        console.warn('⚠️ Problem selection on getContestProblems warning:', selErr.message);
+ console.warn(' Problem selection on getContestProblems warning:', selErr.message);
       }
     }
 
@@ -1092,7 +1092,7 @@ exports.inviteParticipants = async (req, res) => {
           userId: targetUser._id,
           inviterId: req.user._id,
         }, { priority: 2 }).catch((err) => {
-          console.warn(`⚠️ Failed to queue invitation email for ${targetUser.email}:`, err.message);
+ console.warn(` Failed to queue invitation email for ${targetUser.email}:`, err.message);
         });
       } catch (_) {}
 

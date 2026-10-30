@@ -184,7 +184,7 @@ const runBuildSolution = async (req, res) => {
     const engineStatus = await isBuildEngineAvailable();
     if (!engineStatus.available) {
       return res.status(503).json({
-        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+        message: 'The execution engine is currently offline. Please try again later.',
         isServiceUnavailable: true,
         engineStatus: 'offline',
       });
@@ -246,7 +246,7 @@ const runBuildSolution = async (req, res) => {
       err.code === 'ECONNREFUSED';
     const statusCode = isOffline ? 503 : 500;
     const message = isOffline
-      ? 'The project execution sandbox is temporarily offline or initializing. Please ensure Docker or the build worker is running.'
+      ? 'The execution engine is currently offline. Please try again later.'
       : 'Error executing test run: ' + err.message;
     return res.status(statusCode).json({ message, isServiceUnavailable: isOffline });
   }
@@ -281,7 +281,7 @@ const submitBuildSolution = async (req, res) => {
     const engineStatus = await isBuildEngineAvailable();
     if (!engineStatus.available) {
       return res.status(503).json({
-        message: 'The BuildMode execution engine is offline. Please start Docker Desktop and run "npm run worker:build" on your machine.',
+        message: 'The execution engine is currently offline. Please try again later.',
         isServiceUnavailable: true,
         engineStatus: 'offline',
       });

@@ -17,7 +17,7 @@ const emailQueue = new Queue('email-notifications', {
 
 emailQueue.on('error', (err) => {
   if (isBullMQAvailable()) {
-    console.error('⚠️ [EmailQueue] Queue connection error:', err.message);
+ console.error(' [EmailQueue] Queue connection error:', err.message);
   }
 });
 
@@ -37,7 +37,7 @@ async function addEmailJob(jobName, jobData, options = {}) {
       );
       return await Promise.race([jobPromise, timeoutPromise]);
     } catch (err) {
-      console.warn(`⚠️ [EmailQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
+ console.warn(` [EmailQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
     }
   }
 
@@ -46,10 +46,10 @@ async function addEmailJob(jobName, jobData, options = {}) {
     try {
       const { processEmailJob } = require('../workers/emailWorker');
       processEmailJob({ name: jobName, data: jobData }).catch((err) => {
-        console.error(`❌ [EmailQueue] In-process fallback error for "${jobName}":`, err.message);
+ console.error(` [EmailQueue] In-process fallback error for "${jobName}":`, err.message);
       });
     } catch (err) {
-      console.error(`❌ [EmailQueue] Failed to run in-process worker:`, err.message);
+ console.error(` [EmailQueue] Failed to run in-process worker:`, err.message);
     }
   });
 

@@ -62,10 +62,10 @@ async function sendMailSafe(options) {
         },
         timeout: 8000,
       });
-      console.log(`📧 [ContestEmail] Dispatched via Brevo API to ${options.to} (MessageId: ${res.data?.messageId})`);
+ console.log(` [ContestEmail] Dispatched via Brevo API to ${options.to} (MessageId: ${res.data?.messageId})`);
       return { success: true, messageId: res.data?.messageId };
     } catch (apiErr) {
-      console.warn(`⚠️ [ContestEmail] Brevo API error (${apiErr.message}). Mocking delivery.`);
+ console.warn(` [ContestEmail] Brevo API error (${apiErr.message}). Mocking delivery.`);
       return { success: true, mocked: true, reason: apiErr.message };
     }
   }
@@ -90,14 +90,14 @@ async function sendMailSafe(options) {
           timeout: 8000,
         }
       );
-      console.log(`📧 [ContestEmail] Dispatched via Resend HTTPS API to ${options.to} (ID: ${res.data?.id})`);
+ console.log(` [ContestEmail] Dispatched via Resend HTTPS API to ${options.to} (ID: ${res.data?.id})`);
       return { success: true, messageId: res.data?.id };
     } catch (apiErr) {
-      console.warn(`⚠️ [ContestEmail] Resend API error (${apiErr.message}). Mocking delivery.`);
+ console.warn(` [ContestEmail] Resend API error (${apiErr.message}). Mocking delivery.`);
       return { success: true, mocked: true, reason: apiErr.message };
     }
   }
-  console.log(`ℹ️ [ContestEmail] RESEND_API_KEY not configured. Mock delivery to ${options.to}: "${options.subject}"`);
+ console.log(`ℹ [ContestEmail] RESEND_API_KEY not configured. Mock delivery to ${options.to}: "${options.subject}"`);
   return { success: true, mocked: true, reason: 'Resend unconfigured' };
 }
 

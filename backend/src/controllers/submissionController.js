@@ -255,7 +255,7 @@ exports.createSubmission = async (req, res) => {
       submission,
     });
   } catch (error) {
-    console.error('🔥 createSubmission controller error:', error.message);
+ console.error(' createSubmission controller error:', error.message);
     const isUnavailable =
       error.isServiceUnavailable ||
       error.code === 'ECONNREFUSED' ||
@@ -672,7 +672,7 @@ exports.getProblemStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('🔥 getProblemStats error:', error.message);
+ console.error(' getProblemStats error:', error.message);
     res.status(500).json({ message: error.message });
   }
 };

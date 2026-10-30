@@ -13,7 +13,7 @@ const buildQueue = new Queue('api-judge', {
 
 buildQueue.on('error', (err) => {
   if (isBullMQAvailable()) {
-    console.error('⚠️ [BullMQ buildQueue] Queue connection error:', err.message);
+ console.error(' [BullMQ buildQueue] Queue connection error:', err.message);
   }
 });
 
@@ -26,11 +26,11 @@ function getQueueEvents() {
       });
       queueEventsInstance.on('error', (err) => {
         if (isBullMQAvailable()) {
-          console.error('⚠️ [BullMQ QueueEvents] Connection error:', err.message);
+ console.error(' [BullMQ QueueEvents] Connection error:', err.message);
         }
       });
     } catch (e) {
-      console.warn('⚠️ [BullMQ QueueEvents] Could not initialize QueueEvents:', e.message);
+ console.warn(' [BullMQ QueueEvents] Could not initialize QueueEvents:', e.message);
     }
   }
   return queueEventsInstance;
@@ -55,7 +55,7 @@ async function addBuildJob(submissionId, options = {}) {
       );
       return await Promise.race([jobPromise, timeoutPromise]);
     } catch (err) {
-      console.warn(`⚠️ [BuildQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
+ console.warn(` [BuildQueue] BullMQ offline (${err.message}). Using in-process execution fallback.`);
     }
   }
 

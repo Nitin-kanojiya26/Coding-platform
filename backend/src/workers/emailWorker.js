@@ -98,7 +98,7 @@ async function processEmailJob(job) {
         notif.sentAt = new Date();
         await notif.save();
       } catch (err) {
-        console.warn(`⚠️ [EmailWorker] Failed reminder to ${user.email}:`, err.message);
+ console.warn(` [EmailWorker] Failed reminder to ${user.email}:`, err.message);
       }
     }
   } else if (name === 'invite-contest') {

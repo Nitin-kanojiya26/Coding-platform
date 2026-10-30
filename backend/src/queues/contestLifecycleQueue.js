@@ -17,7 +17,7 @@ const contestLifecycleQueue = new Queue('contest-lifecycle', {
 
 contestLifecycleQueue.on('error', (err) => {
   if (isBullMQAvailable()) {
-    console.error('⚠️ [BullMQ contestLifecycleQueue] Queue connection error:', err.message);
+ console.error(' [BullMQ contestLifecycleQueue] Queue connection error:', err.message);
   }
 });
 
@@ -74,7 +74,7 @@ async function scheduleContestLifecycleJobs(contest) {
       );
     }
   } catch (err) {
-    console.warn(`⚠️ [ContestLifecycleQueue] Could not schedule jobs for contest ${contest._id}: ${err.message}`);
+ console.warn(` [ContestLifecycleQueue] Could not schedule jobs for contest ${contest._id}: ${err.message}`);
   }
 }
 
@@ -104,7 +104,7 @@ async function cancelContestLifecycleJobs(contestId) {
       })
     );
   } catch (err) {
-    console.warn(`⚠️ [ContestLifecycleQueue] Error removing jobs for contest ${contestId}: ${err.message}`);
+ console.warn(` [ContestLifecycleQueue] Error removing jobs for contest ${contestId}: ${err.message}`);
   }
 }
 

@@ -115,7 +115,7 @@ function spawnWithKill(cmd, args, options = {}) {
  * 3. Mark submissions stuck in Running as Internal Error
  */
 async function performStartupCleanup() {
-  console.log('🧹 [BuildWorker] Running startup cleanup...');
+ console.log(' [BuildWorker] Running startup cleanup...');
 
   try {
     // 1. Remove leftover containers (app-* and harness-*)
@@ -142,7 +142,7 @@ async function performStartupCleanup() {
         await spawnCommand('docker', ['rm', '-f', cName]);
       }
       if (leftoverContainers.length > 0) {
-        console.log(`🧹 [BuildWorker] Cleaned up ${leftoverContainers.length} leftover judge containers.`);
+ console.log(` [BuildWorker] Cleaned up ${leftoverContainers.length} leftover judge containers.`);
       }
     }
 
@@ -164,7 +164,7 @@ async function performStartupCleanup() {
         await spawnCommand('docker', ['network', 'rm', nName]);
       }
       if (leftoverNetworks.length > 0) {
-        console.log(`🧹 [BuildWorker] Cleaned up ${leftoverNetworks.length} leftover judge networks.`);
+ console.log(` [BuildWorker] Cleaned up ${leftoverNetworks.length} leftover judge networks.`);
       }
     }
 
@@ -177,10 +177,10 @@ async function performStartupCleanup() {
       }
     );
     if (updated.modifiedCount > 0) {
-      console.log(`🧹 [BuildWorker] Marked ${updated.modifiedCount} stuck submissions as Internal Error.`);
+ console.log(` [BuildWorker] Marked ${updated.modifiedCount} stuck submissions as Internal Error.`);
     }
   } catch (err) {
-    console.error('⚠️ [BuildWorker] Startup cleanup warning:', err.message);
+ console.error(' [BuildWorker] Startup cleanup warning:', err.message);
   }
 }
 
@@ -525,7 +525,7 @@ async function processBuildSubmissionDirectly(submissionId) {
     try {
       const { updateUserContestStanding } = require('../services/contestLeaderboardService');
       updateUserContestStanding(submission.contestId, submission.userId).catch((err) => {
-        console.warn(`⚠️ Error updating contest standing for build submission ${submissionId}:`, err.message);
+ console.warn(` Error updating contest standing for build submission ${submissionId}:`, err.message);
       });
       const { emitSubmissionUpdate } = require('../sockets/contestSocket');
       emitSubmissionUpdate(submission.contestId, submission.userId, {
@@ -554,7 +554,7 @@ if (!isWorkerDisabled) {
     'api-judge',
     async (job) => {
       if (job.name === 'evaluate-run') {
-        console.log(`⚡ [BuildWorker] Processing remote Run Code request for problem: ${job.data?.problem?.slug || 'unknown'}`);
+ console.log(` [BuildWorker] Processing remote Run Code request for problem: ${job.data?.problem?.slug || 'unknown'}`);
         return await executeDockerFlow(job.data.submission, job.data.problem, { isRun: true });
       }
       return await processBuildSubmissionDirectly(job.data.submissionId);
@@ -637,24 +637,24 @@ if (isStandalone) {
   require('dotenv').config();
   const connectDB = require('../config/db');
 
-  console.log('🚀 [BuildWorker] Starting standalone Build Mode runner...');
+ console.log(' [BuildWorker] Starting standalone Build Mode runner...');
   connectDB().then(async () => {
     const health = await module.exports.checkDockerHealth();
     if (health.ok) {
-      console.log(`🐳 [BuildWorker] Docker daemon connected (v${health.version}).`);
-      console.log('⚡ [BuildWorker] Connected to MongoDB and waiting for jobs on Redis queue [api-judge]...');
+ console.log(` [BuildWorker] Docker daemon connected (v${health.version}).`);
+ console.log(' [BuildWorker] Connected to MongoDB and waiting for jobs on Redis queue [api-judge]...');
       startHeartbeat();
-      console.log('💓 [BuildWorker] Execution engine heartbeat active (cloud can now dispatch jobs).');
+ console.log(' [BuildWorker] Execution engine heartbeat active (cloud can now dispatch jobs).');
     } else {
-      console.warn(`⚠️ [BuildWorker] WARNING: Docker daemon is not running (${health.error}). Submissions will fail until Docker Desktop is started.`);
+ console.warn(` [BuildWorker] WARNING: Docker daemon is not running (${health.error}). Submissions will fail until Docker Desktop is started.`);
     }
   }).catch((err) => {
-    console.error('❌ [BuildWorker] Failed to connect to database:', err.message);
+ console.error(' [BuildWorker] Failed to connect to database:', err.message);
     process.exit(1);
   });
 
   const shutdown = async (sig) => {
-    console.log(`\n🛑 [BuildWorker] Received ${sig}. Shutting down worker...`);
+ console.log(`\n [BuildWorker] Received ${sig}. Shutting down worker...`);
     stopHeartbeat();
     if (buildWorker) {
       try {
@@ -665,7 +665,7 @@ if (isStandalone) {
     try {
       await mongoose.connection.close(false);
     } catch (_) {}
-    console.log('👋 [BuildWorker] Worker stopped cleanly.');
+ console.log(' [BuildWorker] Worker stopped cleanly.');
     process.exit(0);
   };
 

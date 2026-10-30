@@ -165,7 +165,7 @@ exports.requestPasswordResetOTP = async (req, res) => {
         try {
             await sendOTPEmail(email, resetOtpCode, 'CodeArena - Reset Your Password');
         } catch (emailError) {
-            console.error(`⚠️ [EmailService] Could not send reset email to ${email}:`, emailError.message);
+ console.error(` [EmailService] Could not send reset email to ${email}:`, emailError.message);
         }
 
         res.status(200).json({
